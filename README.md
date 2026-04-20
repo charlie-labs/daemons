@@ -1,5 +1,3 @@
-## What this repo is
-
 This repo contains example daemon files for common daemon patterns.
 
 These examples are reference patterns for Charlie daemons. They are not the normative source of truth for the daemon format or for authoring rules.
@@ -17,6 +15,15 @@ Start with the docs:
 Read [Daemons](https://docs.charlielabs.ai/daemons) first if you are new to the concept.
 
 Use [DAEMON.md reference](https://docs.charlielabs.ai/daemons/daemon-md-reference) for the exact authored contract and [Testing and iterating on daemons](https://docs.charlielabs.ai/daemons/testing-and-iterating-on-daemons) for testing and rollout guidance.
+
+## Example index
+
+| Category               | Daemon ID          | Path                                                                                                                         | Description                                                                                              |
+| ---------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| PR mergeability        | `pr-mergeability`  | [daemons/pr-mergeability/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/pr-mergeability/DAEMON.md)   | Keeps non-draft PRs mergeable and CI-green without changing PR intent/scope.                             |
+| PR metadata management | `pr-metadata`      | [daemons/pr-metadata/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/pr-metadata/DAEMON.md)           | Keeps PR title/body metadata complete, current, and linked to the correct issue item.                    |
+| PR review triage       | `pr-review-triage` | [daemons/pr-review-triage/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/pr-review-triage/DAEMON.md) | Triages review feedback for correctness/duplication/conflict and safely resolves fixed feedback threads. |
+
 
 ## How to use this repo
 
@@ -38,14 +45,6 @@ The docs are the source of truth for:
 - [how to test and iterate safely](https://docs.charlielabs.ai/daemons/testing-and-iterating-on-daemons)
 
 Use the docs for concept, contract, and authoring guidance. Use this repo for concrete patterns.
-
-## Example index
-
-| Category               | Daemon ID          | Path                                                                                                                         | Description                                                                                              |
-| ---------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| PR mergeability        | `pr-mergeability`  | [daemons/pr-mergeability/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/pr-mergeability/DAEMON.md)   | Keeps non-draft PRs mergeable and CI-green without changing PR intent/scope.                             |
-| PR metadata management | `pr-metadata`      | [daemons/pr-metadata/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/pr-metadata/DAEMON.md)           | Keeps PR title/body metadata complete, current, and linked to the correct issue item.                    |
-| PR review triage       | `pr-review-triage` | [daemons/pr-review-triage/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/pr-review-triage/DAEMON.md) | Triages review feedback for correctness/duplication/conflict and safely resolves fixed feedback threads. |
 
 ## How Charlie should use these examples
 
