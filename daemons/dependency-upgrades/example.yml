@@ -1,0 +1,29 @@
+id: dependency-upgrades
+title: Grouped Dependency Update Maintainer
+status: ready
+summary: Opens low-noise dependency upgrade PRs with grouped minor and patch updates.
+readiness: adapt-before-use
+showOnWebsite: true
+showInDashboard: true
+fit:
+  jobsToBeDone:
+    - maintain-and-modernize
+    - operate
+  bestFor:
+    - Repositories with regular dependency drift and a lockfile-backed package manager.
+    - Teams that want reviewable upgrade PRs instead of large occasional dependency sweeps.
+  notFor:
+    - Repositories where dependency updates usually require manual migration planning.
+    - Teams that want automatic merge behavior for dependency updates.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other:
+    - A package manager lockfile and repository-local install command.
+    - Verification commands that can prove grouped updates are safe enough to review.
+adaptation:
+  mustCustomize:
+    - Confirm package manager detection works for the repository.
+    - Confirm install, lockfile, and verification commands.
+    - Adjust branch, title, and label conventions to the team.

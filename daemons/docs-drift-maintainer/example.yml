@@ -1,0 +1,29 @@
+id: docs-drift-maintainer
+title: README & Docs Freshness Maintainer
+status: ready
+summary: Finds documentation drift caused by code changes and opens small source-backed docs PRs.
+readiness: adapt-before-use
+showOnWebsite: true
+showInDashboard: true
+fit:
+  jobsToBeDone:
+    - document
+    - maintain-and-modernize
+  bestFor:
+    - Repositories where README, API, setup, or runbook docs drift from implementation.
+    - Teams that want documentation updates tied to source changes and verification evidence.
+  notFor:
+    - Repositories where documentation updates require product, legal, or policy decisions.
+    - Teams without clear ownership of generated versus hand-authored documentation.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other:
+    - Documentation and source path patterns for the repository.
+    - Repository-local formatting, linting, or documentation verification commands.
+adaptation:
+  mustCustomize:
+    - Replace docs and source path patterns with the customer's repository layout.
+    - Confirm verification commands for documentation formatting or linting.
+    - Define which docs are authoritative and which are generated.
