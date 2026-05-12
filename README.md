@@ -12,6 +12,11 @@ Start with the docs:
 - [DAEMON.md reference](https://docs.charlielabs.ai/daemons/daemon-md-reference)
 - [Testing and iterating on daemons](https://docs.charlielabs.ai/daemons/testing-and-iterating-on-daemons)
 
+For this repo's examples package and catalog contract, use:
+
+- [Examples v2 package and catalog spec](docs/examples-spec.md)
+- [Examples authoring guide](docs/examples-authoring-guide.md)
+
 Read [Daemons](https://docs.charlielabs.ai/daemons) first if you are new to the concept.
 
 Use [DAEMON.md reference](https://docs.charlielabs.ai/daemons/daemon-md-reference) for the exact authored contract and [Testing and iterating on daemons](https://docs.charlielabs.ai/daemons/testing-and-iterating-on-daemons) for testing and rollout guidance.
@@ -29,6 +34,8 @@ Use [DAEMON.md reference](https://docs.charlielabs.ai/daemons/daemon-md-referenc
 ## Generated examples catalog
 
 The root `examples.json` file is generated from each `daemons/<id>/example.yml`, `DAEMON.md`, and supported files under `scripts/**` and `references/**`.
+
+Use [Examples v2 package and catalog spec](docs/examples-spec.md) for the exact package, metadata, generation, validation, and public-safety contract. Use [Examples authoring guide](docs/examples-authoring-guide.md) for author/reviewer guidance.
 
 Use the repo-owned checks before changing examples:
 
@@ -71,3 +78,4 @@ When choosing daemons:
 When creating or editing daemon files:
 
 - use [Writing and editing DAEMON.md](https://docs.charlielabs.ai/daemons/writing-and-editing-daemon-md) and [DAEMON.md reference](https://docs.charlielabs.ai/daemons/daemon-md-reference), and treat examples as reference patterns rather than source of truth.
+- use [Examples authoring guide](docs/examples-authoring-guide.md) when adding or reviewing example packages in this repo.
