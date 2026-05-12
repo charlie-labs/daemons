@@ -16,6 +16,11 @@ Read [Daemons](https://docs.charlielabs.ai/daemons) first if you are new to the 
 
 Use [DAEMON.md reference](https://docs.charlielabs.ai/daemons/daemon-md-reference) for the exact authored contract and [Testing and iterating on daemons](https://docs.charlielabs.ai/daemons/testing-and-iterating-on-daemons) for testing and rollout guidance.
 
+For this repo's example package and catalog contract, use:
+
+- [Daemon examples v2 spec](docs/examples-spec.md)
+- [Daemon examples authoring guide](docs/examples-authoring-guide.md)
+
 ## Example index
 
 | Category | Daemon ID | Path | Description |
@@ -28,7 +33,7 @@ Use [DAEMON.md reference](https://docs.charlielabs.ai/daemons/daemon-md-referenc
 
 ## Generated examples catalog
 
-The root `examples.json` file is generated from each `daemons/<id>/example.yml`, `DAEMON.md`, and supported files under `scripts/**` and `references/**`.
+The root `examples.json` file is generated from each `daemons/<id>/example.yml`, `DAEMON.md`, and supported files under `scripts/**` and `references/**`. The canonical repo-local contract is [Daemon examples v2 spec](docs/examples-spec.md); authoring and review guidance lives in [Daemon examples authoring guide](docs/examples-authoring-guide.md).
 
 Use the repo-owned checks before changing examples:
 
@@ -60,7 +65,7 @@ The docs are the source of truth for:
 - [what good daemon files look like](https://docs.charlielabs.ai/daemons/writing-and-editing-daemon-md)
 - [how to test and iterate safely](https://docs.charlielabs.ai/daemons/testing-and-iterating-on-daemons)
 
-Use the docs for concept, contract, and authoring guidance. Use this repo for concrete patterns.
+Use the public daemon docs for general concept, runtime contract, and rollout guidance. Use this repo for the examples v2 package/catalog contract, authoring guide, and concrete patterns.
 
 ## How Charlie should use these examples
 
