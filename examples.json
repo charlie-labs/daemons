@@ -6,6 +6,217 @@
   },
   "examples": [
     {
+      "id": "dependency-upgrades",
+      "title": "Grouped Dependency Update Maintainer",
+      "status": "ready",
+      "summary": "Opens low-noise dependency upgrade PRs with grouped minor and patch updates.",
+      "readiness": "adapt-before-use",
+      "showOnWebsite": true,
+      "showInDashboard": true,
+      "fit": {
+        "jobsToBeDone": [
+          "maintain-and-modernize",
+          "operate"
+        ],
+        "bestFor": [
+          "Repositories with regular dependency drift and a lockfile-backed package manager.",
+          "Teams that want reviewable upgrade PRs instead of large occasional dependency sweeps."
+        ],
+        "notFor": [
+          "Repositories where dependency updates usually require manual migration planning.",
+          "Teams that want automatic merge behavior for dependency updates."
+        ]
+      },
+      "requirements": {
+        "requiredIntegrations": [
+          "github"
+        ],
+        "optionalIntegrations": [],
+        "other": [
+          "A package manager lockfile and repository-local install command.",
+          "Verification commands that can prove grouped updates are safe enough to review."
+        ]
+      },
+      "adaptation": {
+        "mustCustomize": [
+          "Confirm package manager detection works for the repository.",
+          "Confirm install, lockfile, and verification commands.",
+          "Adjust branch, title, and label conventions to the team."
+        ]
+      },
+      "daemon": {
+        "path": "DAEMON.md",
+        "content": "---\nid: dependency-upgrades\npurpose: Keep repository dependencies current with low-noise grouped upgrade pull requests.\nroutines:\n  - Detect the repository package manager, dependency manifests, lockfile, and verification commands.\n  - Identify safe patch and minor dependency upgrades, grouped by runtime and development dependency type.\n  - Create or update focused dependency upgrade pull requests with verification evidence and clear rollback notes.\ndeny:\n  - Do not auto-merge dependency pull requests.\n  - Do not perform major-version upgrades unless the repository policy explicitly allows them.\n  - Do not change dependency range style, package manager, registry configuration, or workspace layout.\n  - Do not make broad refactors or unrelated code changes while fixing upgrade fallout.\n  - Do not proceed when package manager, lockfile, or verification commands are ambiguous.\nschedule: '0 8 * * 1'\n---\n\n# Grouped Dependency Update Maintainer\n\n## Package manager detection\n\nDetect the package manager from the repository, preferring lockfiles and repository scripts over assumptions.\n\nWhen available, run:\n\n```bash\n.agents/daemons/dependency-upgrades/scripts/detect-package-manager.sh\n```\n\nThe script takes no arguments and prints exactly one package manager name to stdout: `pnpm`, `yarn`, `npm`, or `bun`. It exits non-zero for unknown or ambiguous lockfile state. Treat a non-zero exit as a stop condition, not as permission to guess.\n\nIf the package manager cannot be determined confidently, stop and ask for the correct package manager and verification commands.\n\n## Update policy\n\nDefault scope:\n\n- patch and minor updates only\n- runtime dependencies and development dependencies in separate pull requests\n- no package manager migration\n- no registry or workspace layout changes\n\nMajor upgrades are out of scope unless the repository has an explicit policy for major upgrade pull requests.\n\n## PR policy\n\nCreate or update at most two pull requests per run:\n\n1. runtime dependency patch/minor updates\n2. development dependency patch/minor updates\n\nUse stable branches:\n\n- `daemon/deps-runtime-minor-patch`\n- `daemon/deps-dev-minor-patch`\n\nUse clear titles:\n\n- `deps: update runtime dependencies`\n- `deps(dev): update development dependencies`\n\nEach PR body must include:\n\n- package manager detected\n- packages updated\n- dependency type bucket\n- install command run\n- verification commands run\n- failures, skipped packages, and follow-ups\n\n## Verification and freshness\n\nBefore modifying files, re-read the current default branch and existing daemon upgrade branches or pull requests to avoid duplicate work.\n\nAfter applying updates:\n\n1. run the repository install command\n2. run the repository verification commands\n3. inspect the diff to confirm it only contains dependency update changes and minimal lockfile changes\n\nIf verification fails and the fix is not a small dependency-related adjustment, leave the pull request as draft or stop with a concise handoff note. Do not broaden into feature or refactor work.\n\n## Limits\n\n- Max open pull requests created or updated per run: 2\n- Max packages per grouped pull request: 20\n- Max retry attempts after failed verification: 1\n- No changes outside dependency manifests, lockfiles, and minimal generated dependency metadata unless the pull request is explicitly marked draft with rationale\n\n## No-op when\n\n- no patch or minor upgrades are available\n- package manager detection is ambiguous\n- verification cannot be run safely\n- an existing human-owned dependency upgrade is already active for the same dependency bucket\n"
+      },
+      "scripts": [
+        "scripts/detect-package-manager.sh"
+      ],
+      "references": [
+        "references/package-manager-adaptation.md"
+      ],
+      "source": {
+        "directory": "daemons/dependency-upgrades",
+        "url": "https://github.com/charlie-labs/daemons/tree/master/daemons/dependency-upgrades"
+      }
+    },
+    {
+      "id": "docs-drift-maintainer",
+      "title": "README & Docs Freshness Maintainer",
+      "status": "ready",
+      "summary": "Finds documentation drift caused by code changes and opens small source-backed docs PRs.",
+      "readiness": "adapt-before-use",
+      "showOnWebsite": true,
+      "showInDashboard": true,
+      "fit": {
+        "jobsToBeDone": [
+          "document",
+          "maintain-and-modernize"
+        ],
+        "bestFor": [
+          "Repositories where README, API, setup, or runbook docs drift from implementation.",
+          "Teams that want documentation updates tied to source changes and verification evidence."
+        ],
+        "notFor": [
+          "Repositories where documentation updates require product, legal, or policy decisions.",
+          "Teams without clear ownership of generated versus hand-authored documentation."
+        ]
+      },
+      "requirements": {
+        "requiredIntegrations": [
+          "github"
+        ],
+        "optionalIntegrations": [],
+        "other": [
+          "Documentation and source path patterns for the repository.",
+          "Repository-local formatting, linting, or documentation verification commands."
+        ]
+      },
+      "adaptation": {
+        "mustCustomize": [
+          "Replace docs and source path patterns with the customer's repository layout.",
+          "Confirm verification commands for documentation formatting or linting.",
+          "Define which docs are authoritative and which are generated."
+        ]
+      },
+      "daemon": {
+        "path": "DAEMON.md",
+        "content": "---\nid: docs-drift-maintainer\npurpose: Keep repository documentation current with small, source-backed documentation pull requests.\nwatch:\n  - A GitHub pull request is merged or synchronized with changes to source files that may affect public documentation, setup instructions, API docs, or runbooks.\nroutines:\n  - Detect documentation impacted by recent source, configuration, or workflow changes.\n  - Create or update one focused documentation pull request with source links and verification results.\n  - Report ambiguous documentation conflicts instead of rewriting broad docs speculatively.\ndeny:\n  - Do not modify runtime code, tests, migrations, build outputs, generated files, or repository configuration.\n  - Do not rewrite broad documentation areas when a targeted edit is sufficient.\n  - Do not invent product behavior, API contracts, ownership, or setup steps.\n  - Do not delete documentation unless a human explicitly requested removal.\n  - Do not edit legal, security, compliance, or policy documents without explicit human approval.\nschedule: '0 10 * * 1'\n---\n\n# README & Docs Freshness Maintainer\n\n## Source of truth\n\nUse implementation, tests, configuration, and recently merged pull requests as source evidence. Do not treat stale docs as proof that behavior still works.\n\nUse `references/docs-impact-rubric.md` to decide whether a source change needs a documentation update.\n\n## Target selection\n\nPrefer one focused docs target per activation.\n\nHigh-priority targets:\n\n1. setup or onboarding docs broken by repository changes\n2. API docs stale relative to exported behavior\n3. runbooks stale relative to operational commands or alerts\n4. README sections missing important entrypoint or verification context\n\n## PR policy\n\nCreate at most one documentation PR per run.\n\nThe PR must contain only documentation changes unless the repository has an explicit generated-docs workflow and the generated output is required.\n\nThe PR body must include:\n\n- source change or evidence link\n- docs file changed\n- why the doc was stale or missing\n- verification command run\n- any unresolved human decision\n\n## Verification\n\nRun the repository's documentation formatting or lint command when available.\n\nIf no docs verification command exists, run a basic markdown formatting or checking command when available and call out the missing docs verification in the PR.\n\n## Coordination\n\nBefore opening a new PR, inspect existing open documentation PRs. Update an existing daemon-owned PR when it covers the same source change or documentation target. Do not open duplicate docs PRs for the same stale claim.\n\n## No-op when\n\n- no clear docs impact exists\n- the correct docs target cannot be identified\n- updating docs would require guessing behavior\n- another active PR already updates the same docs for the same source change\n"
+      },
+      "scripts": [],
+      "references": [
+        "references/docs-impact-rubric.md"
+      ],
+      "source": {
+        "directory": "daemons/docs-drift-maintainer",
+        "url": "https://github.com/charlie-labs/daemons/tree/master/daemons/docs-drift-maintainer"
+      }
+    },
+    {
+      "id": "github-activity-digest",
+      "title": "GitHub Activity Digest",
+      "status": "ready",
+      "summary": "Posts a low-noise scheduled digest of meaningful pull request and CI activity.",
+      "readiness": "adapt-before-use",
+      "showOnWebsite": true,
+      "showInDashboard": true,
+      "fit": {
+        "jobsToBeDone": [
+          "operate",
+          "explain"
+        ],
+        "bestFor": [
+          "Teams that want lightweight visibility without manual GitHub status gathering.",
+          "Repositories or organizations with enough pull request and CI activity to summarize daily."
+        ],
+        "notFor": [
+          "Teams that need incident, release, or people-management reporting beyond GitHub activity.",
+          "Repositories where activity volume is too low to justify a scheduled digest."
+        ]
+      },
+      "requirements": {
+        "requiredIntegrations": [
+          "github",
+          "slack"
+        ],
+        "optionalIntegrations": [],
+        "other": [
+          "A configured destination channel or thread for the digest.",
+          "Agreed signal thresholds and privacy rules for what belongs in the digest."
+        ]
+      },
+      "adaptation": {
+        "mustCustomize": [
+          "Configure repository or organization scope.",
+          "Configure the destination channel and duplicate-post detection strategy.",
+          "Tune signal thresholds, quiet-day behavior, and privacy rules."
+        ]
+      },
+      "daemon": {
+        "path": "DAEMON.md",
+        "content": "---\nid: github-activity-digest\npurpose: Publish one low-noise daily digest of meaningful GitHub pull request and CI activity.\nroutines:\n  - Collect meaningful GitHub pull request and CI activity since the previous scheduled run.\n  - Select only high-signal items that changed what the team needs to know or do.\n  - Post one concise digest to the configured team destination when the signal threshold is met.\ndeny:\n  - Do not modify GitHub state.\n  - Do not post more than one digest for the same UTC date.\n  - Do not post raw event dumps, long watch lists, speculative metrics, or inferred performance scores.\n  - Do not name people in problem-oriented bullets unless the team policy explicitly allows it.\n  - Do not post on low-signal days unless the team explicitly wants quiet-day confirmations.\nschedule: '0 15 * * 1-5'\n---\n\n# GitHub Activity Digest\n\n## Scope\n\nCollect activity from the configured GitHub organization or repository set.\n\nDefault window:\n\n- previous scheduled run to current scheduled run\n- Monday includes weekend activity since the prior Friday run\n\n## Signal threshold\n\nInclude activity only when it changes what the team needs to know or do.\n\nExamples:\n\n- pull request merged\n- pull request opened and ready for review\n- pull request unblocked\n- recurring CI failure affecting active work\n- important deploy or release activity\n\nExclude:\n\n- label-only churn\n- assignment-only changes\n- bot housekeeping\n- comment-only chatter without action\n- duplicate references to the same underlying change\n\n## Low-noise behavior\n\nIf fewer than two meaningful items exist, do not post unless the single item is a critical blocker or unblocker.\n\nIf no item meets the signal threshold, no-op silently.\n\n## Output format\n\nUse `references/digest-template.md`.\n\nLimits:\n\n- 8 total bullets maximum\n- 1 link maximum per bullet\n- no tables\n- no nested bullet lists\n- no unverified counts\n\n## Idempotency\n\nUse a daily key:\n\n```text\ngithub-activity-digest:<YYYY-MM-DD>\n```\n\nBefore posting, check whether a digest with the same key already exists. If yes, exit with no action unless correcting a factual error in the existing digest is safe and supported.\n\n## Escalation\n\nSkip posting and ask for human attention when:\n\n- GitHub data is incomplete or contradictory\n- destination configuration is missing\n- duplicate-post detection cannot be performed\n- privacy policy for the selected content is unclear\n"
+      },
+      "scripts": [],
+      "references": [
+        "references/digest-template.md"
+      ],
+      "source": {
+        "directory": "daemons/github-activity-digest",
+        "url": "https://github.com/charlie-labs/daemons/tree/master/daemons/github-activity-digest"
+      }
+    },
+    {
+      "id": "linear-issue-labeler",
+      "title": "Issue Label Hygiene Helper",
+      "status": "ready",
+      "summary": "Keeps recently changed Linear issues aligned with a documented label taxonomy.",
+      "readiness": "adapt-before-use",
+      "showOnWebsite": true,
+      "showInDashboard": true,
+      "fit": {
+        "jobsToBeDone": [
+          "organize",
+          "operate"
+        ],
+        "bestFor": [
+          "Teams using Linear labels for routing, reporting, or automation.",
+          "Workspaces where issue labels drift, conflict, or are often missing."
+        ],
+        "notFor": [
+          "Teams without a maintained label taxonomy.",
+          "Workflows where labels are intentionally ad hoc or owner-specific."
+        ]
+      },
+      "requirements": {
+        "requiredIntegrations": [
+          "linear"
+        ],
+        "optionalIntegrations": [],
+        "other": [
+          "A documented label taxonomy with required families, deprecated labels, and conflict rules.",
+          "A configured issue scope such as team, project, or recently changed window."
+        ]
+      },
+      "adaptation": {
+        "mustCustomize": [
+          "Replace the label taxonomy template with the team's actual labels.",
+          "Confirm which labels the daemon may add automatically.",
+          "Confirm whether labels may be removed or only proposed for repair."
+        ]
+      },
+      "daemon": {
+        "path": "DAEMON.md",
+        "content": "---\nid: linear-issue-labeler\npurpose: Keep recently changed Linear issues labeled according to the team's current taxonomy.\nroutines:\n  - Survey recently created or updated Linear issues inside the configured workspace scope.\n  - Determine missing required labels from the current label taxonomy and issue context.\n  - Add unambiguous missing labels or post one compact repair proposal when labels conflict.\ndeny:\n  - Do not apply deprecated labels.\n  - Do not remove or replace existing labels unless the taxonomy explicitly allows that exact repair.\n  - Do not change issue status, priority, assignee, project, cycle, estimate, due date, or body.\n  - Do not guess between two plausible labels in the same required label family.\n  - Do not repeat the same repair proposal for an unchanged conflict.\nschedule: '0 */4 * * *'\n---\n\n# Issue Label Hygiene Helper\n\n## Label taxonomy\n\nRead `references/label-taxonomy.md` before deciding labels.\n\nIf the taxonomy is missing, stale, contradictory, or does not mention a required label family, no-op and ask for taxonomy clarification.\n\n## Scope\n\nDefault scope:\n\n- issues created or updated in the last 4 hours\n- open issues only\n- issue teams or projects configured for this repository or workspace\n\nDo not scan the entire workspace unless the daemon file is intentionally updated to do so.\n\n## Decision policy\n\nAdd a missing label when:\n\n- the label family is required by the taxonomy\n- exactly one label in that family is supported by issue evidence\n- the label is current, not deprecated\n- applying it does not conflict with existing labels\n\nPost a repair proposal instead of mutating when:\n\n- multiple labels in one family could apply\n- an issue has deprecated labels\n- existing labels conflict with the taxonomy\n- the issue body or title does not provide enough context\n\n## Repair proposal format\n\nUse one concise issue comment:\n\n```md\nLabel repair needed\n\nRecommended labels: <labels>\nReason: <short rationale>\nBlocked because: <specific uncertainty or conflict>\n```\n\n## Limits\n\n- Max issues inspected per run: 100 recently changed issues\n- Max issues mutated per run: 30\n- Max repair proposal comments per run: 10\n- Max labels added per issue per run: 5\n\n## Idempotency\n\nNever add duplicate labels. Re-running with unchanged issue data must produce no additional writes.\n\nUse a conflict signature based on issue ID, current label set, title/body hash, and taxonomy version. Do not repeat the same repair proposal while that signature is unchanged.\n\n## No-op when\n\n- the label taxonomy cannot be read\n- the taxonomy does not define required label families\n- Linear issue data is incomplete\n- no recently changed in-scope issues need labels\n- the correct label cannot be selected with high confidence\n"
+      },
+      "scripts": [],
+      "references": [
+        "references/label-taxonomy.md"
+      ],
+      "source": {
+        "directory": "daemons/linear-issue-labeler",
+        "url": "https://github.com/charlie-labs/daemons/tree/master/daemons/linear-issue-labeler"
+      }
+    },
+    {
       "id": "pr-mergeability",
       "title": "PR mergeability",
       "status": "ready",
@@ -56,7 +267,7 @@
     },
     {
       "id": "pr-metadata",
-      "title": "PR metadata manager",
+      "title": "PR Metadata Manager",
       "status": "ready",
       "summary": "Keeps pull request titles and bodies complete, current, and linked to the right issue item.",
       "readiness": "adapt-before-use",
@@ -84,18 +295,20 @@
           "linear"
         ],
         "other": [
-          "A documented PR metadata contract for title suffixes, body sections, and issue references."
+          "A documented PR metadata contract for title suffixes, body sections, and issue references.",
+          "A clear issue identifier pattern and source of truth for linked issue relationships."
         ]
       },
       "adaptation": {
         "mustCustomize": [
           "Replace the placeholder issue identifier pattern with the team's real format.",
-          "Confirm the exact required PR body sections and explicit issue-reference line."
+          "Confirm the exact required PR body sections and explicit issue-reference line.",
+          "Confirm how linked issue IDs should be inferred for the team's workflow."
         ]
       },
       "daemon": {
         "path": "DAEMON.md",
-        "content": "---\nid: pr-metadata\npurpose: Keep pull request title and body metadata complete, current, and linked to the correct issue-tracker item.\nwatch:\n  - Wake on pull request opened, edited, reopened, and synchronize events.\n  - Wake on pull request review comments or mentions requesting title or body metadata updates.\nroutines:\n  - Verify the pull request title ends with the linked issue identifier and patch only the suffix when it is missing or stale.\n  - Ensure the pull request body includes current sections for primary changes, reviewer walkthrough, correctness and invariants, and testing and QA.\n  - Ensure the pull request body ends with an explicit issue reference like Resolves <ISSUE-1234>.\ndeny:\n  - Do not approve, merge, close, or reopen pull requests.\n  - Do not edit source code, tests, CI config, labels, reviewers, assignees, milestones, or other non metadata fields.\n  - Do not rewrite the whole pull request body when targeted section patches are sufficient.\n---\n\n# PR Metadata Manager\n\n## Scope\n\nThis daemon manages pull request metadata only:\n\n- title suffix correctness,\n- required body sections,\n- and final explicit issue reference.\n\nIt should make the smallest safe update that satisfies the metadata contract.\n\n## Metadata contract\n\n### 1) Title format\n\n- The title must end with the linked issue ID token matching `<issue-id-pattern>` (for example `ENG-9048`).\n- If the issue ID exists but is stale or wrong, replace only the trailing issue token.\n- Preserve the existing title wording whenever possible.\n\n### 2) Required body sections\n\nEnsure the PR body contains all of the following sections with useful content:\n\n1. `## Primary changes`\n2. `## Reviewer walkthrough`\n3. `## Correctness and invariants`\n4. `## Testing and QA`\n\nIf a section already exists and is still accurate, keep it unchanged.\nIf a section is missing or stale, patch only that section.\n\n### 3) Required final issue reference\n\n- The PR body must end with an explicit issue reference line using one of these forms:\n  - `Resolves <issue-id>` for issues fully resolved by this PR.\n  - `Refs <issue-id>` only for related issues not fully resolved by this PR.\n- If a valid explicit issue reference exists but the issue ID or keyword (`Resolves` vs `Refs`) is wrong for the current PR context, patch just that line.\n\n## Execution routine\n\n1. Inspect current PR title and PR body.\n2. Infer the target issue ID from current PR context.\n3. Identify missing or stale metadata fields.\n4. Prepare minimal targeted edits before writing.\n5. Apply title and body updates only when needed.\n6. Report exactly what changed and why.\n\n## Patch strategy\n\n- Prefer incremental edits over full rewrites.\n- Preserve accurate sections and surrounding formatting.\n- Keep existing non required sections unless they conflict with required metadata.\n- If issue ID cannot be determined with high confidence, do not guess. Report blocked status and request clarification.\n"
+        "content": "---\nid: pr-metadata\npurpose: Keep open non-draft pull request title and body metadata accurate, reviewable, and linked to the right issue-tracker items.\nwatch:\n  - A GitHub pull request event opens, edits, reopens, or synchronizes an open non-draft pull request.\n  - A direct mention or review comment asks for pull request title or body metadata repair.\nroutines:\n  - Determine confidently relevant issue IDs from linked metadata, branch name, title, and body.\n  - Repair the pull request title issue suffix when the primary issue is clear.\n  - Repair or refresh required pull request body sections when current pull request context makes accurate content clear.\n  - Ensure the pull request body ends with explicit issue reference lines for confidently relevant issues.\n  - Apply minimal title or body edits only when needed.\ndeny:\n  - Do not act on draft, closed, or merged pull requests.\n  - Do not act outside the triggering repository and pull request.\n  - Do not edit source code, tests, CI config, labels, reviewers, assignees, milestones, review state, comments, issues, Linear records, pull request state, or other non-metadata fields.\n  - Do not rewrite the full pull request body when targeted section edits are sufficient.\n  - Do not guess issue IDs, title suffixes, or body content when evidence is ambiguous.\n  - Do not change an existing valid Refs or Resolves keyword unless the issue reference line is malformed or missing.\n  - Do not post comments for successful edits, blocked cases, or routine no-ops.\n---\n\n# PR Metadata Manager\n\n## Scope\n\nThis daemon manages pull request metadata only:\n\n- title issue suffix correctness\n- required body sections\n- final explicit issue reference lines\n\nIt should make the smallest safe update that satisfies the repository metadata contract and otherwise stay silent.\n\n## Issue inference\n\nUse the strongest available source first:\n\n1. linked GitHub or issue-tracker metadata\n2. branch name\n3. existing pull request title\n4. existing pull request body\n\nInfer a set of confidently relevant issue IDs. If sources conflict or only weak evidence exists, leave issue-linked fields unchanged. If no safe metadata edit remains, no-op silently.\n\nChoose one primary issue ID for the title suffix. Prefer the primary linked or closing issue when that is clear. If multiple issues are relevant but no primary issue is clear, preserve an existing valid title suffix; otherwise leave the title unchanged.\n\n## Title policy\n\nThe pull request title should end with exactly one issue ID token matching `<issue-id-pattern>`, such as `ENG-9048`.\n\nWhen the primary issue is clear, patch only the trailing issue suffix:\n\n- Add the suffix when missing.\n- Replace a stale trailing issue token.\n- Preserve existing title wording and punctuation whenever possible.\n\nOn edit events, restore the required suffix when a human edit removes or stales it and the primary issue is still clear.\n\n## Body policy\n\nThe pull request body should contain these headings, normalized exactly:\n\n1. `## Primary changes`\n2. `## Reviewer walkthrough`\n3. `## Correctness and invariants`\n4. `## Testing and QA`\n\nNormalize equivalent headings to the required headings. Preserve accurate human wording inside sections. Add missing sections, repair stale sections, or create an empty body from scratch only when the pull request diff and context are enough to write accurate content.\n\nOn synchronize events, refresh existing sections only when they are clearly stale relative to the updated pull request diff. Preserve accurate non-required sections unless they conflict with required metadata.\n\n## Issue references\n\nThe pull request body should end with one explicit issue reference per line for every confidently relevant issue ID.\n\nUse:\n\n- `Resolves ENG-9048` when the issue appears to be resolved by the pull request.\n- `Refs ENG-9048` when the issue is related but not clearly resolved by the pull request.\n\nPreserve existing valid `Refs` or `Resolves` keywords. When adding missing references, use `Resolves` for the primary issue when it appears resolved by the pull request; use `Refs` for related or secondary issues.\n\nPreserve existing reference order and append missing issue IDs after existing references. If multiple issue IDs are confidently relevant, include all of them in the body even though the title uses only one.\n\n## Patch policy\n\nMake the smallest safe title or body edit that satisfies the metadata contract. Prefer targeted section edits over whole-body rewrites.\n\nStay silent for routine no-ops: already-correct metadata, draft/closed/merged pull requests, ambiguous issue inference, insufficient body context, unsupported event types, blocked edits, or successful metadata-only edits.\n"
       },
       "scripts": [],
       "references": [],

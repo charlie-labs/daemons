@@ -1,0 +1,30 @@
+id: github-activity-digest
+title: GitHub Activity Digest
+status: ready
+summary: Posts a low-noise scheduled digest of meaningful pull request and CI activity.
+readiness: adapt-before-use
+showOnWebsite: true
+showInDashboard: true
+fit:
+  jobsToBeDone:
+    - operate
+    - explain
+  bestFor:
+    - Teams that want lightweight visibility without manual GitHub status gathering.
+    - Repositories or organizations with enough pull request and CI activity to summarize daily.
+  notFor:
+    - Teams that need incident, release, or people-management reporting beyond GitHub activity.
+    - Repositories where activity volume is too low to justify a scheduled digest.
+requirements:
+  requiredIntegrations:
+    - github
+    - slack
+  optionalIntegrations: []
+  other:
+    - A configured destination channel or thread for the digest.
+    - Agreed signal thresholds and privacy rules for what belongs in the digest.
+adaptation:
+  mustCustomize:
+    - Configure repository or organization scope.
+    - Configure the destination channel and duplicate-post detection strategy.
+    - Tune signal thresholds, quiet-day behavior, and privacy rules.
