@@ -24,10 +24,7 @@ Use [DAEMON.md reference](https://docs.charlielabs.ai/daemons/daemon-md-referenc
 | Documentation freshness | `docs-drift-maintainer` | [daemons/docs-drift-maintainer/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/docs-drift-maintainer/DAEMON.md) | Finds documentation drift caused by code changes and opens small source-backed docs PRs. |
 | GitHub activity reporting | `github-activity-digest` | [daemons/github-activity-digest/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/github-activity-digest/DAEMON.md) | Posts a low-noise scheduled digest of meaningful pull request and CI activity. |
 | Linear issue hygiene | `linear-issue-labeler` | [daemons/linear-issue-labeler/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/linear-issue-labeler/DAEMON.md) | Keeps recently changed Linear issues aligned with a documented label taxonomy. |
-| PR mergeability | `pr-mergeability` | [daemons/pr-mergeability/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/pr-mergeability/DAEMON.md) | Keeps non-draft PRs mergeable and CI-green without changing PR intent/scope. |
 | PR metadata management | `pr-metadata` | [daemons/pr-metadata/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/pr-metadata/DAEMON.md) | Keeps PR title/body metadata complete, current, and linked to the correct issue item. |
-| PR review triage | `pr-review-triage` | [daemons/pr-review-triage/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/pr-review-triage/DAEMON.md) | Triages review feedback for correctness/duplication/conflict and safely resolves fixed feedback threads. |
-
 
 ## Generated examples catalog
 

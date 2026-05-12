@@ -1,9 +1,9 @@
 id: pr-review-triage
 title: PR review triage
-status: draft
+status: deprecated
 summary: Triages PR review feedback for correctness, duplication, conflicts, and safe post-fix resolution.
 readiness: adapt-before-use
-showOnWebsite: true
+showOnWebsite: false
 showInDashboard: false
 fit:
   jobsToBeDone:
