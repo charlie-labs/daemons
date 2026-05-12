@@ -1,10 +1,10 @@
 id: pr-mergeability
 title: PR mergeability
-status: ready
+status: deprecated
 summary: Keeps non-draft pull requests mergeable and CI-green without changing PR intent or scope.
 readiness: adapt-before-use
-showOnWebsite: true
-showInDashboard: true
+showOnWebsite: false
+showInDashboard: false
 fit:
   jobsToBeDone:
     - maintain-and-modernize
