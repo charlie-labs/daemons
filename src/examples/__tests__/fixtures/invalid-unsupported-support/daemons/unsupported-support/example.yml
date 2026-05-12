@@ -1,0 +1,21 @@
+id: unsupported-support
+title: unsupported support fixture
+status: ready
+summary: Demonstrates the unsupported-support package shape for catalog validation.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: false
+fit:
+  jobsToBeDone:
+    - daemon-operations
+  bestFor:
+    - Teams validating the examples catalog generator.
+  notFor:
+    - Production daemon deployments without local review.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other: []
+adaptation:
+  mustCustomize: []

@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.22
+      - run: bun install --frozen-lockfile --registry https://registry.npmjs.org/
+      - run: bun run typecheck
+      - run: bun run test
+      - run: bun run generate:examples
+      - run: bun run validate:examples
+      - run: git diff --exit-code examples.json

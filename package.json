@@ -1,0 +1,20 @@
+{
+  "name": "@charlie-labs/daemon-examples",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "generate:examples": "bun scripts/generate-examples.ts",
+    "validate:examples": "bun scripts/validate-examples.ts"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.22",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.14"
+  }
+}

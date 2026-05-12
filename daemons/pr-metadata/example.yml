@@ -1,0 +1,28 @@
+id: pr-metadata
+title: PR metadata manager
+status: ready
+summary: Keeps pull request titles and bodies complete, current, and linked to the right issue item.
+readiness: adapt-before-use
+showOnWebsite: true
+showInDashboard: true
+fit:
+  jobsToBeDone:
+    - organize
+    - document
+  bestFor:
+    - Repositories with a consistent pull request body contract that reviewers rely on.
+    - Teams that use issue identifiers in PR titles or bodies for traceability.
+  notFor:
+    - Repositories where PR descriptions are intentionally free-form.
+    - Teams without a stable issue-reference format or review metadata standard.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations:
+    - linear
+  other:
+    - A documented PR metadata contract for title suffixes, body sections, and issue references.
+adaptation:
+  mustCustomize:
+    - Replace the placeholder issue identifier pattern with the team's real format.
+    - Confirm the exact required PR body sections and explicit issue-reference line.
