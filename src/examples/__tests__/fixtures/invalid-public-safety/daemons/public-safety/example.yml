@@ -1,0 +1,21 @@
+id: public-safety
+title: public safety fixture
+status: ready
+summary: See https://example.slack.com/archives/C123/p123 for private context.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: false
+fit:
+  jobsToBeDone:
+    - daemon-operations
+  bestFor:
+    - Teams validating the examples catalog generator.
+  notFor:
+    - Production daemon deployments without local review.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other: []
+adaptation:
+  mustCustomize: []

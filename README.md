@@ -25,6 +25,22 @@ Use [DAEMON.md reference](https://docs.charlielabs.ai/daemons/daemon-md-referenc
 | PR review triage       | `pr-review-triage` | [daemons/pr-review-triage/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/pr-review-triage/DAEMON.md) | Triages review feedback for correctness/duplication/conflict and safely resolves fixed feedback threads. |
 
 
+
+## Generated examples catalog
+
+The root `examples.json` file is generated from each `daemons/<id>/example.yml`, `DAEMON.md`, and supported files under `scripts/**` and `references/**`.
+
+Use the repo-owned checks before changing examples:
+
+```bash
+bun install
+bun run generate:examples
+bun run validate:examples
+bun run test
+```
+
+`examples.json` is deterministic and should be committed whenever example packages change.
+
 ## How to use this repo
 
 Use this repo to:

@@ -1,0 +1,21 @@
+id: invalid-daemon
+title: invalid daemon fixture
+status: ready
+summary: Demonstrates the invalid-daemon package shape for catalog validation.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: false
+fit:
+  jobsToBeDone:
+    - daemon-operations
+  bestFor:
+    - Teams validating the examples catalog generator.
+  notFor:
+    - Production daemon deployments without local review.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other: []
+adaptation:
+  mustCustomize: []

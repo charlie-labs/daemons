@@ -1,0 +1,27 @@
+id: pr-review-triage
+title: PR review triage
+status: draft
+summary: Triages PR review feedback for correctness, duplication, conflicts, and safe post-fix resolution.
+readiness: adapt-before-use
+showOnWebsite: true
+showInDashboard: false
+fit:
+  jobsToBeDone:
+    - review-with-confidence
+  bestFor:
+    - Repositories with frequent, actionable GitHub PR review threads.
+    - Teams that want duplicate or conflicting review feedback identified without changing code.
+  notFor:
+    - Teams that want Charlie to approve, request changes, or rewrite code from review comments.
+    - Repositories where review feedback is tracked outside GitHub pull request threads.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other:
+    - GitHub pull request review threads are the source of truth for feedback state.
+    - A repo-local policy for when duplicate or addressed feedback may be hidden or resolved.
+adaptation:
+  mustCustomize:
+    - Confirm the team's confidence threshold for resolving or hiding duplicate feedback.
+    - Confirm the local convention for identifying Charlie-authored triage comments.
