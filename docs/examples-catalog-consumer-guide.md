@@ -185,37 +185,6 @@ That script is executable in the source repository, but v1 does not represent th
 
 Consumers should treat any support-file fetch failure as a blocking install failure. A partial daemon copy can be misleading if `DAEMON.md` references scripts or reference material that were not installed.
 
-## Website migration notes
-
-The current website/docs implementation has historically used hardcoded slugs, pinned pre-v2 ref `42a82b1527bac3e9f730ac216675d29d75ac8d5c`, and raw `DAEMON.md` fetch/parsing.
-
-A catalog-based website should:
-
-- fetch `examples.json` from the website deployment's selected ref;
-- filter with `entry.showOnWebsite === true && entry.status !== "deprecated"`;
-- use catalog metadata for cards, listing copy, fit, requirements, and adaptation summaries;
-- render the daemon file from `entry.daemon.content` instead of fetching and parsing raw `DAEMON.md` separately;
-- keep `source.url` only as a human link to the source package;
-- keep public daemon docs as the source of truth for daemon semantics and rollout guidance.
-
-The website can still pin a deployment ref for stability. If it does, record that ref in deployment configuration or logs because catalog v1 does not include `sourceCommit`.
-
-## Dashboard migration notes
-
-The current dashboard install flow has historically used three hardcoded onboarding daemons, pinned pre-v2 ref `42a82b1527bac3e9f730ac216675d29d75ac8d5c`, recursive source-directory fetching mapped into `.agents/daemons/<id>/...`, a five-minute source-directory cache, and draft PR installation with collision and preflight checks.
-
-A catalog-based dashboard should:
-
-- fetch `examples.json` from an explicit dashboard-selected ref;
-- filter with `entry.showInDashboard === true && entry.status === "ready"`;
-- stop recursively copying `entry.source.directory`;
-- install only `entry.daemon.content` plus listed `scripts` and `references` files;
-- preserve existing collision, preflight, and draft PR review behavior;
-- surface `requirements` and `adaptation.mustCustomize` before install;
-- maintain a dashboard-owned mapping from dashboard problem IDs to catalog `fit.jobsToBeDone` values.
-
-The mapping from dashboard problems to catalog jobs should live in dashboard code or configuration, not in this catalog. `fit.jobsToBeDone` describes reusable catalog fit; it is not a dashboard product taxonomy by itself.
-
 ## `DAEMON.md` and catalog metadata
 
 Public daemon docs at `docs.charlielabs.ai` define daemon semantics. `DAEMON.md` frontmatter and body are runtime guidance for Charlie, not a catalog metadata container.
