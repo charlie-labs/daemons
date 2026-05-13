@@ -19,6 +19,7 @@
     "generate:examples": "bun scripts/generate-examples.ts",
     "validate:examples": "bun scripts/validate-examples.ts",
     "build": "rm -rf dist && bun build src/daemon-cli/bin.ts src/daemon-cli/index.ts --target=node --outdir=dist --entry-naming=[name].js && chmod +x dist/bin.js",
+    "smoke:daemon": "bun scripts/smoke-daemon-bin.ts",
     "prepack": "bun run build"
   },
   "dependencies": {
