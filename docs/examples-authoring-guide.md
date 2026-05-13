@@ -14,12 +14,16 @@ The goal is to make every example easy to find, safe to publish, realistic enoug
 
 ## When to add an example
 
+Start from a customer job-to-be-done, not from an integration demo or clever automation idea. Every example should map to at least one approved `fit.jobsToBeDone` slug. If the customer job is unclear, the example is probably not ready for the public catalog.
+
 Add or keep an example when it shows a reusable daemon pattern that is clearer as source than as prose alone.
 
 Good examples usually have:
 
 - a recurring job with clear ownership;
+- a narrow role that is explainable in one sentence;
 - a bounded wake model (`watch`, `schedule`, or both);
+- small activations with reviewable output on native surfaces;
 - concrete routines and deny rules;
 - clear integration requirements;
 - a useful fit boundary: who it is for and who it is not for;
@@ -31,7 +35,27 @@ Do not add an example for:
 - vague maintenance wishes without a decision policy;
 - workflows that require hidden internal context to understand;
 - customer-specific process that cannot be generalized safely;
+- broad roles where every activation requires judgment outside the authored policy;
 - behavior that would be unsafe to recommend publicly.
+
+## Adaptation, risk, and platform boundaries
+
+Public examples look copyable, but target repos vary by integrations, conventions, permissions, commands, source-of-truth systems, output preferences, existing automation, scale, and tolerance for noise. Make those assumptions visible in `requirements`, `adaptation.mustCustomize`, support files, or `DAEMON.md` runtime policy.
+
+High-risk examples are allowed when they address real operational burden, but author them intentionally. High-risk does not mean "opens a PR touching important code"; reviewable artifacts are usually low operational risk because humans can close, ignore, or revert them. High-risk means the daemon could interfere with human workflows or take actions that are hard or annoying to reverse, such as mutating production state, deleting resources, force-pushing over human changes, closing or reprioritizing many issues, changing production flags, or posting noisy output across surfaces.
+
+For high-risk examples:
+
+- require evidence before consequential claims or writes;
+- prefer reviewable artifacts over direct mutation;
+- keep scope narrow;
+- include strong no-op behavior for ambiguity;
+- deny nearby risky shortcuts;
+- make visible output easy to review.
+
+If a platform changes the daemon's source of truth, routines, output surface, or required permissions, prefer a separate example instead of hiding branches inside one daemon. `requirements.optionalIntegrations` means the daemon can still perform its core role without that integration; it must not encode one-of-many required alternatives.
+
+Do not imply unsupported event wakes. Today, GitHub-native events are the best fit for `watch`; use `schedule` for surveys, reconciliation, reports, or sources without a supported event wake.
 
 ## Authoring workflow
 
@@ -98,6 +122,7 @@ Avoid:
 
 - invented frontmatter fields;
 - catalog metadata in `DAEMON.md`;
+- rollout instructions, validation checklists, setup tutorials, or catalog presentation notes in `DAEMON.md`;
 - copying stale metadata such as `readiness`, `showOnWebsite`, or `bestFor` into frontmatter;
 - long generic filler that does not change behavior;
 - body headings that imply schema beyond the public docs.
@@ -182,6 +207,8 @@ Use `fit.notFor` to prevent over-application:
 
 Put integration requirements in `requiredIntegrations` or `optionalIntegrations`.
 
+List an integration as optional only when the daemon can still perform its core role without it. Do not use `optionalIntegrations` to encode required alternatives such as "GitHub or Linear"; if the source-of-truth platform changes daemon behavior, create platform-specific examples.
+
 Allowed integration values are:
 
 - `github`
@@ -213,6 +240,8 @@ Use `adapt-before-use` when a customer must change any of the following before u
 - support script assumptions.
 
 Use `direct-copy` only when no required customization is declared. Even then, reviewers should verify that the daemon is safe, useful, and accurate for the target repo before use.
+
+Use `adaptation.mustCustomize` for concrete local decisions, replacements, or confirmations. Do not use it for generic warnings, rollout steps, validation checklists, or process advice such as "verify that it works" or "watch the first few activations." Those belong in general daemon rollout docs, not package metadata.
 
 ### 5. Add support files only when they help
 
@@ -265,6 +294,20 @@ When editing an example, first decide what kind of change it is.
 | New pattern using similar ingredients | Prefer a new package ID instead of changing the old example's identity. |
 
 Avoid broad rewrites when a targeted edit would fix the issue. The public writing guide's edit-mode advice applies here too: diagnose the failure mode, then adjust the smallest useful part.
+
+## Anti-patterns
+
+Avoid these common failures:
+
+- One example tries to cover multiple platforms with hidden branching.
+- `example.yml` becomes a configuration language.
+- `DAEMON.md` contains setup, tutorial, rollout, checklist, or catalog metadata.
+- `mustCustomize` contains rollout or verification instructions instead of local decisions.
+- Optional integrations are used to encode required alternatives.
+- The daemon assumes unsupported non-GitHub event wakes.
+- The daemon requires production secrets or mutating infra commands to be useful.
+- The daemon mostly produces noise or restates known information.
+- The daemon is so broad that every activation requires judgment outside its authored policy.
 
 ## Review checklist
 

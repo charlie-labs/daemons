@@ -235,9 +235,28 @@ Use `scripts/**` for reusable helper scripts that are part of the example patter
 
 ## Customer copy semantics
 
-Examples are reference patterns, not automatically installed daemons.
+Examples are reference patterns, not automatically installed daemons. Catalog consumers install an example into a customer repo under:
 
-When copying an example into a customer repo:
+```text
+.agents/daemons/<id>/
+```
+
+Customer copies include:
+
+- `DAEMON.md`;
+- files listed in catalog `scripts[]`;
+- files listed in catalog `references[]`.
+
+Customer copies exclude:
+
+- `example.yml`;
+- any upstream package file that is not represented by the catalog contract.
+
+`example.yml` is public catalog metadata for discovery, recommendation, docs, dashboard, and adaptation flows. It is not part of the daemon runtime contract and must not be copied into customer repositories.
+
+Catalog-based consumers must not recursively copy the whole upstream `daemons/<id>/` directory. They should install from one `examples.json` entry by writing `daemon.content` to `.agents/daemons/<id>/DAEMON.md`, then fetching only the listed `scripts[]` and `references[]` support files from the same source ref used to fetch the catalog.
+
+Before enabling a copied example in a customer repo:
 
 - Treat `DAEMON.md` as a starting point that must be checked against the customer's desired behavior.
 - Review `example.yml` fit and requirements before using the pattern.
@@ -250,6 +269,8 @@ When copying an example into a customer repo:
 ## Generated `examples.json` contract
 
 `examples.json` is generated from the packages in `daemons/**` and committed at the repository root.
+
+The committed artifact path is repository-root `examples.json`. It is generated from this repo's `daemons/` package tree, the full `DAEMON.md` content for each example, and discovered support files under `scripts/**` and `references/**`.
 
 Root shape:
 
@@ -278,11 +299,38 @@ Generation rules:
 
 - examples are sorted by `id`;
 - support path arrays are sorted lexicographically;
+- `source.directory` is the package path under `daemons/`, such as `daemons/pr-metadata`;
+- `source.url` is a human GitHub tree URL using the publication ref;
 - the default publication ref for source URLs is `master`;
+- machine consumers should use the same source ref for `examples.json`, `DAEMON.md`, and support-file fetches;
+- v1 intentionally omits nondeterministic fields such as `generatedAt` or `sourceCommit`;
 - serialization is `JSON.stringify(catalog, null, 2)` followed by a trailing newline;
 - `examples.json` must match generated output exactly.
 
 Run `bun run generate:examples` after changing any example package. Commit `examples.json` if it changes.
+
+## Consumer behavior
+
+Website/docs consumers should show catalog entries where:
+
+- `showOnWebsite: true`;
+- `status !== "deprecated"`.
+
+Dashboard consumers should show catalog entries where:
+
+- `showInDashboard: true`;
+- `status === "ready"`.
+
+If dashboard draft previews are needed later, add an explicit preview-only consumer path instead of overloading the public catalog contract.
+
+Install consumers should:
+
+1. Fetch `examples.json` from one source ref.
+2. Select an entry from the catalog instead of crawling the repo tree.
+3. Write `DAEMON.md` from `entry.daemon.content`.
+4. Fetch each `scripts[]` and `references[]` path from `entry.source.directory` at the same source ref.
+5. Preserve support-file relative paths under `.agents/daemons/<id>/`.
+6. Exclude `example.yml`.
 
 ## Validation expectations
 
