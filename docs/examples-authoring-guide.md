@@ -2,15 +2,22 @@
 
 This guide is for authors and reviewers adding or editing example daemon packages in this repository.
 
-Use it with:
-
-- [Examples v2 package and catalog spec](./examples-spec.md) for the repo-owned package/catalog contract;
-- [Choosing daemons](https://docs.charlielabs.ai/daemons/choosing-daemons) for deciding what should become a daemon;
-- [Writing and editing DAEMON.md](https://docs.charlielabs.ai/daemons/writing-and-editing-daemon-md) for daemon authoring technique;
-- [DAEMON.md reference](https://docs.charlielabs.ai/daemons/daemon-md-reference) for the authored file contract;
-- [Testing and iterating on daemons](https://docs.charlielabs.ai/daemons/testing-and-iterating-on-daemons) for rollout and verification guidance.
-
 The goal is to make every example easy to find, safe to publish, realistic enough to copy from, and explicit about what a customer must adapt.
+
+## Required reading before authoring or review
+
+Before adding or reviewing an example, read the relevant Charlie daemon docs first. Treat this as a review requirement, not optional background: if an example conflicts with these docs, fix the example or explain why the docs should change.
+
+Read these pages before continuing through this guide:
+
+- [Examples v2 package and catalog spec](./examples-spec.md) for the repo-owned package/catalog contract.
+- [Daemons overview](https://docs.charlielabs.ai/daemons) for what daemons are, the wake model, and how `DAEMON.md` controls behavior.
+- [Choosing daemons](https://docs.charlielabs.ai/daemons/choosing-daemons) for deciding whether the customer job is a daemon candidate rather than a one-off Charlie task.
+- [Writing and editing `DAEMON.md`](https://docs.charlielabs.ai/daemons/writing-and-editing-daemon-md) for authoring narrow, explicit, repeatable daemon behavior.
+- [`DAEMON.md` reference](https://docs.charlielabs.ai/daemons/daemon-md-reference) for the exact authored file contract, field names, validation rules, and support-tree semantics.
+- [Testing and iterating on daemons](https://docs.charlielabs.ai/daemons/testing-and-iterating-on-daemons) for rollout, containment, observability, and verification guidance.
+
+Then use the rest of this guide to align the example package, catalog metadata, support files, and public-safety notes with those docs.
 
 ## When to add an example
 
