@@ -16,6 +16,7 @@ For this repo's examples package and catalog contract, use:
 
 - [Examples v2 package and catalog spec](docs/examples-spec.md)
 - [Examples authoring guide](docs/examples-authoring-guide.md)
+- [Examples catalog consumer guide](docs/examples-catalog-consumer-guide.md)
 
 Read [Daemons](https://docs.charlielabs.ai/daemons) first if you are new to the concept.
 
@@ -35,7 +36,7 @@ Use [DAEMON.md reference](https://docs.charlielabs.ai/daemons/daemon-md-referenc
 
 The root `examples.json` file is generated from each `daemons/<id>/example.yml`, `DAEMON.md`, and supported files under `scripts/**` and `references/**`.
 
-Use [Examples v2 package and catalog spec](docs/examples-spec.md) for the exact package, metadata, generation, validation, and public-safety contract. Use [Examples authoring guide](docs/examples-authoring-guide.md) for author/reviewer guidance.
+Use [Examples v2 package and catalog spec](docs/examples-spec.md) for the exact package, metadata, generation, validation, and public-safety contract. Use [Examples authoring guide](docs/examples-authoring-guide.md) for author/reviewer guidance. Use [Examples catalog consumer guide](docs/examples-catalog-consumer-guide.md) for website, dashboard, and install consumer guidance.
 
 Use the repo-owned checks before changing examples:
 
