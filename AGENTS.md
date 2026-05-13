@@ -1,5 +1,7 @@
 # AGENTS.md
 
+These rules must be strictly followed for all work in this repository.
+
 This repository publishes public Charlie daemon examples and the npm package `@charlie-labs/daemons`, which exposes the `daemon` CLI. Example packages live in `daemons/<id>/`; the generated root `examples.json` catalog is the public index consumed by the CLI.
 
 ## Source map
