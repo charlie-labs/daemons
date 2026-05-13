@@ -12,8 +12,9 @@ Start with the docs:
 - [DAEMON.md reference](https://docs.charlielabs.ai/daemons/daemon-md-reference)
 - [Testing and iterating on daemons](https://docs.charlielabs.ai/daemons/testing-and-iterating-on-daemons)
 
-For this repo's examples package and catalog contract, use:
+For this repo's examples package, CLI, and catalog contract, use:
 
+- [Daemon catalog CLI](docs/daemon-cli.md)
 - [Examples v2 package and catalog spec](docs/examples-spec.md)
 - [Examples authoring guide](docs/examples-authoring-guide.md)
 - [Examples catalog consumer guide](docs/examples-catalog-consumer-guide.md)
@@ -35,6 +36,38 @@ Use [DAEMON.md reference](https://docs.charlielabs.ai/daemons/daemon-md-referenc
 ## Generated examples catalog
 
 The root `examples.json` file is generated from each `daemons/<id>/example.yml`, `DAEMON.md`, and supported files under `scripts/**` and `references/**`.
+
+
+## Daemon catalog CLI
+
+This package is npm-ready as `@charlie-labs/daemons` and exposes the `daemon` binary.
+
+Use it to browse the public examples catalog, safely scaffold catalog examples into `.agents/daemons/<id>/`, and validate runtime daemon files:
+
+```bash
+daemon list
+
+daemon show dependency-upgrades --json
+
+daemon add dependency-upgrades --dry-run
+
+daemon validate .agents/daemons/dependency-upgrades/DAEMON.md
+
+daemon validate --all --json
+```
+
+Key safety defaults:
+
+- catalog reads default to `master` and support `--ref <sha|branch|tag>`;
+- install copies only catalog-listed `DAEMON.md`, `scripts[]`, and `references[]` files from the same ref;
+- install never copies `example.yml` or crawls upstream directories;
+- existing destination directories/files require `--force`;
+- deprecated examples require `--allow-deprecated`;
+- add/install/show always surface `adaptationsRequired[]` in JSON;
+- scaffolding does not activate a daemon until the change is merged and ingested by Charlie.
+
+See [Daemon catalog CLI](docs/daemon-cli.md) for command details, JSON envelope, validation semantics, and exit codes.
+
 
 Use [Examples v2 package and catalog spec](docs/examples-spec.md) for the exact package, metadata, generation, validation, and public-safety contract. Use [Examples authoring guide](docs/examples-authoring-guide.md) for author/reviewer guidance. Use [Examples catalog consumer guide](docs/examples-catalog-consumer-guide.md) for website, dashboard, and install consumer guidance.
 
