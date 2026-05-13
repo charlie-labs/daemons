@@ -1,12 +1,26 @@
 {
-  "name": "@charlie-labs/daemon-examples",
-  "private": true,
+  "name": "@charlie-labs/daemons",
+  "version": "0.0.0",
+  "description": "Public Charlie daemon examples catalog and CLI.",
   "type": "module",
+  "bin": {
+    "daemon": "./dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "examples.json",
+    "daemons",
+    "docs",
+    "README.md"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "generate:examples": "bun scripts/generate-examples.ts",
-    "validate:examples": "bun scripts/validate-examples.ts"
+    "validate:examples": "bun scripts/validate-examples.ts",
+    "build": "rm -rf dist && bun build src/daemon-cli/bin.ts src/daemon-cli/index.ts --target=node --outdir=dist --entry-naming=[name].js && chmod +x dist/bin.js",
+    "smoke:daemon": "bun scripts/smoke-daemon-bin.ts",
+    "prepack": "bun run build"
   },
   "dependencies": {
     "yaml": "^2.8.1",
@@ -16,5 +30,19 @@
     "@types/bun": "^1.2.22",
     "typescript": "^5.9.3",
     "vitest": "^4.0.14"
-  }
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/charlie-labs/daemons.git"
+  },
+  "bugs": {
+    "url": "https://github.com/charlie-labs/daemons/issues"
+  },
+  "homepage": "https://github.com/charlie-labs/daemons#readme"
 }

@@ -1,8 +1,9 @@
 import { parseDocument } from 'yaml';
 import { z, type ZodIssue } from 'zod';
+import { validateCronExpression } from '../daemon-cli/validation/cron';
 import { findPublicSafetyErrors } from './public-safety';
-import { isKebabCaseSlug } from './paths';
-import type { DaemonFrontmatter, ExampleMetadata, ValidationError, ValidationResult } from './types';
+import { isKebabCaseSlug, isSupportPath } from './paths';
+import type { CatalogExample, DaemonFrontmatter, ExampleMetadata, ExamplesCatalog, ValidationError, ValidationResult } from './types';
 import { formatFieldPath, machineError } from './validation';
 
 const STALE_METADATA_FIELDS = new Set([
@@ -86,13 +87,12 @@ const exampleMetadataSchema = z
     }
   });
 
-const cronFieldSchema = /^[0-9*,/\-]+$/;
 const fiveFieldCronSchema = z.string().superRefine((value, context) => {
-  const fields = value.trim().split(/\s+/);
-  if (fields.length !== 5 || fields.some((field) => !cronFieldSchema.test(field))) {
+  const result = validateCronExpression({ cronExpression: value });
+  if (!result.ok) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Expected a standard five-field UTC cron expression.',
+      message: `Expected a standard five-field UTC cron expression (${result.reason}).`,
     });
   }
 });
@@ -116,6 +116,168 @@ const daemonFrontmatterSchema = z
       });
     }
   });
+
+const catalogExampleSchema: z.ZodType<CatalogExample> = z
+  .object({
+    id: slugSchema,
+    title: nonEmptyStringSchema,
+    status: z.enum(['draft', 'ready', 'deprecated']),
+    summary: nonEmptyStringSchema,
+    readiness: z.enum(['direct-copy', 'adapt-before-use']),
+    showOnWebsite: z.boolean(),
+    showInDashboard: z.boolean(),
+    fit: z
+      .object({
+        jobsToBeDone: z.array(jobToBeDoneSchema).min(1),
+        bestFor: z.array(nonEmptyStringSchema).min(1),
+        notFor: z.array(nonEmptyStringSchema).min(1),
+      })
+      .strict(),
+    requirements: z
+      .object({
+        requiredIntegrations: z.array(integrationSchema),
+        optionalIntegrations: z.array(integrationSchema),
+        other: stringListSchema,
+      })
+      .strict(),
+    adaptation: z
+      .object({
+        mustCustomize: stringListSchema,
+      })
+      .strict(),
+    daemon: z
+      .object({
+        path: z.literal('DAEMON.md'),
+        content: nonEmptyStringSchema,
+      })
+      .strict(),
+    scripts: z.array(
+      z.string().refine((value) => isSupportPath(value, 'scripts'), {
+        message: 'Expected a daemon-package-relative scripts/ support path.',
+      })
+    ),
+    references: z.array(
+      z.string().refine((value) => isSupportPath(value, 'references'), {
+        message: 'Expected a daemon-package-relative references/ support path.',
+      })
+    ),
+    source: z
+      .object({
+        directory: nonEmptyStringSchema,
+        url: nonEmptyStringSchema,
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.readiness === 'adapt-before-use' && value.adaptation.mustCustomize.length === 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['adaptation', 'mustCustomize'],
+        message: 'adapt-before-use examples must name at least one local customization.',
+      });
+    }
+
+    if (value.readiness === 'direct-copy' && value.adaptation.mustCustomize.length > 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['adaptation', 'mustCustomize'],
+        message: 'direct-copy examples must not require local customization.',
+      });
+    }
+
+    const expectedSourceDirectory = `daemons/${value.id}`;
+    if (value.source.directory !== expectedSourceDirectory) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['source', 'directory'],
+        message: `source.directory must match ${expectedSourceDirectory}.`,
+      });
+    }
+  });
+
+const examplesCatalogSchema: z.ZodType<ExamplesCatalog> = z
+  .object({
+    schemaVersion: z.literal(1),
+    source: z
+      .object({
+        repository: z.literal('charlie-labs/daemons'),
+        baseDirectory: z.literal('daemons'),
+      })
+      .strict(),
+    examples: z.array(catalogExampleSchema),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const seen = new Set<string>();
+    for (const [index, example] of value.examples.entries()) {
+      if (seen.has(example.id)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['examples', index, 'id'],
+          message: `Duplicate example id ${example.id}.`,
+        });
+      }
+      seen.add(example.id);
+    }
+  });
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function parseExamplesCatalogContent(args: {
+  content: string;
+  path: string;
+}): ValidationResult<ExamplesCatalog> {
+  let value: unknown;
+  try {
+    value = JSON.parse(args.content);
+  } catch (error) {
+    return {
+      ok: false,
+      errors: [
+        machineError({
+          code: 'invalid_catalog_json',
+          path: args.path,
+          message: error instanceof Error ? error.message : 'examples.json is not valid JSON.',
+        }),
+      ],
+    };
+  }
+
+  return parseExamplesCatalogValue({ value, path: args.path });
+}
+
+export function parseExamplesCatalogValue(args: {
+  value: unknown;
+  path: string;
+}): ValidationResult<ExamplesCatalog> {
+  if (!isRecord(args.value) || args.value.schemaVersion !== 1) {
+    const actual = isRecord(args.value) ? String(args.value.schemaVersion) : typeof args.value;
+    return {
+      ok: false,
+      errors: [
+        machineError({
+          code: 'unsupported_catalog_schema_version',
+          path: args.path,
+          fieldPath: 'schemaVersion',
+          message: `Unsupported examples.json schemaVersion ${actual}; supported schemaVersion is 1.`,
+        }),
+      ],
+    };
+  }
+
+  const parsed = examplesCatalogSchema.safeParse(args.value);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      errors: zodIssuesToValidationErrors(parsed.error.issues, args.path),
+    };
+  }
+
+  return { ok: true, value: parsed.data, errors: [] };
+}
 
 export function parseExampleYaml(args: {
   content: string;
