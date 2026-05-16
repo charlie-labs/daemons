@@ -6,77 +6,23 @@
   },
   "examples": [
     {
-      "id": "dependency-upgrades",
-      "title": "Grouped Dependency Update Maintainer",
-      "status": "ready",
-      "summary": "Opens low-noise dependency upgrade PRs with grouped minor and patch updates.",
-      "readiness": "adapt-before-use",
-      "showOnWebsite": true,
-      "showInDashboard": true,
-      "fit": {
-        "jobsToBeDone": [
-          "maintain-and-modernize",
-          "operate"
-        ],
-        "bestFor": [
-          "Repositories with regular dependency drift and a lockfile-backed package manager.",
-          "Teams that want reviewable upgrade PRs instead of large occasional dependency sweeps."
-        ],
-        "notFor": [
-          "Repositories where dependency updates usually require manual migration planning.",
-          "Teams that want automatic merge behavior for dependency updates."
-        ]
-      },
-      "requirements": {
-        "requiredIntegrations": [
-          "github"
-        ],
-        "optionalIntegrations": [],
-        "other": [
-          "A package manager lockfile and repository-local install command.",
-          "Verification commands that can prove grouped updates are safe enough to review."
-        ]
-      },
-      "adaptation": {
-        "mustCustomize": [
-          "Confirm package manager detection works for the repository.",
-          "Confirm install, lockfile, and verification commands.",
-          "Adjust branch, title, and label conventions to the team."
-        ]
-      },
-      "daemon": {
-        "path": "DAEMON.md",
-        "content": "---\nid: dependency-upgrades\npurpose: Keep repository dependencies current with low-noise grouped upgrade pull requests.\nroutines:\n  - Detect the repository package manager, dependency manifests, lockfile, and verification commands.\n  - Identify safe patch and minor dependency upgrades, grouped by runtime and development dependency type.\n  - Create or update focused dependency upgrade pull requests with verification evidence and clear rollback notes.\ndeny:\n  - Do not auto-merge dependency pull requests.\n  - Do not perform major-version upgrades unless the repository policy explicitly allows them.\n  - Do not change dependency range style, package manager, registry configuration, or workspace layout.\n  - Do not make broad refactors or unrelated code changes while fixing upgrade fallout.\n  - Do not proceed when package manager, lockfile, or verification commands are ambiguous.\nschedule: '0 8 * * 1'\n---\n\n# Grouped Dependency Update Maintainer\n\n## Package manager detection\n\nDetect the package manager from the repository, preferring lockfiles and repository scripts over assumptions.\n\nWhen available, run:\n\n```bash\n.agents/daemons/dependency-upgrades/scripts/detect-package-manager.sh\n```\n\nThe script takes no arguments and prints exactly one package manager name to stdout: `pnpm`, `yarn`, `npm`, or `bun`. It exits non-zero for unknown or ambiguous lockfile state. Treat a non-zero exit as a stop condition, not as permission to guess.\n\nIf the package manager cannot be determined confidently, stop and ask for the correct package manager and verification commands.\n\n## Update policy\n\nDefault scope:\n\n- patch and minor updates only\n- runtime dependencies and development dependencies in separate pull requests\n- no package manager migration\n- no registry or workspace layout changes\n\nMajor upgrades are out of scope unless the repository has an explicit policy for major upgrade pull requests.\n\n## PR policy\n\nCreate or update at most two pull requests per run:\n\n1. runtime dependency patch/minor updates\n2. development dependency patch/minor updates\n\nUse stable branches:\n\n- `daemon/deps-runtime-minor-patch`\n- `daemon/deps-dev-minor-patch`\n\nUse clear titles:\n\n- `deps: update runtime dependencies`\n- `deps(dev): update development dependencies`\n\nEach PR body must include:\n\n- package manager detected\n- packages updated\n- dependency type bucket\n- install command run\n- verification commands run\n- failures, skipped packages, and follow-ups\n\n## Verification and freshness\n\nBefore modifying files, re-read the current default branch and existing daemon upgrade branches or pull requests to avoid duplicate work.\n\nAfter applying updates:\n\n1. run the repository install command\n2. run the repository verification commands\n3. inspect the diff to confirm it only contains dependency update changes and minimal lockfile changes\n\nIf verification fails and the fix is not a small dependency-related adjustment, leave the pull request as draft or stop with a concise handoff note. Do not broaden into feature or refactor work.\n\n## Limits\n\n- Max open pull requests created or updated per run: 2\n- Max packages per grouped pull request: 20\n- Max retry attempts after failed verification: 1\n- No changes outside dependency manifests, lockfiles, and minimal generated dependency metadata unless the pull request is explicitly marked draft with rationale\n\n## No-op when\n\n- no patch or minor upgrades are available\n- package manager detection is ambiguous\n- verification cannot be run safely\n- an existing human-owned dependency upgrade is already active for the same dependency bucket\n"
-      },
-      "scripts": [
-        "scripts/detect-package-manager.sh"
-      ],
-      "references": [
-        "references/package-manager-adaptation.md"
-      ],
-      "source": {
-        "directory": "daemons/dependency-upgrades",
-        "url": "https://github.com/charlie-labs/daemons/tree/master/daemons/dependency-upgrades"
-      }
-    },
-    {
       "id": "docs-drift-maintainer",
-      "title": "README & Docs Freshness Maintainer",
+      "title": "Recent Docs Drift Maintainer",
       "status": "ready",
-      "summary": "Finds documentation drift caused by code changes and opens small source-backed docs PRs.",
+      "summary": "Runs each weekday to repair docs drift from recent merged source changes with small source-backed PRs.",
       "readiness": "adapt-before-use",
       "showOnWebsite": true,
       "showInDashboard": true,
       "fit": {
         "jobsToBeDone": [
-          "document",
-          "maintain-and-modernize"
+          "document"
         ],
         "bestFor": [
-          "Repositories where README, API, setup, or runbook docs drift from implementation.",
-          "Teams that want documentation updates tied to source changes and verification evidence."
+          "Repositories where README, API, setup, or runbook docs drift after implementation changes.",
+          "Teams that want recent documentation updates tied to source changes and verification evidence."
         ],
         "notFor": [
+          "Teams looking for this daemon to perform broad historical stale-documentation cleanup.",
           "Repositories where documentation updates require product, legal, or policy decisions.",
           "Teams without clear ownership of generated versus hand-authored documentation."
         ]
@@ -88,27 +34,70 @@
         "optionalIntegrations": [],
         "other": [
           "Documentation and source path patterns for the repository.",
-          "Repository-local formatting, linting, or documentation verification commands."
+          "A defined boundary between hand-authored and generated documentation."
         ]
       },
       "adaptation": {
         "mustCustomize": [
-          "Replace docs and source path patterns with the customer's repository layout.",
-          "Confirm verification commands for documentation formatting or linting.",
-          "Define which docs are authoritative and which are generated."
+          "Replace repository configuration placeholders for source paths, documentation paths, generated-docs policy, and documentation verification behavior."
         ]
       },
       "daemon": {
         "path": "DAEMON.md",
-        "content": "---\nid: docs-drift-maintainer\npurpose: Keep repository documentation current with small, source-backed documentation pull requests.\nwatch:\n  - A GitHub pull request is merged or synchronized with changes to source files that may affect public documentation, setup instructions, API docs, or runbooks.\nroutines:\n  - Detect documentation impacted by recent source, configuration, or workflow changes.\n  - Create or update one focused documentation pull request with source links and verification results.\n  - Report ambiguous documentation conflicts instead of rewriting broad docs speculatively.\ndeny:\n  - Do not modify runtime code, tests, migrations, build outputs, generated files, or repository configuration.\n  - Do not rewrite broad documentation areas when a targeted edit is sufficient.\n  - Do not invent product behavior, API contracts, ownership, or setup steps.\n  - Do not delete documentation unless a human explicitly requested removal.\n  - Do not edit legal, security, compliance, or policy documents without explicit human approval.\nschedule: '0 10 * * 1'\n---\n\n# README & Docs Freshness Maintainer\n\n## Source of truth\n\nUse implementation, tests, configuration, and recently merged pull requests as source evidence. Do not treat stale docs as proof that behavior still works.\n\nUse `references/docs-impact-rubric.md` to decide whether a source change needs a documentation update.\n\n## Target selection\n\nPrefer one focused docs target per activation.\n\nHigh-priority targets:\n\n1. setup or onboarding docs broken by repository changes\n2. API docs stale relative to exported behavior\n3. runbooks stale relative to operational commands or alerts\n4. README sections missing important entrypoint or verification context\n\n## PR policy\n\nCreate at most one documentation PR per run.\n\nThe PR must contain only documentation changes unless the repository has an explicit generated-docs workflow and the generated output is required.\n\nThe PR body must include:\n\n- source change or evidence link\n- docs file changed\n- why the doc was stale or missing\n- verification command run\n- any unresolved human decision\n\n## Verification\n\nRun the repository's documentation formatting or lint command when available.\n\nIf no docs verification command exists, run a basic markdown formatting or checking command when available and call out the missing docs verification in the PR.\n\n## Coordination\n\nBefore opening a new PR, inspect existing open documentation PRs. Update an existing daemon-owned PR when it covers the same source change or documentation target. Do not open duplicate docs PRs for the same stale claim.\n\n## No-op when\n\n- no clear docs impact exists\n- the correct docs target cannot be identified\n- updating docs would require guessing behavior\n- another active PR already updates the same docs for the same source change\n"
+        "content": "---\nid: docs-drift-maintainer\npurpose: Keep repository documentation aligned with recent merged source changes using small, source-backed documentation pull requests.\nroutines:\n  - Inspect recently merged pull requests and source, configuration, or workflow changes for documentation impact.\n  - Create or update one focused documentation pull request with source links.\ndeny:\n  - Do not proceed while any repository configuration placeholder remains unresolved.\n  - Do not perform broad historical stale-documentation sweeps.\n  - Do not modify runtime code, tests, migrations, build outputs, or repository configuration.\n  - Do not manually edit generated documentation outputs; use the documented generator only when the generated-docs policy says generated docs must change.\n  - Do not rewrite broad documentation areas when a targeted edit is sufficient.\n  - Do not invent product behavior, API contracts, ownership, or setup steps.\n  - Do not delete documentation unless a human explicitly requested removal.\n  - Do not edit legal, security, compliance, or policy documents without explicit human approval.\nschedule: '0 10 * * 1-5'\n---\n\n# Recent Docs Drift Maintainer\n\n## Repository configuration\n\nUse these repository-specific values:\n\n- Source paths: `<source_globs>`\n- Documentation paths: `<docs_globs>`\n- Generated documentation policy: `<generated_docs_policy>`\n- Documentation verification: `<docs_verification_command_or_none>`\n\n## Source of truth\n\nUse implementation, tests, configuration, and recently merged pull requests as source evidence. Do not treat stale docs as proof that behavior still works.\n\n## Candidate discovery\n\nOn each scheduled run, inspect recently merged pull requests and source changes since the previous successful `docs-drift-maintainer` run.\n\nIf the previous successful run is unclear, inspect the past 3 business days.\n\nOnly handle documentation drift tied to recent source, configuration, or workflow changes. Older stale documentation that is not tied to recent changes belongs to `docs-stale-maintainer`.\n\n## Target selection\n\nPrefer one focused docs target per activation.\n\nHigh-priority targets:\n\n1. setup or onboarding docs broken by repository changes\n2. API docs stale relative to exported behavior\n3. runbooks stale relative to operational commands or alerts\n4. README sections missing important entrypoint or verification context\n\n## PR policy\n\nCreate at most one documentation PR per run.\n\nThe PR must contain only documentation changes unless the generated-docs policy requires running a documented generator for generated documentation output.\n\nThe PR body must include:\n\n- source change or evidence link\n- docs file changed\n- why the doc was stale or missing\n- verification command run\n\n## Verification\n\nRun the repository's documentation formatting or lint command when available.\n\n## Coordination\n\nBefore opening a new PR, inspect existing open documentation PRs. Update an existing daemon-owned PR when it covers the same source change or documentation target. Do not open duplicate docs PRs for the same stale claim.\n\nDo not push to human-owned documentation PRs. If a human-owned PR already covers the same source change or documentation target, no-op.\n\n## Communication policy\n\nNo-op silently for routine cases where no documentation impact is clear, another PR already covers the target, or evidence is ambiguous.\n\nSurface blockers only in the documentation PR body when opening or updating a PR.\n\n## No-op when\n\n- any repository configuration placeholder remains unresolved\n- there have been no repository changes since the previous `docs-drift-maintainer` activation\n- no clear docs impact exists\n- the correct docs target cannot be identified\n- updating docs would require guessing behavior\n- another active PR already updates the same docs for the same source change\n"
       },
       "scripts": [],
-      "references": [
-        "references/docs-impact-rubric.md"
-      ],
+      "references": [],
       "source": {
         "directory": "daemons/docs-drift-maintainer",
         "url": "https://github.com/charlie-labs/daemons/tree/master/daemons/docs-drift-maintainer"
+      }
+    },
+    {
+      "id": "docs-stale-maintainer",
+      "title": "Stale Docs Maintainer",
+      "status": "ready",
+      "summary": "Runs weekly to repair older outdated documentation in small source-backed PRs with a hard size limit.",
+      "readiness": "adapt-before-use",
+      "showOnWebsite": true,
+      "showInDashboard": true,
+      "fit": {
+        "jobsToBeDone": [
+          "document"
+        ],
+        "bestFor": [
+          "Repositories with setup, API, README, or runbook docs that become outdated over time.",
+          "Teams that want steady bounded stale-docs repair PRs instead of large occasional cleanup sweeps."
+        ],
+        "notFor": [
+          "Repositories where stale documentation claims usually require product, legal, compliance, security, or policy judgment.",
+          "Teams that want broad documentation rewrites or audit reports instead of small pull requests."
+        ]
+      },
+      "requirements": {
+        "requiredIntegrations": [
+          "github"
+        ],
+        "optionalIntegrations": [],
+        "other": [
+          "Documentation path patterns and source-evidence locations for stale-claim verification.",
+          "A defined boundary between hand-authored and generated documentation."
+        ]
+      },
+      "adaptation": {
+        "mustCustomize": [
+          "Replace repository configuration placeholders for documentation paths, source-evidence locations, and generated-docs policy."
+        ]
+      },
+      "daemon": {
+        "path": "DAEMON.md",
+        "content": "---\nid: docs-stale-maintainer\npurpose: Repair older stale documentation with bounded, source-backed documentation pull requests.\nroutines:\n  - Survey configured documentation paths for older stale claims using source evidence.\n  - Select one high-confidence stale-documentation theme for a bounded documentation pull request.\n  - Create or update one bounded documentation pull request with source links.\ndeny:\n  - Do not proceed while any repository configuration placeholder remains unresolved.\n  - Do not modify runtime code, tests, migrations, build outputs, or repository configuration.\n  - Do not manually edit generated documentation outputs; use the documented generator only when the generated-docs policy says generated docs must change.\n  - Do not include more than 3 documentation files or more than one stale-documentation theme in a pull request.\n  - Do not bundle unrelated stale findings, broad rewrites, formatting-only cleanup, or style-only edits.\n  - Do not invent product behavior, API contracts, ownership, or setup steps.\n  - Do not edit legal, security, compliance, or policy documents without explicit human approval.\nschedule: '0 10 * * 1'\n---\n\n# Stale Docs Maintainer\n\n## Repository configuration\n\nUse these repository-specific values:\n\n- Documentation paths: `<docs_globs>`\n- Source evidence locations: `<source_evidence_globs>`\n- Generated documentation policy: `<generated_docs_policy>`\n\n## Source of truth\n\nUse implementation, tests, configuration, workflows, release notes, and other current repository sources as evidence. Do not treat stale docs as proof that behavior still works.\n\n## Staleness decision policy\n\nA documentation claim is stale only when current source evidence contradicts it. Do not treat document age alone as proof of staleness.\n\nRequire source evidence before changing a stale claim. Do not use one stale document as evidence that another stale document is correct.\n\nSkip stale claims when current behavior is unclear, the update would require broad judgment, or the correct targeted docs change cannot be determined from source evidence.\n\n## Candidate discovery\n\nOn each scheduled run, survey the configured documentation paths for older stale claims independent of recent pull requests.\n\nLook for stale setup commands, API examples, configuration references, environment variables, CLI commands, routes, runbooks, alerts, examples, templates, and generated starter-code instructions.\n\n## Selection and limits\n\nCreate or update at most one documentation PR per run.\n\nEach PR may update at most 3 documentation files and must focus on one stale-documentation theme. Do not mix unrelated stale findings.\n\nWhen more candidates exist, choose the highest-confidence, highest-impact theme and leave the rest for future scheduled runs.\n\n## PR policy\n\nThe PR must contain only documentation changes unless the generated-docs policy requires running a documented generator for generated documentation output.\n\nThe PR body must include:\n\n- stale claim repaired\n- source evidence link or path\n- docs files changed\n- why the prior documentation was stale\n\nDo not open standalone stale-doc reports.\n\n## Coordination\n\nBefore opening a new PR, inspect existing open documentation PRs. Update an existing daemon-owned PR when it covers the same stale-documentation theme or documentation target. Do not open duplicate docs PRs for the same stale claim.\n\nDo not push to human-owned documentation PRs. If a human-owned PR already covers the same stale-documentation theme or documentation target, no-op.\n\n## Communication policy\n\nNo-op silently for routine cases where no stale documentation is clear, another PR already covers the target, or evidence is ambiguous.\n\nSurface blockers only in the documentation PR body when opening or updating a PR.\n\n## No-op when\n\n- any repository configuration placeholder remains unresolved\n- no stale claim can be verified against source evidence\n- the correct docs target cannot be identified\n- updating docs would require guessing behavior\n- the stale claim requires product, legal, security, compliance, or policy judgment\n- another active PR already updates the same docs for the same stale claim\n"
+      },
+      "scripts": [],
+      "references": [],
+      "source": {
+        "directory": "daemons/docs-stale-maintainer",
+        "url": "https://github.com/charlie-labs/daemons/tree/master/daemons/docs-stale-maintainer"
       }
     },
     {
@@ -165,6 +154,56 @@
       }
     },
     {
+      "id": "js-ts-dependency-upgrades",
+      "title": "JavaScript/TypeScript Dependency Update Maintainer",
+      "status": "ready",
+      "summary": "Opens low-noise JavaScript/TypeScript dependency upgrade PRs with configured package-manager commands.",
+      "readiness": "adapt-before-use",
+      "showOnWebsite": true,
+      "showInDashboard": true,
+      "fit": {
+        "jobsToBeDone": [
+          "maintain-and-modernize",
+          "operate"
+        ],
+        "bestFor": [
+          "Teams that want more flexible, repo-specific dependency update automation than rigid default bot configuration.",
+          "JavaScript or TypeScript repositories with regular dependency drift and a lockfile-backed package manager.",
+          "Teams that want reviewable upgrade PRs instead of large occasional dependency sweeps."
+        ],
+        "notFor": [
+          "Repositories where dependency updates usually require manual migration planning."
+        ]
+      },
+      "requirements": {
+        "requiredIntegrations": [
+          "github"
+        ],
+        "optionalIntegrations": [],
+        "other": [
+          "A configured JavaScript/TypeScript package manager, lockfile, manifests, update commands, and install command."
+        ]
+      },
+      "adaptation": {
+        "mustCustomize": [
+          "Replace all package-manager configuration placeholders in DAEMON.md with the repository's npm, pnpm, Yarn, or Bun commands.",
+          "Adjust branch, title, and label conventions to the team."
+        ]
+      },
+      "daemon": {
+        "path": "DAEMON.md",
+        "content": "---\nid: js-ts-dependency-upgrades\npurpose: Keep JavaScript and TypeScript dependencies current with low-noise grouped upgrade pull requests.\nroutines:\n  - Scan the configured manifests and lockfile for available JavaScript and TypeScript dependency updates.\n  - Identify safe patch and minor dependency upgrades, grouped by runtime and development dependency type.\n  - Create or update focused dependency upgrade pull requests with verification evidence and clear rollback notes.\ndeny:\n  - Do not proceed while any configuration placeholder remains unresolved.\n  - Do not auto-merge dependency pull requests.\n  - Do not perform major-version upgrades unless the repository policy explicitly allows them.\n  - Do not change dependency range style, package manager, registry configuration, or workspace layout.\n  - Do not make broad refactors or unrelated code changes while fixing upgrade fallout.\n  - Do not run package-manager commands outside the configured outdated scan, update, install, and verification commands.\nschedule: '0 8 * * 1'\n---\n\n# JavaScript/TypeScript Dependency Update Maintainer\n\n## Configuration\n\nUse these repository-specific values:\n\n- Package manager: `<package-manager>`\n- Dependency manifests: `<manifest-globs>`\n- Lockfile: `<lockfile-path>`\n- Outdated scan: `<outdated-command>`\n- Runtime dependency update: `<runtime-update-command>`\n- Development dependency update: `<development-update-command>`\n- Install or lockfile refresh: `<install-command>`\n- Verification:\n  - `<verification-command>`\n- Runtime dependency branch: `daemon/deps-runtime-minor-patch`\n- Development dependency branch: `daemon/deps-dev-minor-patch`\n- Runtime dependency title: `deps: update runtime dependencies`\n- Development dependency title: `deps(dev): update development dependencies`\n\n## Update policy\n\nDefault scope:\n\n- patch and minor updates only\n- runtime dependencies and development dependencies in separate pull requests\n- no package manager migration\n- no registry or workspace layout changes\n\nMajor upgrades are out of scope unless the repository has an explicit policy for major upgrade pull requests.\n\nRun the configured outdated scan before choosing updates. Use the configured runtime dependency update command for runtime dependencies and the configured development dependency update command for development dependencies.\n\n## PR policy\n\nCreate or update at most two pull requests per run:\n\n1. runtime dependency patch/minor updates\n2. development dependency patch/minor updates\n\nUse the configured branch and title for each dependency bucket.\n\nEach PR body must include:\n\n- configured package manager\n- packages updated\n- dependency type bucket\n- install command run\n- verification commands run\n- failures, skipped packages, and follow-ups\n\n## Verification and freshness\n\nBefore modifying files, re-read the current default branch and existing daemon upgrade branches or pull requests to avoid duplicate work.\n\nAfter applying updates:\n\n1. run the configured install or lockfile refresh command\n2. run the configured verification commands\n3. inspect the diff to confirm it only contains dependency update changes and minimal lockfile changes\n\nIf verification fails and the fix is not a small dependency-related adjustment, leave the pull request as draft or stop with a concise handoff note. Do not broaden into feature or refactor work.\n\n## Limits\n\n- Max open pull requests created or updated per run: 2\n- Max packages per grouped pull request: 20\n- No changes outside dependency manifests, lockfiles, and minimal generated dependency metadata unless the pull request is explicitly marked draft with rationale\n\n## No-op when\n\n- no patch or minor upgrades are available\n- any configuration placeholder remains unresolved\n- verification cannot be run safely\n- an existing human-owned dependency upgrade is already active for the same dependency bucket\n"
+      },
+      "scripts": [],
+      "references": [
+        "references/package-manager-adaptation.md"
+      ],
+      "source": {
+        "directory": "daemons/js-ts-dependency-upgrades",
+        "url": "https://github.com/charlie-labs/daemons/tree/master/daemons/js-ts-dependency-upgrades"
+      }
+    },
+    {
       "id": "linear-issue-labeler",
       "title": "Issue Label Hygiene Helper",
       "status": "ready",
@@ -217,25 +256,26 @@
       }
     },
     {
-      "id": "pr-mergeability",
-      "title": "PR mergeability",
-      "status": "deprecated",
-      "summary": "Keeps non-draft pull requests mergeable and CI-green without changing PR intent or scope.",
+      "id": "pr-check-repair",
+      "title": "PR Check Repair",
+      "status": "ready",
+      "summary": "Repairs failing GitHub-visible PR checks with focused evidence-grounded commits, flaky reruns, or low-noise blocked comments.",
       "readiness": "adapt-before-use",
-      "showOnWebsite": false,
-      "showInDashboard": false,
+      "showOnWebsite": true,
+      "showInDashboard": true,
       "fit": {
         "jobsToBeDone": [
-          "maintain-and-modernize",
           "review-with-confidence"
         ],
         "bestFor": [
-          "Repositories with active pull request queues and required mergeability checks.",
-          "Teams that want mechanical branch freshness and low-risk check fixes proposed on PRs."
+          "Repositories with active pull request queues and required checks.",
+          "Teams comfortable with Charlie pushing narrow check-fix commits to pull request branches.",
+          "Repositories where failures have useful logs, local reproduction commands, or clear provider data."
         ],
         "notFor": [
-          "Repositories where merge conflicts usually require product or design decisions.",
-          "Teams that do not want Charlie to push fixes to pull request branches."
+          "Teams that do not want automated commits pushed to pull request branches.",
+          "Checks that usually require product, security, or dependency judgment.",
+          "Failures caused mostly by external provider configuration, secrets, or environment issues."
         ]
       },
       "requirements": {
@@ -244,32 +284,81 @@
         ],
         "optionalIntegrations": [],
         "other": [
-          "A clear set of mergeability checks or branch protection rules.",
-          "Local commands for low-risk lint, snapshot, lockfile, or flaky-test maintenance."
+          "Access to check logs or provider data.",
+          "Repository-local verification commands."
         ]
       },
       "adaptation": {
         "mustCustomize": [
-          "Confirm which required checks define mergeability for the repository.",
-          "Confirm which low-risk fix commands Charlie may run on PR branches."
+          "Confirm the check repair categories are aligned with the team's expectations."
         ]
       },
       "daemon": {
         "path": "DAEMON.md",
-        "content": "---\nid: pr-mergeability\npurpose: Keep non-draft pull requests mergeable and CI-green without changing PR intent/scope, while staying anchored to one trigger context per run.\nwatch:\n  - Branch sync and update events on non-draft PRs.\n  - Check-status signals on non-draft PRs for checks that affect mergeability.\nroutines:\n  - Resolve mechanical merge conflicts when the safe resolution is clear and preserves PR intent/scope.\n  - 'Apply low-risk mergeability fixes: snapshot updates, lockfile drift fixes, lint autofix, and flaky-test retries when tied to the trigger context.'\n  - Escalate semantic/intention conflicts between base and branch instead of auto-resolving.\ndeny:\n  - When triggered by a check-status signal, do not fix or comment on unrelated failing checks.\n  - Do not open new pull requests or new issues.\n  - Do not review, approve, or request changes on pull requests.\n  - Do not implement review-comment suggestion patches.\n  - Avoid force-push by default; if force is absolutely required, use `--force-with-lease` only after fresh remote verification.\n  - Do not make changes beyond mergeability maintenance.\n---\n\n# PR Mergeability (Daemons v0)\n\n## Role\n\nMaintain mergeability for all non-draft PRs by keeping branches fresh and required checks green, without changing PR intent/scope.\n\n## Primary trigger context\n\nAnchor each run to one primary trigger context and keep work scoped to it:\n\n- `repo`\n- `pr`\n- `head_sha`\n- check identity (when triggered by a check-status signal)\n\nIf the PR `head_sha` changes during the run, re-evaluate scope and next actions against the new head before continuing.\n\n## Wake conditions\n\nWake only for non-draft PR mergeability signals:\n\n- Branch sync/update events.\n- CI/check status changes that affect mergeability.\n\nDo not wake on review or commit events.\n\n## Scan scope policy\n\n- Start narrow: inspect only files, checks, and logs directly tied to the primary trigger context.\n- You may expand to broader **read-only** context only when it is plausibly the same root cause.\n- Keep edits scoped to mergeability actions for the trigger context.\n\n## Branch freshness and work-fighting safety\n\n- Re-fetch and verify remote/head state before starting edits.\n- Re-fetch and verify again before push.\n- If remote PR head moved, stop and re-evaluate instead of blindly continuing.\n- Avoid force-push by default.\n- If force-push is absolutely required, use `--force-with-lease` only after fresh remote verification.\n\n## In scope\n\n- Refresh stale non-draft PR branches from base.\n- Resolve mechanical merge conflicts when the safe resolution is clear and preserves PR intent/scope.\n- Apply low-risk mergeability fixes: snapshot updates, lockfile drift fixes, lint autofix, and flaky-test retries.\n- Escalate semantic/intention conflicts between base and branch instead of auto-resolving.\n\n## Comment policy\n\n- Comment only when the run took or attempted a mergeability action.\n- Keep comments scoped to the primary trigger context and clearly related checks.\n- When triggered by a check-status signal, do not comment on unrelated failing checks.\n- When blocked, leave a PR handoff comment with what was attempted, what is blocked, and the next human action.\n- Default to one PR comment per run with key info; split only when there is a strong reason.\n- Sign comments as `charlied/pr-mergeability`.\n\n## Out of scope\n\n- Opening new pull requests or new issues.\n- Review decisions (approve/request changes).\n- Implementing review-comment suggestion patches.\n- Any work beyond mergeability maintenance.\n"
+        "content": "---\nid: pr-check-repair\npurpose: Repair failing checks on non-draft pull requests by diagnosing the triggering check, pushing evidence-grounded fixes, and commenting only when action or human attention is needed.\nwatch:\n  - A GitHub check run, check suite, or commit status from GitHub or an integrated provider reports a non-successful result on the current head of a non-draft pull request, including failure, error, timed_out, cancelled, or action required.\nroutines:\n  - Diagnose the triggering failing check using check logs, provider data, local reproduction, repo context, PR diff, and clear PR intent.\n  - Push a focused evidence-grounded fix to the PR branch when the correct repo change is clear.\n  - Coordinate with concurrent `pr-check-repair` activations before editing and before pushing.\n  - Rerun a clearly flaky check when flake evidence is strong and no repo change is needed.\ndeny:\n  - Do not refresh PR branches from base or resolve merge conflicts; use base only as read-only evidence when branch staleness affects the failing check.\n  - Do not fix unrelated failing checks; assume each other failing check has its own `pr-check-repair` activation.\n  - Do not make product, security, dependency, external-environment, production-data, backfill, or data-shape decisions solely to make checks pass.\n  - Do not change external provider configuration, CI project settings, or secrets outside the repository.\n  - Do not push speculative changes when the failure cause or intended fix is unclear.\n  - Do not manually rerun checks after pushing a commit; rely on the push to trigger checks naturally.\n  - Do not edit or act outside the triggering repo, PR, head SHA, and failing check.\n  - Do not open new pull requests or new issues.\n  - Do not submit PR reviews, approve, or request changes on pull requests.\n  - Do not force-push.\n---\n\n# PR Check Repair\n\n## Triggering-check scope policy\n\nHandle only the triggering failing check. If another failing check shares the same root cause, fix that root cause only when necessary for the triggering check. If another human or `pr-check-repair` activation already fixed the same root cause, stop/no-op without commenting unless human action is still needed.\n\nExpect parallel `pr-check-repair` activations for other failing checks. When overlap is plausible, refresh and inspect the current remote PR head before editing or pushing. When tools expose task status or transcripts, also inspect active/recent daemon activity.\n\n## Repair decision policy\n\nFix and push when the triggering check is current, the cause is clear from available evidence, the fix does not require a product/security/infrastructure/dependency/data judgment call, and the commit can be pushed without overwriting concurrent work.\n\nStop/no-op and comment with the blocking reason when the fix requires human judgment, external environment/config/secrets changes, dependency substitution or security review, production data/backfill decisions, or unavailable permissions/tooling.\n\n## Repair categories\n\n| Category                                                                                                | Posture                                                                                            |\n| ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |\n| Formatting, lint, typecheck, snapshots, generated fixtures, and lockfile drift                          | Fix and push.                                                                                      |\n| Failing unit/integration tests where PR intent or documented behavior makes the expected behavior clear | Fix implementation or update tests, then push.                                                     |\n| E2E failures with clear evidence from traces, logs, repo behavior, or changed stable selectors          | Fix app code or tests, then push.                                                                  |\n| CI/workflow syntax errors introduced by the PR                                                          | Fix and push.                                                                                      |\n| Simple generated/schema migrations needed by a clear schema/model change                                | Generate or add them and push when the devbox has the required tooling and permissions.            |\n| Flaky checks with strong flake evidence                                                                 | Rerun once when no repo change is needed, or push the narrowest stabilizing fix when one is clear. |\n| Ambiguous product intent, conflicting requirements, or unclear PR direction                             | Stop/no-op; comment if human action is needed.                                                     |\n| Secrets, provider config, CI project settings, or external service failures outside the repo            | Stop/no-op; comment if human action is needed.                                                     |\n| Dependency replacement or vulnerability/security choices                                                | Stop/no-op; comment if human action is needed.                                                     |\n| Production data migrations, backfills, or data-shape decisions                                          | Stop/no-op; comment if human action is needed.                                                     |\n\n## Branch and concurrency safety\n\n- Re-fetch and verify the current remote PR head before starting edits.\n- Re-fetch and verify the current remote PR head again before push.\n- If remote PR head moved, re-evaluate before continuing. Continue after compatible human/daemon pushes, but never overwrite them.\n- If branch staleness is the only failure cause, stop/no-op because branch refresh is outside `pr-check-repair` scope.\n- If staleness is ambiguous, compare against current base when available. If base already fixes the issue and the PR branch is merely stale, do not push a repair commit.\n\n## Comment policy\n\nComment only after a pushed fix, flaky rerun, or blocked state requiring human action. Include the triggering check, action taken or blocking reason, commit pushed or rerun performed, and next human action when blocked.\n\nDo not comment for routine no-ops: stale triggers, checks already fixed, duplicate activations, another human/daemon already fixing the same root cause, or failures clearly owned by another daemon.\n"
       },
       "scripts": [],
       "references": [],
       "source": {
-        "directory": "daemons/pr-mergeability",
-        "url": "https://github.com/charlie-labs/daemons/tree/master/daemons/pr-mergeability"
+        "directory": "daemons/pr-check-repair",
+        "url": "https://github.com/charlie-labs/daemons/tree/master/daemons/pr-check-repair"
+      }
+    },
+    {
+      "id": "pr-merge-conflict-repair",
+      "title": "PR Merge Conflict Repair",
+      "status": "ready",
+      "summary": "Repairs clear merge conflicts on non-draft GitHub pull requests after target base branch changes, with focused verification and low-noise blocked comments.",
+      "readiness": "adapt-before-use",
+      "showOnWebsite": true,
+      "showInDashboard": true,
+      "fit": {
+        "jobsToBeDone": [
+          "review-with-confidence"
+        ],
+        "bestFor": [
+          "Repositories with active pull request queues where merge conflicts regularly block review or merge.",
+          "Teams comfortable with Charlie pushing clear conflict-resolution commits to pull request branches.",
+          "Repositories where PR intent, tests, and ownership boundaries make mechanical conflict repair safe to attempt."
+        ],
+        "notFor": [
+          "Teams that do not want automated commits pushed to pull request branches.",
+          "Repositories where merge conflicts usually require product, security, data-shape, or dependency-substitution decisions.",
+          "Repositories where most pull requests come from forks that Charlie should not update."
+        ]
+      },
+      "requirements": {
+        "requiredIntegrations": [
+          "github"
+        ],
+        "optionalIntegrations": [],
+        "other": [
+          "GitHub mergeability metadata for open pull requests."
+        ]
+      },
+      "adaptation": {
+        "mustCustomize": [
+          "Confirm the target base branch scope, such as `main` or `master`, force-push policy, and conflict categories are aligned with the team's expectations."
+        ]
+      },
+      "daemon": {
+        "path": "DAEMON.md",
+        "content": "---\nid: pr-merge-conflict-repair\npurpose: Resolve merge conflicts on non-draft pull requests found after repository branch changes.\nwatch:\n  - A GitHub push updates `refs/heads/main`.\nroutines:\n  - Run `bun .agents/daemons/pr-merge-conflict-repair/scripts/find-conflicted-pulls.ts --repo <owner/repo>` to find open non-draft PRs with mergeability state `CONFLICTING`.\n  - Re-fetch the current remote PR head and the PR's current base branch before editing each conflicted PR.\n  - Resolve the conflict and push to the existing PR branch when repo context, tests, and PR intent make the resolution clear.\n  - Run focused verification after conflict resolution when feasible.\ndeny:\n  - Do not update PRs that are only behind their base branch and not conflicting.\n  - Do not act on draft PRs.\n  - Do not push to fork or cross-repository PR branches unless maintainer edits are explicitly allowed and safe.\n  - Do not fix unrelated checks except generated artifacts, lockfiles, or snapshots directly required by the conflict resolution.\n  - Do not make product, security, dependency-substitution, external-environment, production-data, backfill, or data-shape decisions solely to resolve conflicts.\n  - Do not continue on a PR if its remote head changes during the run.\n  - Do not open new pull requests or new issues.\n  - Do not submit PR reviews, approve, or request changes on pull requests.\n  - Do not force-push unless repo policy explicitly permits rebase-based repair; use `--force-with-lease` only after fresh remote verification.\n---\n\n# PR Merge Conflict Repair\n\n## Candidate discovery\n\nRun the candidate discovery script before any repair work. Treat its output as a candidate list, not as authority to edit.\n\nDefault-branch pushes are the survey trigger, not proof that every conflict was caused by the default branch. The discovery script may return conflicted non-draft PRs targeting any base branch; repair each PR against its own current base.\n\nIf no non-draft PRs are conflicting, stop/no-op without commenting. Skip PRs whose mergeability remains `UNKNOWN` after retry.\n\n## Repair decision policy\n\nFix and push when the PR is still conflicting, the remote head has not changed, and the conflict resolution is clear from repo context, tests, and PR intent.\n\nStop/no-op and comment with the blocking reason when the conflict requires human judgment, unclear product intent, dependency substitution, external configuration, production data/backfill decisions, or unavailable permissions/tooling.\n\nUse the repo/platform's default branch-update mechanism when available. If it is unavailable or cannot resolve the conflict, choose merge or rebase case by case based on repo conventions and the safest path for the PR branch.\n\nIf the base branch moves during the run, re-fetch and re-evaluate against the new base. Continue only if the resolution is still clear.\n\n## Comment policy\n\nComment only when blocked and human action is needed. Include the PR, conflict summary, what was attempted, why the daemon stopped, and the next human action.\n\nDo not comment for routine no-ops: no conflicted candidates, draft PRs, PRs no longer conflicting, PR head changed, or mergeability still `UNKNOWN`.\n"
+      },
+      "scripts": [
+        "scripts/find-conflicted-pulls.ts"
+      ],
+      "references": [],
+      "source": {
+        "directory": "daemons/pr-merge-conflict-repair",
+        "url": "https://github.com/charlie-labs/daemons/tree/master/daemons/pr-merge-conflict-repair"
       }
     },
     {
       "id": "pr-metadata",
       "title": "PR Metadata Manager",
       "status": "ready",
-      "summary": "Keeps pull request titles and bodies complete, current, and linked to the right issue item.",
+      "summary": "Keeps pull request titles and bodies complete, current, and linked to the right issues.",
       "readiness": "adapt-before-use",
       "showOnWebsite": true,
       "showInDashboard": true,
@@ -296,19 +385,20 @@
         ],
         "other": [
           "A documented PR metadata contract for title suffixes, body sections, and issue references.",
-          "A clear issue identifier pattern and source of truth for linked issue relationships."
+          "A selected issue tracker or linked-issue source of truth.",
+          "A clear issue ID pattern for the selected issue source."
         ]
       },
       "adaptation": {
         "mustCustomize": [
-          "Replace the placeholder issue identifier pattern with the team's real format.",
+          "Specify the issue tracker or linked-issue source of truth and the team's issue ID pattern.",
           "Confirm the exact required PR body sections and explicit issue-reference line.",
           "Confirm how linked issue IDs should be inferred for the team's workflow."
         ]
       },
       "daemon": {
         "path": "DAEMON.md",
-        "content": "---\nid: pr-metadata\npurpose: Keep open non-draft pull request title and body metadata accurate, reviewable, and linked to the right issue-tracker items.\nwatch:\n  - A GitHub pull request event opens, edits, reopens, or synchronizes an open non-draft pull request.\n  - A direct mention or review comment asks for pull request title or body metadata repair.\nroutines:\n  - Determine confidently relevant issue IDs from linked metadata, branch name, title, and body.\n  - Repair the pull request title issue suffix when the primary issue is clear.\n  - Repair or refresh required pull request body sections when current pull request context makes accurate content clear.\n  - Ensure the pull request body ends with explicit issue reference lines for confidently relevant issues.\n  - Apply minimal title or body edits only when needed.\ndeny:\n  - Do not act on draft, closed, or merged pull requests.\n  - Do not act outside the triggering repository and pull request.\n  - Do not edit source code, tests, CI config, labels, reviewers, assignees, milestones, review state, comments, issues, Linear records, pull request state, or other non-metadata fields.\n  - Do not rewrite the full pull request body when targeted section edits are sufficient.\n  - Do not guess issue IDs, title suffixes, or body content when evidence is ambiguous.\n  - Do not change an existing valid Refs or Resolves keyword unless the issue reference line is malformed or missing.\n  - Do not post comments for successful edits, blocked cases, or routine no-ops.\n---\n\n# PR Metadata Manager\n\n## Scope\n\nThis daemon manages pull request metadata only:\n\n- title issue suffix correctness\n- required body sections\n- final explicit issue reference lines\n\nIt should make the smallest safe update that satisfies the repository metadata contract and otherwise stay silent.\n\n## Issue inference\n\nUse the strongest available source first:\n\n1. linked GitHub or issue-tracker metadata\n2. branch name\n3. existing pull request title\n4. existing pull request body\n\nInfer a set of confidently relevant issue IDs. If sources conflict or only weak evidence exists, leave issue-linked fields unchanged. If no safe metadata edit remains, no-op silently.\n\nChoose one primary issue ID for the title suffix. Prefer the primary linked or closing issue when that is clear. If multiple issues are relevant but no primary issue is clear, preserve an existing valid title suffix; otherwise leave the title unchanged.\n\n## Title policy\n\nThe pull request title should end with exactly one issue ID token matching `<issue-id-pattern>`, such as `ENG-9048`.\n\nWhen the primary issue is clear, patch only the trailing issue suffix:\n\n- Add the suffix when missing.\n- Replace a stale trailing issue token.\n- Preserve existing title wording and punctuation whenever possible.\n\nOn edit events, restore the required suffix when a human edit removes or stales it and the primary issue is still clear.\n\n## Body policy\n\nThe pull request body should contain these headings, normalized exactly:\n\n1. `## Primary changes`\n2. `## Reviewer walkthrough`\n3. `## Correctness and invariants`\n4. `## Testing and QA`\n\nNormalize equivalent headings to the required headings. Preserve accurate human wording inside sections. Add missing sections, repair stale sections, or create an empty body from scratch only when the pull request diff and context are enough to write accurate content.\n\nOn synchronize events, refresh existing sections only when they are clearly stale relative to the updated pull request diff. Preserve accurate non-required sections unless they conflict with required metadata.\n\n## Issue references\n\nThe pull request body should end with one explicit issue reference per line for every confidently relevant issue ID.\n\nUse:\n\n- `Resolves ENG-9048` when the issue appears to be resolved by the pull request.\n- `Refs ENG-9048` when the issue is related but not clearly resolved by the pull request.\n\nPreserve existing valid `Refs` or `Resolves` keywords. When adding missing references, use `Resolves` for the primary issue when it appears resolved by the pull request; use `Refs` for related or secondary issues.\n\nPreserve existing reference order and append missing issue IDs after existing references. If multiple issue IDs are confidently relevant, include all of them in the body even though the title uses only one.\n\n## Patch policy\n\nMake the smallest safe title or body edit that satisfies the metadata contract. Prefer targeted section edits over whole-body rewrites.\n\nStay silent for routine no-ops: already-correct metadata, draft/closed/merged pull requests, ambiguous issue inference, insufficient body context, unsupported event types, blocked edits, or successful metadata-only edits.\n"
+        "content": "---\nid: pr-metadata\npurpose: Keep open non-draft pull request titles and bodies accurate, reviewable, and linked to the right issues.\nwatch:\n  - A GitHub pull request is opened, edited, reopened, or synchronized while open and non-draft.\nroutines:\n  - Determine relevant issue IDs from linked issue metadata first, then branch name, title, and body.\n  - Repair the PR title issue suffix when the primary issue is clear.\n  - Repair or refresh required PR body sections when current PR context makes accurate content clear.\n  - Ensure the PR body ends with explicit issue reference lines for all confidently relevant issues.\n  - Apply minimal title/body edits only when needed.\ndeny:\n  - Do not act on draft, closed, or merged pull requests.\n  - Do not act outside the triggering repository and pull request.\n  - Do not edit source code, tests, CI config, labels, reviewers, assignees, milestones, review state, comments, issues, issue-tracker records, or other non-metadata fields.\n  - Do not rewrite the full PR body when targeted section edits are sufficient.\n  - Do not guess issue IDs, title suffixes, or body content when evidence is ambiguous.\n  - Do not change an existing valid `Refs` or `Resolves` keyword unless the issue reference line is malformed or missing.\n  - Do not post comments for successful edits, blocked cases, or routine no-ops.\n---\n\n# PR Metadata\n\n## Issue Inference\n\nUse the strongest available source first:\n\n1. Linked issue metadata.\n2. Branch name.\n3. Existing PR title.\n4. Existing PR body.\n\nInfer a set of confidently relevant issue IDs. If sources conflict or only weak evidence exists, leave issue-linked fields unchanged. If no safe metadata edit remains, stop/no-op silently.\n\nChoose one primary issue ID for the title suffix. Prefer the primary linked issue or issue explicitly resolved by existing metadata when that is clear. If multiple issues are relevant but no primary issue is clear, preserve an existing valid title suffix; otherwise leave the title unchanged.\n\n## Title Policy\n\nThe PR title should end with exactly one issue ID token, such as `ABC-123`.\n\nWhen the primary issue is clear, patch only the trailing issue suffix:\n\n- Add the suffix when missing.\n- Replace a stale trailing issue token.\n- Preserve existing title wording and punctuation whenever possible.\n\nOn `edited` events, restore the required suffix when a human edit removes or stales it and the primary issue is still clear.\n\n## Body Policy\n\nThe PR body should contain these headings, normalized exactly:\n\n1. `## Primary changes`\n2. `## Reviewer walkthrough`\n3. `## Correctness and invariants`\n4. `## Testing and QA`\n\nNormalize equivalent headings to the required headings. Preserve accurate human wording inside sections. Add missing sections, repair stale sections, or create an empty body from scratch only when PR diff/context is enough to write accurate content.\n\nOn `synchronize` events, refresh existing sections only when they are clearly stale relative to the updated PR diff. Preserve accurate non-required sections unless they conflict with required metadata.\n\n## Issue References\n\nThe PR body should end with one explicit issue reference per line for every confidently relevant issue ID.\n\nUse:\n\n- `Resolves ABC-123` when the issue appears to be resolved by the PR.\n- `Refs ABC-123` when the issue is related but not clearly resolved.\n\nPreserve existing valid `Refs` or `Resolves` keywords. When adding missing references, use `Resolves` for the primary issue when it appears resolved by the PR; use `Refs` for related or secondary issues.\n\nPreserve existing reference order and append missing issue IDs after existing references. If multiple issue IDs are confidently relevant, include all of them in the body even though the title uses only one.\n\n## Patch Policy\n\nMake the smallest safe PR title/body edit that satisfies the metadata contract. Prefer targeted section edits over whole-body rewrites.\n\nStay silent for routine no-ops: already-correct metadata, draft/closed/merged PRs, ambiguous issue inference, insufficient body context, unsupported event types, blocked edits, or successful metadata-only edits.\n"
       },
       "scripts": [],
       "references": [],
@@ -320,21 +410,20 @@
     {
       "id": "pr-review-triage",
       "title": "PR review triage",
-      "status": "deprecated",
-      "summary": "Triages PR review feedback for correctness, duplication, conflicts, and safe post-fix resolution.",
+      "status": "ready",
+      "summary": "Triages PR review threads and top-level PR comments for merge-readiness, duplicate feedback, fixed items, and safe low-noise follow-up.",
       "readiness": "adapt-before-use",
-      "showOnWebsite": false,
+      "showOnWebsite": true,
       "showInDashboard": false,
       "fit": {
         "jobsToBeDone": [
           "review-with-confidence"
         ],
         "bestFor": [
-          "Repositories with frequent, actionable GitHub PR review threads.",
-          "Teams that want duplicate or conflicting review feedback identified without changing code."
+          "Repositories with frequent actionable GitHub review threads or PR comments that affect merge-readiness.",
+          "Teams that want non-human feedback deduplicated, corrected, or acknowledged without changing code."
         ],
         "notFor": [
-          "Teams that want Charlie to approve, request changes, or rewrite code from review comments.",
           "Repositories where review feedback is tracked outside GitHub pull request threads."
         ]
       },
@@ -344,19 +433,18 @@
         ],
         "optionalIntegrations": [],
         "other": [
-          "GitHub pull request review threads are the source of truth for feedback state.",
+          "GitHub pull request review threads and top-level PR comments are the source of truth for feedback state.",
           "A repo-local policy for when duplicate or addressed feedback may be hidden or resolved."
         ]
       },
       "adaptation": {
         "mustCustomize": [
-          "Confirm the team's confidence threshold for resolving or hiding duplicate feedback.",
-          "Confirm the local convention for identifying Charlie-authored triage comments."
+          "Review the action policy and ensure it is aligned with the team's expectations."
         ]
       },
       "daemon": {
         "path": "DAEMON.md",
-        "content": "---\nid: pr-review-triage\npurpose: Keep pull request review feedback threads accurate by requiring explicit correctness triage, handling duplicate/conflicting feedback, and resolving fixed feedback safely with GitHub-only thread actions.\nwatch:\n  - Wake on every pull request review submission event from non-Charlie authors (human or bot).\n  - Wake on every pull request review comment event from non-Charlie authors (human or bot).\n  - Wake on pull request synchronize/update events (new commits pushed to the PR branch) to re-check unresolved review feedback after code changes.\nroutines:\n  - Bootstrap deterministic PR review context via `.agents/daemons/pr-review-triage/scripts/bootstrap-data.ts --repo <owner/repo> --pr <number>` before any triage action.\n  - Fail fast with no GitHub thread mutations when bootstrap completeness is not `complete`.\n  - For every actionable review feedback thread, produce an explicit correctness triage decision (`valid`, `invalid`, or `uncertain`) with rationale.\n  - Evaluate review feedback in the triggering pull request to detect semantic duplicates and conflicting guidance.\n  - Reply on duplicate feedback with a link to the canonical feedback item and a short duplicate rationale.\n  - Prefer hide/minimize for duplicate feedback when confidence is medium or high; if hide/minimize is unavailable, resolve instead.\n  - Reply on conflicting feedback with which guidance appears correct and why.\n  - After commits are pushed, detect whether unresolved feedback has been addressed in code and resolve the corresponding thread only when confidence is medium or high.\ndeny:\n  - Do not take actions outside GitHub.\n  - Do not perform actions other than reply, resolve, or hide/minimize on review feedback threads.\n  - Do not process pull request review or pull request review comment events authored by Charlie (`sender.isCharlie=true`); exit with no action.\n  - Do not treat Charlie-authored validation/triage comments as actionable feedback.\n  - Do not post validation replies (`valid`/`invalid`/`uncertain`) about Charlie-authored validation/triage comments, including this daemon's prior validation comments.\n  - Do not post validation replies (`valid`/`invalid`/`uncertain`) to human-authored comments.\n  - Do not post replies to human-authored review comments requesting changes; keep triage internal for those comments.\n  - Do not approve, request changes, dismiss reviews, or change pull request state.\n  - Do not edit code, push commits, or open new pull requests/issues.\n  - Do not autonomously resolve or hide/minimize feedback when confidence is low.\n  - Do not resolve a feedback thread just because a new commit mentions it; require code-level evidence and confidence threshold.\n  - Do not post repetitive or duplicate replies when the same semantic guidance was already posted and no new evidence is available.\n---\n\n# PR Review Triage\n\n## Scope\n\n- Operate only on pull request review, pull request review comment, and pull request synchronize/update activity.\n- Accept both human-authored and non-Charlie bot-authored review/comment triggers.\n- Process both human-authored and non-Charlie bot-authored reviews/comments, but do not reply to human-authored comments that request changes.\n- Self-trigger guard: if the triggering pull request review or pull request review comment event is authored by Charlie (`sender.isCharlie=true`), do nothing and exit.\n- Keep triage scoped to the current pull request and the feedback threads relevant to the trigger.\n\n## Bootstrap prerequisite (required)\n\nBefore evaluating any review feedback, run:\n\n```bash\nbun .agents/daemons/pr-review-triage/scripts/bootstrap-data.ts --repo <owner/repo> --pr <number>\n```\n\nRequired bootstrap policy:\n\n1. `--repo` and `--pr` are required. Do not infer identity from env, task metadata, or git remotes.\n2. The script performs a `gh api graphql` request for the requested PR and emits the raw response string to stdout.\n3. Parse and validate that response in daemon/runtime code before taking triage actions.\n\n## Human feedback precedence and validation boundaries\n\n- Human-authored PR feedback is the primary source-of-truth for action selection.\n- If human feedback conflicts with agent/bot feedback, prioritize the human feedback for canonical duplicate/conflict resolution choices.\n- You must still perform correctness triage for all actionable feedback internally.\n- Never post explicit validation labels (`valid`/`invalid`/`uncertain`) in replies to human-authored comments.\n- Validation-style replies are allowed only for non-human feedback contexts when needed.\n\n## Charlie self-validation exclusion (required)\n\nTreat Charlie-authored validation/triage comments as non-actionable and always skip them.\n\nA review comment/reply must be considered Charlie-authored validation/triage feedback when either check matches:\n\n1. Author login/name matches Charlie case-insensitively (for example: `charliecreates[bot]`, `CharlieCreates`, `CharlieHelps`).\n2. Comment body contains the daemon signature marker `— charlied/pr-review-triage`.\n\nRequired behavior:\n\n- Use these matches defensively: if either check matches, treat the comment as non-actionable.\n- Exclude matched comments from correctness triage, duplicate/conflict detection, and post-fix resolution decisions.\n- Do not post validation replies (`valid`/`invalid`/`uncertain`) about matched comments.\n- Never post a validation comment about this daemon's own validation comments.\n\n## Correctness triage policy (required per actionable comment)\n\nFor every actionable review comment/thread, you must classify review correctness as exactly one of:\n\n- `valid`: feedback is correct and points to a real issue, risk, or requirement gap.\n- `invalid`: feedback is not correct for the current PR state (for example, contradicted by code, tests, or repo policy).\n- `uncertain`: available evidence is insufficient to decide `valid` or `invalid` confidently.\n\nRequired behavior:\n\n1. Produce one explicit classification (`valid` / `invalid` / `uncertain`) for each actionable comment.\n2. Include a concise rationale grounded in concrete evidence (diff, file behavior, tests, invariants, or documented conventions).\n3. If classification is `uncertain`, explain what is ambiguous and avoid autonomous resolve/hide/minimize actions.\n\nFor human-authored comments requesting changes, keep this classification internal and do not post reply comments.\nWhen the actionable comment is human-authored, keep this classification internal and do not post a validation-style reply.\n\nDuplicate/conflict detection does not replace correctness triage. Every actionable comment still requires an explicit correctness classification.\n\n## Duplicate detection policy\n\nClassify feedback as a semantic duplicate when it points to the same underlying fix, even if wording, tone, code span, or author differs.\n\nWhen a duplicate is detected:\n\n1. Identify a canonical feedback item (prefer the earliest still-relevant thread with the clearest requested fix).\n2. Prefer human-authored canonical feedback over bot/agent-authored feedback when they are semantically equivalent.\n3. Post a reply on the duplicate that links to the canonical feedback item.\n4. Include a concise rationale for why the feedback is considered duplicate.\n5. If confidence is medium or high, hide/minimize the duplicate when possible.\n6. If hide/minimize is unavailable, resolve the duplicate instead.\n\nAlways include the canonical link in the duplicate reply, even when no autonomous hide/resolve action is taken.\nBefore posting, detect whether an equivalent duplicate/conflict/uncertainty reply already exists in the thread. If yes, do not post another equivalent reply.\n\n## Confidence and autonomy\n\n- `high` confidence: strong evidence the classification is correct.\n- `medium` confidence: sufficient evidence with minor ambiguity.\n- `low` confidence: meaningful ambiguity remains.\n\nAutonomous resolve/hide/minimize is allowed only at `medium` or `high` confidence.\nIf confidence is `low`, leave a reply explaining uncertainty and do not resolve/hide/minimize.\n\n## Conflict handling policy\n\nTreat feedback as conflicting when requested changes cannot both be true at once (for example, opposite implementation direction, incompatible correctness claims, or mutually exclusive code paths).\n\nWhen conflict is detected, reply in-thread with:\n\n- which feedback appears correct,\n- why it appears correct (reference code behavior, invariants, tests, or established repo conventions),\n- and what remains uncertain if confidence is not high.\n\n## Post-fix detection and resolution policy\n\nWhen new commits are pushed to the PR branch, re-check unresolved actionable feedback threads against the updated code.\n\nRequired behavior:\n\n1. Detect whether the pushed diff addresses each unresolved actionable feedback item.\n2. For feedback that appears addressed, assess confidence that the underlying issue is actually fixed.\n3. Resolve (or hide/minimize when appropriate for duplicates) only when confidence is `medium` or `high`.\n4. If confidence is `low`, keep the thread unresolved and reply with the remaining uncertainty.\n\nDo not resolve based only on intent statements, commit messages, or partial evidence; resolution requires code-level evidence that the feedback is addressed.\n\n## Anti-loop policy\n\n- Detect repetitive interaction loops (for example: repeated re-statements of the same conclusion by Charlie with no new code or evidence change).\n- If the current action would repeat an equivalent prior Charlie reply in the same thread, remain silent.\n- Only post another reply when new evidence, state change, or materially different reasoning exists.\n- When in doubt between repeating vs. silence, choose silence.\n\n## Action boundaries\n\n- Stay in GitHub only.\n- Allowed actions: reply, resolve, hide/minimize.\n- Prefer hide/minimize over resolve for duplicates when autonomous action is allowed.\n- Use resolve only as the fallback when hide/minimize is unavailable.\n"
+        "content": "---\nid: pr-review-triage\npurpose: Keep non-draft pull request feedback focused on merge-readiness by assessing feedback and resolving items that no longer need reviewer attention.\nwatch:\n  - A GitHub pull request review is submitted on an open non-draft pull request.\n  - A top-level GitHub PR comment is created on an open non-draft pull request.\n  - A GitHub pull request head commit changes on an open non-draft pull request.\nroutines:\n  - Bootstrap PR review, issue-comment, thread, and pagination context via `bun .agents/daemons/pr-review-triage/scripts/bootstrap-data.ts --repo <owner/repo> --pr <number>` before any triage action.\n  - Treat each review thread or top-level PR issue comment as one triage item.\n  - \"Assign each actionable item one disposition: `valid`, `invalid`, `duplicate`, `fixed`, or `uncertain`.\"\n  - Apply the author-specific action policy for the item disposition.\n  - Re-check unresolved review feedback after PR head updates and resolve fixed threads only with code-level evidence.\ndeny:\n  - Do not act on draft, closed, or merged pull requests.\n  - Do not process events authored by Charlie; exit with no action.\n  - Do not process GitHub `pull_request_review_comment` webhook events; exit with no action.\n  - Do not act outside the triggering repository or pull request, or outside review threads and top-level PR comments that belong to that pull request.\n  - Do not treat Charlie-authored triage comments as actionable feedback.\n  - Do not reply to, hide, minimize, or add reactions to human-authored review comments or top-level PR comments.\n  - Do not approve, request changes, dismiss reviews, merge pull requests, or change pull request state.\n  - Do not edit code, push commits, open pull requests, or open issues.\n  - Do not perform GitHub mutations other than posting comments/replies, resolving review threads, hiding/minimizing comments, or adding reactions required by this policy.\n  - Do not resolve human-authored review threads unless the fix is mechanical, unambiguous, and strongly evidenced in code.\n  - Do not resolve, hide, minimize, or react when confidence is low.\n  - Do not resolve a feedback thread just because a new commit mentions it; require code-level evidence.\n  - Do not post repetitive comments when an equivalent Charlie comment or fix acknowledgement already exists.\n---\n\n# PR Review Triage\n\n## Bootstrap\n\nBefore evaluating feedback, run:\n\n```bash\nbun .agents/daemons/pr-review-triage/scripts/bootstrap-data.ts --repo <owner/repo> --pr <number>\n```\n\nThe script emits raw GraphQL JSON. Parse the response, confirm the PR is open and non-draft, and inspect every relevant `pageInfo`. If relevant reviews, review threads, thread comments, or top-level PR comments are paginated beyond the returned data, stop/no-op rather than acting from incomplete context.\n\n## Triage Items\n\nTreat each review thread as one item. Treat each top-level PR issue comment as one item because issue comments do not have thread resolution.\n\nTop-level PR issue comments are eligible only when they contain concrete merge-readiness feedback or a correctness claim. Silently skip routine automation, status, subscription, or linkback comments. This issue-comment gate does not apply to PR review comments or review threads.\n\nIgnore Charlie-authored triage output. Treat output as Charlie-authored when the author is Charlie or the body contains `charlied/pr-review-triage`.\n\nUse fetched author metadata for action policy: Charlie markers win; `User` authors are human-authored; bot/app authors are non-human; missing or ambiguous author identity uses the most restrictive applicable policy.\n\nHuman-authored feedback is authoritative context for merge-readiness. Use it to choose canonical duplicate items and to invalidate conflicting non-human feedback, but do not publicly adjudicate human feedback.\n\n## Dispositions\n\nAssign exactly one disposition to each actionable item:\n\n- `valid`: the feedback identifies a real merge-readiness issue, risk, or requirement gap.\n- `invalid`: the feedback is contradicted by code, tests, repo policy, or stronger human feedback.\n- `duplicate`: the feedback requests the same underlying fix as another item.\n- `fixed`: the feedback was valid, but current code-level evidence shows it has been addressed.\n- `uncertain`: available evidence is insufficient for a confident disposition.\n\nUse `high`, `medium`, or `low` confidence. Mutating actions require `medium` or `high` confidence.\n\n## Action Policy\n\nFor human-authored review threads:\n\n- `valid`: leave unresolved without comment.\n- `invalid`: do not comment; resolve only when the issue is clearly mechanical, unambiguous, and contradicted by current code or policy.\n- `duplicate`: do not comment, hide, minimize, or resolve.\n- `fixed`: resolve only with strong code-level evidence; if someone already said the issue was fixed, just resolve.\n- `uncertain`: no-op.\n\nFor non-human review threads:\n\n- `valid`: reply with a concise rationale or useful context, then leave unresolved.\n- `invalid`: reply with the rationale, then resolve or hide/minimize when confidence is `medium` or `high`.\n- `duplicate`: reply with a link to the canonical source item and a short duplicate rationale, then hide/minimize when confidence is `medium` or `high`.\n- `fixed`: reply with the code-level evidence and resolve, unless someone already said it was fixed; then only resolve.\n- `uncertain`: leave unresolved; reply only when the uncertainty itself helps reviewers decide merge-readiness.\n\nFor human-authored top-level PR issue comments:\n\n- Treat them as authoritative context.\n- Do not reply, hide/minimize, resolve, or add reactions.\n\nFor non-human top-level PR issue comments:\n\n- `valid`: add a thumbs-up reaction; post a comment only when extra context materially helps reviewers.\n- `invalid`: add a thumbs-down reaction, then post a new top-level PR comment linking to the invalid comment and explaining why it is invalid.\n- `duplicate`: hide/minimize the duplicate when possible, and post a new top-level PR comment linking the duplicate to the canonical source item.\n- `fixed`: post a fixed acknowledgement only when it helps reviewers; skip the comment when someone already acknowledged the fix.\n- `uncertain`: no-op unless a short uncertainty comment would reduce reviewer confusion.\n\n## Duplicate And Conflict Policy\n\nClassify feedback as duplicate when it points to the same underlying fix, even if wording, line span, or author differs. Prefer a human-authored canonical item over an equivalent non-human item. Otherwise prefer the earliest still-relevant item with the clearest requested fix.\n\nTreat feedback as conflicting when requested changes cannot both be correct. Human feedback overrides conflicting non-human feedback unless current code or repo policy clearly proves the human feedback was mechanical and incorrect.\n\n## Idempotency\n\nBefore any visible action, check whether an equivalent Charlie reply, top-level comment, reaction, resolve, hide, or minimize action already exists for the same item and PR head. If yes, do not repeat it.\n\nStay silent for routine no-ops: draft/closed/merged PRs, Charlie-authored triggers, unsupported event types, incomplete relevant pagination, or equivalent actions already taken.\n\nWhen a PR head update makes feedback fixed, do not post a fixed comment if the fix author or another reviewer already said the thread/comment was fixed. Resolve the thread when resolution is allowed.\n\nUse reviewer value as the tie-breaker when the rules do not decide: act only when the action makes it easier to determine whether the PR is ready to merge or what must change before it can merge.\n"
       },
       "scripts": [
         "scripts/bootstrap-data.ts"

@@ -1,9 +1,7 @@
-#!/usr/bin/env bun
-
-import { spawnSync } from 'node:child_process';
+import { spawnSync } from "node:child_process";
 
 const USAGE =
-  'Usage: bun .agents/daemons/pr-review-triage/scripts/bootstrap-data.ts --repo <owner/repo> --pr <number>';
+  "Usage: bun .agents/daemons/pr-review-triage/scripts/bootstrap-data.ts --repo <owner/repo> --pr <number>";
 
 const HELP_TEXT = `Bootstrap baseline data for the pr-review-triage daemon.
 
@@ -20,10 +18,22 @@ query PrReviewTriageBootstrap($owner: String!, $repo: String!, $prNumber: Int!) 
   repository(owner: $owner, name: $repo) {
     nameWithOwner
     pullRequest(number: $prNumber) {
+      id
       number
       title
       state
+      isDraft
+      merged
       url
+      baseRefName
+      baseRefOid
+      headRefName
+      headRefOid
+      author {
+        __typename
+        login
+      }
+      authorAssociation
       reviews(first: 100) {
         pageInfo {
           hasNextPage
@@ -35,7 +45,9 @@ query PrReviewTriageBootstrap($owner: String!, $repo: String!, $prNumber: Int!) 
           submittedAt
           body
           url
+          authorAssociation
           author {
+            __typename
             login
           }
         }
@@ -49,6 +61,7 @@ query PrReviewTriageBootstrap($owner: String!, $repo: String!, $prNumber: Int!) 
           id
           isResolved
           isOutdated
+          viewerCanResolve
           path
           line
           comments(first: 100) {
@@ -62,8 +75,21 @@ query PrReviewTriageBootstrap($owner: String!, $repo: String!, $prNumber: Int!) 
               createdAt
               updatedAt
               url
+              authorAssociation
+              isMinimized
+              minimizedReason
+              viewerCanMinimize
+              viewerCanReact
               author {
+                __typename
                 login
+              }
+              reactionGroups {
+                content
+                viewerHasReacted
+                users(first: 1) {
+                  totalCount
+                }
               }
             }
           }
@@ -80,8 +106,21 @@ query PrReviewTriageBootstrap($owner: String!, $repo: String!, $prNumber: Int!) 
           createdAt
           updatedAt
           url
+          authorAssociation
+          isMinimized
+          minimizedReason
+          viewerCanMinimize
+          viewerCanReact
           author {
+            __typename
             login
+          }
+          reactionGroups {
+            content
+            viewerHasReacted
+            users(first: 1) {
+              totalCount
+            }
           }
         }
       }
@@ -90,20 +129,26 @@ query PrReviewTriageBootstrap($owner: String!, $repo: String!, $prNumber: Int!) 
 }
 `;
 
-function parseArgs(argv: readonly string[]) {
+interface CliArgs {
+  repoOwner: string;
+  repoName: string;
+  prNumber: number;
+}
+
+function parseArgs(argv: readonly string[]): CliArgs {
   let repoRaw: string | null = null;
   let prRaw: string | null = null;
 
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
 
-    if (token === '--repo' || token === '--pr') {
+    if (token === "--repo" || token === "--pr") {
       const value = argv[index + 1];
-      if (!value || value.startsWith('-')) {
-        throw new Error(`Missing value for ${token}.\n${USAGE}`);
+      if (!value || value.startsWith("-")) {
+        throw new TypeError(`Missing value for ${token}.\n${USAGE}`);
       }
 
-      if (token === '--repo') {
+      if (token === "--repo") {
         repoRaw = value;
       } else {
         prRaw = value;
@@ -113,68 +158,81 @@ function parseArgs(argv: readonly string[]) {
       continue;
     }
 
-    if (token === '-h' || token === '--help') {
+    if (token === "-h" || token === "--help") {
       process.stdout.write(HELP_TEXT);
       process.exit(0);
     }
 
-    throw new Error(`Unknown argument: ${token}\n${USAGE}`);
+    throw new TypeError(`Unknown argument: ${token}\n${USAGE}`);
   }
 
   if (!repoRaw || !prRaw) {
-    throw new Error(`Both --repo and --pr are required.\n${USAGE}`);
+    throw new TypeError(`Both --repo and --pr are required.\n${USAGE}`);
   }
 
-  const [repoOwner, repoName, extra] = repoRaw.split('/');
+  const [repoOwner, repoName, extra] = repoRaw.split("/");
   if (!repoOwner || !repoName || extra) {
-    throw new Error(`Invalid --repo value: ${repoRaw}. Expected owner/repo.`);
+    throw new TypeError(
+      `Invalid --repo value: ${repoRaw}. Expected owner/repo.`,
+    );
   }
 
-  const prNumber = Number.parseInt(prRaw, 10);
-  if (!Number.isInteger(prNumber) || prNumber <= 0) {
-    throw new Error(
-      `Invalid --pr value: ${prRaw}. Expected a positive integer.`
+  const prNumber = parseIntegerString(prRaw, "--pr");
+  if (prNumber <= 0) {
+    throw new RangeError(
+      `Invalid --pr value: ${prRaw}. Expected a positive integer.`,
     );
   }
 
   return { repoOwner, repoName, prNumber };
 }
 
-function fetchBootstrapData(args: {
-  repoOwner: string;
-  repoName: string;
-  prNumber: number;
-}): string {
+function parseIntegerString(value: string, flag: string): number {
+  if (!/^[0-9]+$/.test(value)) {
+    throw new RangeError(`${flag} must be an integer.`);
+  }
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) {
+    throw new RangeError(`${flag} must be an integer.`);
+  }
+
+  return parsed;
+}
+
+function fetchBootstrapData(args: CliArgs): string {
   const result = spawnSync(
-    'gh',
+    "gh",
     [
-      'api',
-      'graphql',
-      '-f',
+      "api",
+      "graphql",
+      "-f",
       `query=${GRAPHQL_QUERY}`,
-      '-F',
+      "-F",
       `owner=${args.repoOwner}`,
-      '-F',
+      "-F",
       `repo=${args.repoName}`,
-      '-F',
+      "-F",
       `prNumber=${args.prNumber}`,
     ],
     {
-      encoding: 'utf8',
+      encoding: "utf8",
       maxBuffer: 10 * 1024 * 1024,
-    }
+    },
   );
 
   if (result.error) {
-    throw new Error(`Failed to run gh api graphql: ${result.error.message}`);
+    throw new TypeError(
+      `Failed to run gh api graphql: ${result.error.message}`,
+    );
   }
 
   if (result.status !== 0) {
     const stderr = result.stderr?.trim();
-    throw new Error(
+    throw new TypeError(
       stderr && stderr.length > 0
         ? `gh api graphql failed: ${stderr}`
-        : `gh api graphql failed with exit code ${String(result.status)}`
+        : `gh api graphql failed with exit code ${String(result.status)}`,
     );
   }
 
@@ -188,7 +246,7 @@ function main(): void {
     process.stdout.write(output);
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'Unknown bootstrap-data error';
+      error instanceof Error ? error.message : "Unknown bootstrap-data error";
     process.stderr.write(`${message}\n`);
     process.exit(1);
   }

@@ -84,7 +84,7 @@ Example install metadata:
   "catalogRepository": "charlie-labs/daemons",
   "catalogRef": "11da8066b1e0cf968d07ce512f65a9a817f9bc10",
   "catalogSchemaVersion": 1,
-  "exampleId": "dependency-upgrades"
+  "exampleId": "js-ts-dependency-upgrades"
 }
 ```
 
@@ -135,8 +135,8 @@ Recommended flow:
 Path mapping example:
 
 ```text
-source:      daemons/dependency-upgrades/scripts/detect-package-manager.sh
-installed:   .agents/daemons/dependency-upgrades/scripts/detect-package-manager.sh
+source:      daemons/js-ts-dependency-upgrades/references/package-manager-adaptation.md
+installed:   .agents/daemons/js-ts-dependency-upgrades/references/package-manager-adaptation.md
 ```
 
 TypeScript-shaped pseudocode:
@@ -178,10 +178,10 @@ Catalog v1 lists support file paths, not file contents or mode metadata.
 If a support script requires executable bits, consumers that write through GitHub APIs should either preserve or set `100755` through tree APIs, or invoke the script through an interpreter instead of relying on executable mode. For example, the current catalog includes:
 
 ```text
-daemons/dependency-upgrades/scripts/detect-package-manager.sh
+daemons/js-ts-dependency-upgrades/references/package-manager-adaptation.md
 ```
 
-That script is executable in the source repository, but v1 does not represent that mode in `examples.json`.
+That support file is listed in the catalog, but v1 does not include support file contents in `examples.json`.
 
 Consumers should treat any support-file fetch failure as a blocking install failure. A partial daemon copy can be misleading if `DAEMON.md` references scripts or reference material that were not installed.
 
