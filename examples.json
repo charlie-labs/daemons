@@ -110,12 +110,11 @@
       "showInDashboard": true,
       "fit": {
         "jobsToBeDone": [
-          "operate",
-          "explain"
+          "operate"
         ],
         "bestFor": [
           "Teams that want lightweight visibility without manual GitHub status gathering.",
-          "Repositories or organizations with enough pull request and CI activity to summarize daily."
+          "Repositories with enough pull request and CI activity to summarize daily."
         ],
         "notFor": [
           "Teams that need incident, release, or people-management reporting beyond GitHub activity.",
@@ -129,20 +128,19 @@
         ],
         "optionalIntegrations": [],
         "other": [
-          "A configured destination channel or thread for the digest.",
+          "A configured Slack channel for the digest.",
           "Agreed signal thresholds and privacy rules for what belongs in the digest."
         ]
       },
       "adaptation": {
         "mustCustomize": [
-          "Configure repository or organization scope.",
-          "Configure the destination channel and duplicate-post detection strategy.",
-          "Tune signal thresholds, quiet-day behavior, and privacy rules."
+          "Replace the Slack channel placeholder with the destination channel name.",
+          "Configure the duplicate-post detection strategy."
         ]
       },
       "daemon": {
         "path": "DAEMON.md",
-        "content": "---\nid: github-activity-digest\npurpose: Publish one low-noise daily digest of meaningful GitHub pull request and CI activity.\nroutines:\n  - Collect meaningful GitHub pull request and CI activity since the previous scheduled run.\n  - Select only high-signal items that changed what the team needs to know or do.\n  - Post one concise digest to the configured team destination when the signal threshold is met.\ndeny:\n  - Do not modify GitHub state.\n  - Do not post more than one digest for the same UTC date.\n  - Do not post raw event dumps, long watch lists, speculative metrics, or inferred performance scores.\n  - Do not name people in problem-oriented bullets unless the team policy explicitly allows it.\n  - Do not post on low-signal days unless the team explicitly wants quiet-day confirmations.\nschedule: '0 15 * * 1-5'\n---\n\n# GitHub Activity Digest\n\n## Scope\n\nCollect activity from the configured GitHub organization or repository set.\n\nDefault window:\n\n- previous scheduled run to current scheduled run\n- Monday includes weekend activity since the prior Friday run\n\n## Signal threshold\n\nInclude activity only when it changes what the team needs to know or do.\n\nExamples:\n\n- pull request merged\n- pull request opened and ready for review\n- pull request unblocked\n- recurring CI failure affecting active work\n- important deploy or release activity\n\nExclude:\n\n- label-only churn\n- assignment-only changes\n- bot housekeeping\n- comment-only chatter without action\n- duplicate references to the same underlying change\n\n## Low-noise behavior\n\nIf fewer than two meaningful items exist, do not post unless the single item is a critical blocker or unblocker.\n\nIf no item meets the signal threshold, no-op silently.\n\n## Output format\n\nUse `references/digest-template.md`.\n\nLimits:\n\n- 8 total bullets maximum\n- 1 link maximum per bullet\n- no tables\n- no nested bullet lists\n- no unverified counts\n\n## Idempotency\n\nUse a daily key:\n\n```text\ngithub-activity-digest:<YYYY-MM-DD>\n```\n\nBefore posting, check whether a digest with the same key already exists. If yes, exit with no action unless correcting a factual error in the existing digest is safe and supported.\n\n## Escalation\n\nSkip posting and ask for human attention when:\n\n- GitHub data is incomplete or contradictory\n- destination configuration is missing\n- duplicate-post detection cannot be performed\n- privacy policy for the selected content is unclear\n"
+        "content": "---\nid: github-activity-digest\npurpose: Publish one low-noise daily digest of meaningful GitHub pull request and CI activity.\nroutines:\n  - Collect meaningful GitHub pull request and CI activity since the previous scheduled run.\n  - Select only high-signal items that changed what the team needs to know or do.\n  - Post one concise digest to the configured Slack channel when the signal threshold is met.\ndeny:\n  - Do not modify GitHub state.\n  - Do not create more than one digest message for the same UTC date.\n  - Do not post raw event dumps, long watch lists, speculative metrics, or inferred performance scores.\n  - Do not name people in problem-oriented bullets unless the team policy explicitly allows it.\n  - Do not post on low-signal days unless the team explicitly wants quiet-day confirmations.\nschedule: \"0 15 * * 1-5\"\n---\n\n# GitHub Activity Digest\n\n## Repository configuration\n\nUse this repository-specific value:\n\n- Slack channel: `<slack_channel_name>`\n\n## Scope\n\nCollect activity from the repository that contains this daemon.\n\nDefault window:\n\n- previous scheduled run to current scheduled run\n- Monday includes weekend activity since the prior Friday run\n\n## Signal threshold\n\nInclude activity only when it changes what the team needs to know or do.\n\nExamples:\n\n- pull request merged\n- pull request opened and ready for review\n- pull request unblocked\n- recurring CI failure affecting active work\n\nExclude:\n\n- label-only churn\n- assignment-only changes\n- bot housekeeping\n- comment-only chatter without action\n- duplicate references to the same underlying change\n\n## Low-noise behavior\n\nIf fewer than two meaningful items exist, do not post unless the single item is a critical blocker or unblocker.\n\nIf no item meets the signal threshold, no-op silently.\n\nNo-op silently when there has been no repository activity since the previous scheduled run.\n\n## Output format\n\nUse `references/digest-template.md`.\n\nFormat the Slack message with Slack `mrkdwn`, not standard Markdown. Use Slack link syntax (`<url|label>`), bold section labels with `*text*`, and plain hyphen bullets. Do not use Markdown headings, Markdown links (`[label](url)`), tables, nested lists, or code fences in the final Slack message.\n\nLimits:\n\n- 1 link maximum per bullet\n- no tables\n- no nested bullet lists\n- no unverified counts\n\n## Communication policy\n\nNo-op silently when no item meets the signal threshold, duplicate detection shows today's digest already exists, or required configuration is missing.\n\nDo not post a digest asking for configuration or policy decisions. Surface blockers only when a configured safe Slack channel exists and human action is required.\n"
       },
       "scripts": [],
       "references": [
