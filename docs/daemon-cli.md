@@ -42,9 +42,9 @@ daemon list
 Use `--ref <sha|branch|tag>` for reproducible reads and installs:
 
 ```bash
-daemon show js-ts-dependency-upgrades --ref 11da8066b1e0cf968d07ce512f65a9a817f9bc10
+daemon show dependency-upgrades --ref 11da8066b1e0cf968d07ce512f65a9a817f9bc10
 
-daemon add js-ts-dependency-upgrades --ref 11da8066b1e0cf968d07ce512f65a9a817f9bc10
+daemon add dependency-upgrades --ref 11da8066b1e0cf968d07ce512f65a9a817f9bc10
 ```
 
 A single command uses the same ref for `examples.json` and every support-file fetch.

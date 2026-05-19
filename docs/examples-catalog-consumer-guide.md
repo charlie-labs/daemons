@@ -84,7 +84,7 @@ Example install metadata:
   "catalogRepository": "charlie-labs/daemons",
   "catalogRef": "11da8066b1e0cf968d07ce512f65a9a817f9bc10",
   "catalogSchemaVersion": 1,
-  "exampleId": "js-ts-dependency-upgrades"
+  "exampleId": "dependency-upgrades"
 }
 ```
 
