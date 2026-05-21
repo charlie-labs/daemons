@@ -1,53 +1,46 @@
 ---
 id: pr-metadata
-purpose: Keep open non-draft pull request title and body metadata accurate, reviewable, and linked to the right issue-tracker items.
+purpose: Keep open non-draft pull request titles and bodies accurate, reviewable, and linked to the right issues.
 watch:
-  - A GitHub pull request event opens, edits, reopens, or synchronizes an open non-draft pull request.
-  - A direct mention or review comment asks for pull request title or body metadata repair.
+  - A GitHub pull request is opened, edited, reopened, or synchronized while open and non-draft.
 routines:
-  - Determine confidently relevant issue IDs from linked metadata, branch name, title, and body.
-  - Repair the pull request title issue suffix when the primary issue is clear.
-  - Repair or refresh required pull request body sections when current pull request context makes accurate content clear.
-  - Ensure the pull request body ends with explicit issue reference lines for confidently relevant issues.
-  - Apply minimal title or body edits only when needed.
+  - Determine relevant issue IDs from linked issue metadata first, then branch name, title, and body.
+  - Repair the PR title issue suffix when the primary issue is clear.
+  - Repair or refresh required PR body sections when current PR context makes accurate content clear.
+  - Ensure the PR body ends with explicit issue reference lines for all confidently relevant issues.
+  - Apply minimal title/body edits only when needed.
 deny:
   - Do not act on draft, closed, or merged pull requests.
   - Do not act outside the triggering repository and pull request.
-  - Do not edit source code, tests, CI config, labels, reviewers, assignees, milestones, review state, comments, issues, Linear records, pull request state, or other non-metadata fields.
-  - Do not rewrite the full pull request body when targeted section edits are sufficient.
+  - Do not edit source code, tests, CI config, labels, reviewers, assignees, milestones, review state, comments, issues, issue-tracker records, or other non-metadata fields.
+  - Do not rewrite the full PR body when targeted section edits are sufficient.
   - Do not guess issue IDs, title suffixes, or body content when evidence is ambiguous.
-  - Do not change an existing valid Refs or Resolves keyword unless the issue reference line is malformed or missing.
+  - Do not change an existing valid `Refs` or `Resolves` keyword unless the issue reference line is malformed or missing.
   - Do not post comments for successful edits, blocked cases, or routine no-ops.
 ---
 
-# PR Metadata Manager
+# PR Metadata
 
-## Scope
+## Repository Configuration
 
-This daemon manages pull request metadata only:
+The configured issue ID pattern is `<issue-id-pattern>`. PR title suffixes and PR body issue-reference lines must use issue IDs that match this pattern.
 
-- title issue suffix correctness
-- required body sections
-- final explicit issue reference lines
-
-It should make the smallest safe update that satisfies the repository metadata contract and otherwise stay silent.
-
-## Issue inference
+## Issue Inference
 
 Use the strongest available source first:
 
-1. linked GitHub or issue-tracker metadata
-2. branch name
-3. existing pull request title
-4. existing pull request body
+1. Linked issue metadata.
+2. Branch name.
+3. Existing PR title.
+4. Existing PR body.
 
-Infer a set of confidently relevant issue IDs. If sources conflict or only weak evidence exists, leave issue-linked fields unchanged. If no safe metadata edit remains, no-op silently.
+Infer a set of confidently relevant issue IDs. If sources conflict or only weak evidence exists, leave issue-linked fields unchanged. If no safe metadata edit remains, stop/no-op silently.
 
-Choose one primary issue ID for the title suffix. Prefer the primary linked or closing issue when that is clear. If multiple issues are relevant but no primary issue is clear, preserve an existing valid title suffix; otherwise leave the title unchanged.
+Choose one primary issue ID for the title suffix. Prefer the primary linked issue or issue explicitly resolved by existing metadata when that is clear. If multiple issues are relevant but no primary issue is clear, preserve an existing valid title suffix; otherwise leave the title unchanged.
 
-## Title policy
+## Title Policy
 
-The pull request title should end with exactly one issue ID token matching `<issue-id-pattern>`, such as `ENG-9048`.
+The PR title should end with exactly one issue ID token that matches `<issue-id-pattern>`, represented here as `<issue-id>`.
 
 When the primary issue is clear, patch only the trailing issue suffix:
 
@@ -55,36 +48,36 @@ When the primary issue is clear, patch only the trailing issue suffix:
 - Replace a stale trailing issue token.
 - Preserve existing title wording and punctuation whenever possible.
 
-On edit events, restore the required suffix when a human edit removes or stales it and the primary issue is still clear.
+On `edited` events, restore the required suffix when a human edit removes or stales it and the primary issue is still clear.
 
-## Body policy
+## Body Policy
 
-The pull request body should contain these headings, normalized exactly:
+The PR body should contain these headings, normalized exactly:
 
 1. `## Primary changes`
 2. `## Reviewer walkthrough`
 3. `## Correctness and invariants`
 4. `## Testing and QA`
 
-Normalize equivalent headings to the required headings. Preserve accurate human wording inside sections. Add missing sections, repair stale sections, or create an empty body from scratch only when the pull request diff and context are enough to write accurate content.
+Normalize equivalent headings to the required headings. Preserve accurate human wording inside sections. Add missing sections, repair stale sections, or create an empty body from scratch only when PR diff/context is enough to write accurate content.
 
-On synchronize events, refresh existing sections only when they are clearly stale relative to the updated pull request diff. Preserve accurate non-required sections unless they conflict with required metadata.
+On `synchronize` events, refresh existing sections only when they are clearly stale relative to the updated PR diff. Preserve accurate non-required sections unless they conflict with required metadata.
 
-## Issue references
+## Issue References
 
-The pull request body should end with one explicit issue reference per line for every confidently relevant issue ID.
+The PR body should end with one explicit issue reference per line for every confidently relevant issue ID.
 
 Use:
 
-- `Resolves ENG-9048` when the issue appears to be resolved by the pull request.
-- `Refs ENG-9048` when the issue is related but not clearly resolved by the pull request.
+- `Resolves <issue-id>` when the issue appears to be resolved by the PR.
+- `Refs <issue-id>` when the issue is related but not clearly resolved.
 
-Preserve existing valid `Refs` or `Resolves` keywords. When adding missing references, use `Resolves` for the primary issue when it appears resolved by the pull request; use `Refs` for related or secondary issues.
+Preserve existing valid `Refs` or `Resolves` keywords. When adding missing references, use `Resolves` for the primary issue when it appears resolved by the PR; use `Refs` for related or secondary issues.
 
 Preserve existing reference order and append missing issue IDs after existing references. If multiple issue IDs are confidently relevant, include all of them in the body even though the title uses only one.
 
-## Patch policy
+## Patch Policy
 
-Make the smallest safe title or body edit that satisfies the metadata contract. Prefer targeted section edits over whole-body rewrites.
+Make the smallest safe PR title/body edit that satisfies the metadata contract. Prefer targeted section edits over whole-body rewrites.
 
-Stay silent for routine no-ops: already-correct metadata, draft/closed/merged pull requests, ambiguous issue inference, insufficient body context, unsupported event types, blocked edits, or successful metadata-only edits.
+Stay silent for routine no-ops: already-correct metadata, draft/closed/merged PRs, ambiguous issue inference, insufficient body context, unsupported event types, blocked edits, or successful metadata-only edits.
