@@ -21,6 +21,10 @@ deny:
 
 # PR Metadata
 
+## Repository Configuration
+
+The configured issue ID pattern is `<issue-id-pattern>`. PR title suffixes and PR body issue-reference lines must use issue IDs that match this pattern.
+
 ## Issue Inference
 
 Use the strongest available source first:
@@ -36,7 +40,7 @@ Choose one primary issue ID for the title suffix. Prefer the primary linked issu
 
 ## Title Policy
 
-The PR title should end with exactly one issue ID token, such as `ABC-123`.
+The PR title should end with exactly one issue ID token that matches `<issue-id-pattern>`, represented here as `<issue-id>`.
 
 When the primary issue is clear, patch only the trailing issue suffix:
 
@@ -65,8 +69,8 @@ The PR body should end with one explicit issue reference per line for every conf
 
 Use:
 
-- `Resolves ABC-123` when the issue appears to be resolved by the PR.
-- `Refs ABC-123` when the issue is related but not clearly resolved.
+- `Resolves <issue-id>` when the issue appears to be resolved by the PR.
+- `Refs <issue-id>` when the issue is related but not clearly resolved.
 
 Preserve existing valid `Refs` or `Resolves` keywords. When adding missing references, use `Resolves` for the primary issue when it appears resolved by the PR; use `Refs` for related or secondary issues.
 
