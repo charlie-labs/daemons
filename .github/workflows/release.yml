@@ -101,6 +101,20 @@ jobs:
           release_exists=false
           npm_exists=false
 
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version --registry=https://registry.npmjs.org --json > /tmp/npm-version.json 2>/tmp/npm-view.err; then
+            npm_exists=true
+            found_version="$(tr -d '"[:space:]' < /tmp/npm-version.json)"
+            if [[ "$found_version" != "$PACKAGE_VERSION" ]]; then
+              echo "npm returned version ${found_version}, expected ${PACKAGE_VERSION}." >&2
+              exit 1
+            fi
+          elif grep -Eiq 'E404|404' /tmp/npm-view.err; then
+            npm_exists=false
+          else
+            cat /tmp/npm-view.err >&2
+            exit 1
+          fi
+
           if git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
             tag_exists=true
             git fetch --force origin "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
@@ -111,8 +125,12 @@ jobs:
               exit 1
             fi
             if [[ "$tag_commit" != "$current_sha" ]]; then
-              echo "Existing ${RELEASE_TAG} points at ${tag_commit}, not current commit ${current_sha}." >&2
-              exit 1
+              if [[ "$npm_exists" == "true" ]]; then
+                echo "Existing ${RELEASE_TAG} points at ${tag_commit}, not current commit ${current_sha}; npm already contains ${PACKAGE_NAME}@${PACKAGE_VERSION}, so continuing without moving the tag."
+              else
+                echo "Existing ${RELEASE_TAG} points at ${tag_commit}, not current commit ${current_sha}, and npm does not contain ${PACKAGE_NAME}@${PACKAGE_VERSION}." >&2
+                exit 1
+              fi
             fi
           fi
 
@@ -141,20 +159,6 @@ jobs:
               cat /tmp/release.err >&2
               exit 1
             fi
-          fi
-
-          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version --registry=https://registry.npmjs.org --json > /tmp/npm-version.json 2>/tmp/npm-view.err; then
-            npm_exists=true
-            found_version="$(tr -d '"[:space:]' < /tmp/npm-version.json)"
-            if [[ "$found_version" != "$PACKAGE_VERSION" ]]; then
-              echo "npm returned version ${found_version}, expected ${PACKAGE_VERSION}." >&2
-              exit 1
-            fi
-          elif grep -Eiq 'E404|404' /tmp/npm-view.err; then
-            npm_exists=false
-          else
-            cat /tmp/npm-view.err >&2
-            exit 1
           fi
 
           echo "tag_exists=${tag_exists}" >> "$GITHUB_OUTPUT"

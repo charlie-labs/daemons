@@ -51,12 +51,14 @@ The workflow reads the version from `package.json`:
 
 ## Guardrails and reruns
 
-The workflow is safe to rerun for the same merged commit:
+The workflow is safe to rerun for the same merged commit, and safe for later `master` merges that leave `package.json#version` unchanged:
 
 - If the exact `@charlie-labs/daemons@${version}` already exists on npm, the workflow skips `npm publish` instead of failing on a duplicate publish.
-- If the `v${version}` tag already exists, it must be an annotated tag that resolves to the current merged `master` commit.
+- If the `v${version}` tag already exists, it must always be an annotated tag.
+- If npm does not contain the exact package version yet, an existing `v${version}` tag must resolve to the current merged `master` commit.
+- If npm already contains the exact package version, an annotated `v${version}` tag from the earlier release commit is allowed so unchanged-version `master` merges can leave existing release artifacts unchanged.
 - If the GitHub Release already exists, it must use the matching tag and the expected stable/prerelease setting.
-- If any existing tag or release artifact points somewhere else or has mismatched prerelease metadata, the workflow fails loudly instead of mutating a conflicting release.
+- Any lightweight tag, mismatched GitHub Release metadata, or existing tag on another commit before the exact npm version exists fails loudly instead of mutating an unsafe release.
 
 ## npm trusted publishing setup
 
