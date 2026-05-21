@@ -69,5 +69,3 @@ Configure npm trusted publishing for:
 - Workflow: `.github/workflows/release.yml`
 
 The workflow has `id-token: write` permission so npm can exchange GitHub OIDC identity for publish authorization. It does not use a long-lived `NPM_TOKEN` and does not use a token-based npm publish action.
-
-First-publish caveat: if npm requires the package to exist before trusted publishing can be configured, a maintainer may need to do the smallest approved one-time bootstrap package creation first. After trusted publishing is enabled, future releases should use this workflow without keeping an npm token in GitHub secrets.

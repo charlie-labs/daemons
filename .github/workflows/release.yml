@@ -73,16 +73,9 @@ jobs:
           console.log(`npm_dist_tag=${isPrerelease ? 'next' : 'latest'}`);
           NODE
 
-      - name: Skip bootstrap release
-        if: ${{ steps.package.outputs.package_version == '0.0.1' }}
-        run: |
-          echo "Detected @charlie-labs/daemons@0.0.1."
-          echo "Skipping automated release artifacts and npm publish; follow the first publish / bootstrap runbook before enabling this workflow for later versions."
-
   publish:
     name: Validate, release, and publish to npm
     needs: package
-    if: ${{ needs.package.outputs.package_version != '0.0.1' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
