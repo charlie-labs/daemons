@@ -6,40 +6,36 @@ on:
       - master
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 concurrency:
   group: release-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  publish:
-    name: Validate, release, and publish to npm
+  package:
+    name: Read package metadata
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      package_name: ${{ steps.package.outputs.package_name }}
+      package_version: ${{ steps.package.outputs.package_version }}
+      release_tag: ${{ steps.package.outputs.release_tag }}
+      is_prerelease: ${{ steps.package.outputs.is_prerelease }}
+      npm_dist_tag: ${{ steps.package.outputs.npm_dist_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.2.22
-
-      - name: Setup Node.js and npm
+      - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: '24'
-          registry-url: https://registry.npmjs.org
           package-manager-cache: false
-
-      - name: Configure git identity
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Read package metadata
         id: package
@@ -77,15 +73,53 @@ jobs:
           console.log(`npm_dist_tag=${isPrerelease ? 'next' : 'latest'}`);
           NODE
 
+      - name: Skip bootstrap release
+        if: ${{ steps.package.outputs.package_version == '0.0.1' }}
+        run: |
+          echo "Detected @charlie-labs/daemons@0.0.1."
+          echo "Skipping automated release artifacts and npm publish; follow the first publish / bootstrap runbook before enabling this workflow for later versions."
+
+  publish:
+    name: Validate, release, and publish to npm
+    needs: package
+    if: ${{ needs.package.outputs.package_version != '0.0.1' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.22
+
+      - name: Setup Node.js and npm
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - name: Validate existing release artifacts
         id: guardrails
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          PACKAGE_NAME: ${{ steps.package.outputs.package_name }}
-          PACKAGE_VERSION: ${{ steps.package.outputs.package_version }}
-          RELEASE_TAG: ${{ steps.package.outputs.release_tag }}
-          IS_PRERELEASE: ${{ steps.package.outputs.is_prerelease }}
+          PACKAGE_NAME: ${{ needs.package.outputs.package_name }}
+          PACKAGE_VERSION: ${{ needs.package.outputs.package_version }}
+          RELEASE_TAG: ${{ needs.package.outputs.release_tag }}
+          IS_PRERELEASE: ${{ needs.package.outputs.is_prerelease }}
         run: |
           set -euo pipefail
 
@@ -196,8 +230,8 @@ jobs:
         id: release_notes
         shell: bash
         env:
-          PACKAGE_NAME: ${{ steps.package.outputs.package_name }}
-          PACKAGE_VERSION: ${{ steps.package.outputs.package_version }}
+          PACKAGE_NAME: ${{ needs.package.outputs.package_name }}
+          PACKAGE_VERSION: ${{ needs.package.outputs.package_version }}
         run: |
           node <<'NODE' > /tmp/release-notes.md
           const fs = require('node:fs');
@@ -237,9 +271,9 @@ jobs:
         if: ${{ steps.guardrails.outputs.tag_exists == 'false' }}
         shell: bash
         env:
-          PACKAGE_NAME: ${{ steps.package.outputs.package_name }}
-          PACKAGE_VERSION: ${{ steps.package.outputs.package_version }}
-          RELEASE_TAG: ${{ steps.package.outputs.release_tag }}
+          PACKAGE_NAME: ${{ needs.package.outputs.package_name }}
+          PACKAGE_VERSION: ${{ needs.package.outputs.package_version }}
+          RELEASE_TAG: ${{ needs.package.outputs.release_tag }}
         run: |
           git tag -a "$RELEASE_TAG" -m "${PACKAGE_NAME} ${PACKAGE_VERSION}" "$GITHUB_SHA"
           git push origin "refs/tags/${RELEASE_TAG}"
@@ -249,10 +283,10 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          PACKAGE_NAME: ${{ steps.package.outputs.package_name }}
-          PACKAGE_VERSION: ${{ steps.package.outputs.package_version }}
-          RELEASE_TAG: ${{ steps.package.outputs.release_tag }}
-          IS_PRERELEASE: ${{ steps.package.outputs.is_prerelease }}
+          PACKAGE_NAME: ${{ needs.package.outputs.package_name }}
+          PACKAGE_VERSION: ${{ needs.package.outputs.package_version }}
+          RELEASE_TAG: ${{ needs.package.outputs.release_tag }}
+          IS_PRERELEASE: ${{ needs.package.outputs.is_prerelease }}
           RELEASE_NOTES_PATH: ${{ steps.release_notes.outputs.path }}
         run: |
           args=(
@@ -269,8 +303,8 @@ jobs:
         if: ${{ steps.guardrails.outputs.npm_exists == 'false' }}
         shell: bash
         env:
-          PACKAGE_VERSION: ${{ steps.package.outputs.package_version }}
-          IS_PRERELEASE: ${{ steps.package.outputs.is_prerelease }}
+          PACKAGE_VERSION: ${{ needs.package.outputs.package_version }}
+          IS_PRERELEASE: ${{ needs.package.outputs.is_prerelease }}
         run: |
           if [[ "$IS_PRERELEASE" == "true" ]]; then
             npm publish --access public --tag next --registry=https://registry.npmjs.org

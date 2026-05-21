@@ -1,4 +1,4 @@
-export const DAEMON_CLI_VERSION = '0.0.0';
+export const DAEMON_CLI_VERSION = '0.0.1';
 
 export const EXIT_CODE_SUCCESS = 0;
 export const EXIT_CODE_USAGE = 64;
