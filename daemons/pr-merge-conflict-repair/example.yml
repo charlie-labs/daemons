@@ -1,0 +1,27 @@
+id: pr-merge-conflict-repair
+title: PR Merge Conflict Repair
+status: ready
+summary: Repairs clear merge conflicts on non-draft GitHub pull requests after target base branch changes, with focused verification and low-noise blocked comments.
+readiness: adapt-before-use
+showOnWebsite: true
+showInDashboard: true
+fit:
+  jobsToBeDone:
+    - review-with-confidence
+  bestFor:
+    - Repositories with active pull request queues where merge conflicts regularly block review or merge.
+    - Teams comfortable with Charlie pushing clear conflict-resolution commits to pull request branches.
+    - Repositories where PR intent, tests, and ownership boundaries make mechanical conflict repair safe to attempt.
+  notFor:
+    - Teams that do not want automated commits pushed to pull request branches.
+    - Repositories where merge conflicts usually require product, security, data-shape, or dependency-substitution decisions.
+    - Repositories where most pull requests come from forks that Charlie should not update.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other:
+    - GitHub mergeability metadata for open pull requests.
+adaptation:
+  mustCustomize:
+    - Confirm the target base branch scope, such as `main` or `master`, force-push policy, and conflict categories are aligned with the team's expectations.

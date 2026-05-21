@@ -110,13 +110,13 @@ Install behavior is intentionally narrow:
 Examples:
 
 ```bash
-daemon add dependency-upgrades --dry-run
+daemon add js-ts-dependency-upgrades --dry-run
 
 daemon install docs-drift-maintainer --ref master
 
-daemon add pr-mergeability --allow-deprecated --dry-run
+daemon add pr-merge-conflict-repair --allow-deprecated --dry-run
 
-daemon add dependency-upgrades --force
+daemon add js-ts-dependency-upgrades --force
 ```
 
 JSON data includes:

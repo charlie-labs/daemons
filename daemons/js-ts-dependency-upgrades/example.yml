@@ -1,0 +1,27 @@
+id: js-ts-dependency-upgrades
+title: JavaScript/TypeScript Dependency Update Maintainer
+status: ready
+summary: Opens low-noise JavaScript/TypeScript dependency upgrade PRs with configured package-manager commands.
+readiness: adapt-before-use
+showOnWebsite: true
+showInDashboard: true
+fit:
+  jobsToBeDone:
+    - maintain-and-modernize
+    - operate
+  bestFor:
+    - Teams that want more flexible, repo-specific dependency update automation than rigid default bot configuration.
+    - JavaScript or TypeScript repositories with regular dependency drift and a lockfile-backed package manager.
+    - Teams that want reviewable upgrade PRs instead of large occasional dependency sweeps.
+  notFor:
+    - Repositories where dependency updates usually require manual migration planning.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other:
+    - A configured JavaScript/TypeScript package manager, lockfile, manifests, update commands, and install command.
+adaptation:
+  mustCustomize:
+    - Replace all package-manager configuration placeholders in DAEMON.md with the repository's npm, pnpm, Yarn, or Bun commands.
+    - Adjust branch, title, and label conventions to the team.

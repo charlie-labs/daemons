@@ -106,7 +106,7 @@ requirements:
     - github
   optionalIntegrations: []
   other:
-    - Repository-local verification commands.
+    - Daemon-specific local policy or command prerequisite.
 adaptation:
   mustCustomize:
     - Replace placeholder repository paths and output destinations.
@@ -204,7 +204,7 @@ Allowed integration values:
 - `slack`
 - `sentry`
 
-List an integration as required only when the daemon cannot perform its core job without it. Put non-integration prerequisites, such as a label taxonomy or repo-local verification command, in `requirements.other`.
+List an integration as required only when the daemon cannot perform its core job without it. Put daemon-specific non-integration prerequisites, such as a label taxonomy, branch convention, destination convention, or configured command that the daemon directly invokes, in `requirements.other`.
 
 ### `adaptation`
 
@@ -214,7 +214,7 @@ List an integration as required only when the daemon cannot perform its core job
 | --- | --- | --- |
 | `mustCustomize` | array of strings | Required. Empty only for `direct-copy`; non-empty for `adapt-before-use`. |
 
-Use `mustCustomize` for concrete changes a customer must make before using the pattern, such as replacing path globs, destination channels, issue-state names, label taxonomies, verification commands, thresholds, or ownership boundaries.
+Use `mustCustomize` for concrete changes a customer must make to the example or daemon before using the pattern, such as replacing path globs, destination channels, issue-state names, label taxonomies, configured commands, thresholds, or ownership boundaries. Do not use it for generic rollout instructions, repo setup work, or broad verification reminders.
 
 ## Support files
 

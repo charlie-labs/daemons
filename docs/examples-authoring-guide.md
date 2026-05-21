@@ -49,6 +49,8 @@ Do not add an example for:
 
 Public examples look copyable, but target repos vary by integrations, conventions, permissions, commands, source-of-truth systems, output preferences, existing automation, scale, and tolerance for noise. Make those assumptions visible in `requirements`, `adaptation.mustCustomize`, support files, or `DAEMON.md` runtime policy.
 
+Keep the boundary clear: `DAEMON.md` is runtime policy for Charlie after the daemon is installed and adapted. Instructions about how to use, configure, or modify an example belong in `example.yml`, not in the daemon body where Charlie may treat them as active policy. Support references can provide reusable detail when `example.yml` points readers there.
+
 High-risk examples are allowed when they address real operational burden, but author them intentionally. High-risk does not mean "opens a PR touching important code"; reviewable artifacts are usually low operational risk because humans can close, ignore, or revert them. High-risk means the daemon could interfere with human workflows or take actions that are hard or annoying to reverse, such as mutating production state, deleting resources, force-pushing over human changes, closing or reprioritizing many issues, changing production flags, or posting noisy output across surfaces.
 
 For high-risk examples:
@@ -115,7 +117,7 @@ A strong example `DAEMON.md` has:
 - wake conditions that are specific enough to avoid noise;
 - routines that describe bounded work Charlie can actually perform;
 - deny rules for adjacent risky behavior;
-- body guidance only where it improves runtime decisions;
+- body guidance only where it improves runtime decisions after installation;
 - public-safe placeholders for customer-specific values;
 - a non-empty body with policy, limits, or verification guidance.
 
@@ -129,7 +131,7 @@ Avoid:
 
 - invented frontmatter fields;
 - catalog metadata in `DAEMON.md`;
-- rollout instructions, validation checklists, setup tutorials, or catalog presentation notes in `DAEMON.md`;
+- rollout instructions, validation checklists, setup tutorials, copy-time configuration notes, or catalog presentation notes in `DAEMON.md`;
 - copying stale metadata such as `readiness`, `showOnWebsite`, or `bestFor` into frontmatter;
 - long generic filler that does not change behavior;
 - body headings that imply schema beyond the public docs.
@@ -137,6 +139,8 @@ Avoid:
 ### 4. Write `example.yml`
 
 `example.yml` explains how the example should be discovered, evaluated, and adapted.
+
+Use `example.yml` for required adaptation, branch selection, package-manager command replacement, issue-tracker selection, output destinations, and other copy-time configuration guidance. Keep `DAEMON.md` focused on the daemon's runtime behavior after those decisions have been made.
 
 Use this template:
 
@@ -210,6 +214,8 @@ Use `fit.notFor` to prevent over-application:
 - teams without the required policy or taxonomy;
 - scenarios where a one-off task is safer.
 
+Keep both fields precise. `bestFor` can position the example against broad needs, such as teams wanting flexible repo-specific automation, but should not overclaim. `notFor` should name real exclusions only; do not list a scenario if repo policy or adaptation can reasonably support it.
+
 #### Requirements
 
 Put integration requirements in `requiredIntegrations` or `optionalIntegrations`.
@@ -223,14 +229,16 @@ Allowed integration values are:
 - `slack`
 - `sentry`
 
-Put everything else in `requirements.other`, such as:
+Put daemon-specific non-integration prerequisites in `requirements.other`, such as:
 
 - a documented label taxonomy;
 - known repository paths;
-- verification commands;
 - destination channel conventions;
 - branch, title, or label conventions;
 - signal thresholds or routing rules.
+- configured tool commands that the daemon directly invokes.
+
+Do not use `requirements.other` as a generic repo-health checklist. Broad expectations like having local verification available usually apply to many daemons and should appear only when this specific example depends on a named command, policy, or convention.
 
 #### Readiness and adaptation
 
@@ -248,7 +256,18 @@ Use `adapt-before-use` when a customer must change any of the following before u
 
 Use `direct-copy` only when no required customization is declared. Even then, reviewers should verify that the daemon is safe, useful, and accurate for the target repo before use.
 
-Use `adaptation.mustCustomize` for concrete local decisions, replacements, or confirmations. Do not use it for generic warnings, rollout steps, validation checklists, or process advice such as "verify that it works" or "watch the first few activations." Those belong in general daemon rollout docs, not package metadata.
+Use `adaptation.mustCustomize` for concrete changes a customer must make to the example or daemon before using it, such as replacing placeholder scopes, commands, destinations, thresholds, or policy choices. Do not use it for generic warnings, rollout steps, validation checklists, repo setup work, or process advice such as "verify that it works" or "watch the first few activations." Those belong in general daemon rollout docs, not package metadata.
+
+#### Configurable examples
+
+Some examples intentionally require local values, such as package-manager commands, target branches, path globs, output destinations, or issue-tracker sources of truth.
+
+For configurable examples:
+
+- keep runtime placeholder values in one obvious configuration block or support reference when possible;
+- refer to configured values from the rest of the daemon instead of repeating placeholders throughout the body;
+- declare the required replacement or review in `adaptation.mustCustomize`;
+- avoid putting "change this before enabling" prose inside runtime daemon policy.
 
 ### 5. Add support files only when they help
 
@@ -309,7 +328,9 @@ Avoid these common failures:
 - One example tries to cover multiple platforms with hidden branching.
 - `example.yml` becomes a configuration language.
 - `DAEMON.md` contains setup, tutorial, rollout, checklist, or catalog metadata.
-- `mustCustomize` contains rollout or verification instructions instead of local decisions.
+- `DAEMON.md` explains how to modify the example instead of describing runtime behavior.
+- `requirements.other` lists broad repo hygiene instead of daemon-specific prerequisites.
+- `mustCustomize` contains rollout, verification, or repo setup instructions instead of daemon customization.
 - Optional integrations are used to encode required alternatives.
 - The daemon assumes unsupported non-GitHub event wakes.
 - The daemon requires production secrets or mutating infra commands to be useful.
@@ -341,7 +362,8 @@ Use this checklist before approving example changes.
 - Watch conditions and schedules are specific enough for safe wake behavior.
 - Routines are bounded and actionable.
 - Deny rules cover adjacent risky actions.
-- Body guidance adds useful policy, limits, verification, target selection, or output guidance.
+- Body guidance adds useful runtime policy, limits, verification, target selection, or output guidance.
+- Runtime body text does not include copy-time configuration or modification instructions.
 - No catalog-only fields are in frontmatter.
 - The body is non-empty and public-safe.
 
@@ -351,9 +373,11 @@ Use this checklist before approving example changes.
 - `summary` is concise and outcome-focused.
 - `jobsToBeDone` uses only schema-approved values.
 - `bestFor` and `notFor` help readers decide quickly.
+- `notFor` lists real exclusions, not scenarios that repo policy can support.
 - Required and optional integrations are accurate.
-- `requirements.other` names non-integration prerequisites.
+- `requirements.other` names daemon-specific non-integration prerequisites.
 - `readiness` matches `adaptation.mustCustomize`.
+- `adaptation.mustCustomize` names required daemon/example changes, not generic rollout or repo setup work.
 - Surface flags are intentional.
 
 ### Support files

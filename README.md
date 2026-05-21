@@ -27,11 +27,15 @@ Use [DAEMON.md reference](https://docs.charlielabs.ai/daemons/daemon-md-referenc
 
 | Category | Daemon ID | Path | Description |
 | --- | --- | --- | --- |
-| Dependency maintenance | `dependency-upgrades` | [daemons/dependency-upgrades/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/dependency-upgrades/DAEMON.md) | Opens low-noise dependency upgrade PRs with grouped minor and patch updates. |
-| Documentation freshness | `docs-drift-maintainer` | [daemons/docs-drift-maintainer/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/docs-drift-maintainer/DAEMON.md) | Finds documentation drift caused by code changes and opens small source-backed docs PRs. |
+| Dependency maintenance | `js-ts-dependency-upgrades` | [daemons/js-ts-dependency-upgrades/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/js-ts-dependency-upgrades/DAEMON.md) | Opens low-noise JavaScript/TypeScript dependency upgrade PRs with configured package-manager commands. |
+| Documentation freshness | `docs-drift-maintainer` | [daemons/docs-drift-maintainer/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/docs-drift-maintainer/DAEMON.md) | Repairs docs drift from recent merged source changes with small source-backed PRs. |
+| Documentation freshness | `docs-stale-maintainer` | [daemons/docs-stale-maintainer/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/docs-stale-maintainer/DAEMON.md) | Runs weekly to repair older outdated documentation in small source-backed PRs with a hard size limit. |
 | GitHub activity reporting | `github-activity-digest` | [daemons/github-activity-digest/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/github-activity-digest/DAEMON.md) | Posts a low-noise scheduled digest of meaningful pull request and CI activity. |
 | Linear issue hygiene | `linear-issue-labeler` | [daemons/linear-issue-labeler/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/linear-issue-labeler/DAEMON.md) | Keeps recently changed Linear issues aligned with a documented label taxonomy. |
+| PR check repair | `pr-check-repair` | [daemons/pr-check-repair/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/pr-check-repair/DAEMON.md) | Repairs failing GitHub-visible PR checks with focused evidence-grounded commits, flaky reruns, or low-noise blocked comments. |
+| PR merge conflict repair | `pr-merge-conflict-repair` | [daemons/pr-merge-conflict-repair/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/pr-merge-conflict-repair/DAEMON.md) | Repairs clear merge conflicts on non-draft GitHub pull requests after target base branch changes, with focused verification and low-noise blocked comments. |
 | PR metadata management | `pr-metadata` | [daemons/pr-metadata/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/pr-metadata/DAEMON.md) | Keeps PR title/body metadata complete, current, and linked to the correct issue item. |
+| PR review triage | `pr-review-triage` | [daemons/pr-review-triage/DAEMON.md](https://github.com/charlie-labs/daemons/blob/master/daemons/pr-review-triage/DAEMON.md) | Triages PR review threads and top-level PR comments for merge-readiness, duplicate feedback, fixed items, and safe low-noise follow-up. |
 
 ## Generated examples catalog
 
@@ -47,11 +51,11 @@ Use it to browse the public examples catalog, safely scaffold catalog examples i
 ```bash
 daemon list
 
-daemon show dependency-upgrades --json
+daemon show js-ts-dependency-upgrades --json
 
-daemon add dependency-upgrades --dry-run
+daemon add js-ts-dependency-upgrades --dry-run
 
-daemon validate .agents/daemons/dependency-upgrades/DAEMON.md
+daemon validate .agents/daemons/js-ts-dependency-upgrades/DAEMON.md
 
 daemon validate --all --json
 ```
