@@ -1,6 +1,6 @@
 {
   "name": "@charlie-labs/daemons",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Public Charlie daemon examples catalog and CLI.",
   "type": "module",
   "bin": {
@@ -11,7 +11,8 @@
     "examples.json",
     "daemons",
     "docs",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",

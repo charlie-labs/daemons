@@ -68,6 +68,8 @@ Key safety defaults:
 
 See [Daemon catalog CLI](docs/daemon-cli.md) for command details, JSON envelope, validation semantics, and exit codes.
 
+For release instructions, see [Releasing `@charlie-labs/daemons`](RELEASING.md).
+
 
 Use [Examples v2 package and catalog spec](docs/examples-spec.md) for the exact package, metadata, generation, validation, and public-safety contract. Use [Examples authoring guide](docs/examples-authoring-guide.md) for author/reviewer guidance. Use [Examples catalog consumer guide](docs/examples-catalog-consumer-guide.md) for website, dashboard, and install consumer guidance.
 

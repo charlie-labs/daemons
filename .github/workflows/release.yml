@@ -1,0 +1,317 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Read package metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      package_name: ${{ steps.package.outputs.package_name }}
+      package_version: ${{ steps.package.outputs.package_version }}
+      release_tag: ${{ steps.package.outputs.release_tag }}
+      is_prerelease: ${{ steps.package.outputs.is_prerelease }}
+      npm_dist_tag: ${{ steps.package.outputs.npm_dist_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Read package metadata
+        id: package
+        shell: bash
+        run: |
+          node <<'NODE' >> "$GITHUB_OUTPUT"
+          const fs = require('node:fs');
+
+          const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const name = packageJson.name;
+          const version = packageJson.version;
+          const semverPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+
+          if (typeof name !== 'string' || name.trim() === '') {
+            throw new Error('package.json#name must be a non-empty string.');
+          }
+          if (typeof version !== 'string' || version.trim() === '') {
+            throw new Error('package.json#version must be a non-empty string.');
+          }
+          const match = version.match(semverPattern);
+          if (!match) {
+            throw new Error(`package.json#version must be valid semver, got ${JSON.stringify(version)}.`);
+          }
+
+          const isPrerelease = Boolean(match[4]);
+          const releaseTag = `v${version}`;
+          if (/\s/.test(releaseTag)) {
+            throw new Error(`Derived release tag is invalid: ${JSON.stringify(releaseTag)}.`);
+          }
+
+          console.log(`package_name=${name}`);
+          console.log(`package_version=${version}`);
+          console.log(`release_tag=${releaseTag}`);
+          console.log(`is_prerelease=${isPrerelease ? 'true' : 'false'}`);
+          console.log(`npm_dist_tag=${isPrerelease ? 'next' : 'latest'}`);
+          NODE
+
+      - name: Skip bootstrap release
+        if: ${{ steps.package.outputs.package_version == '0.0.1' }}
+        run: |
+          echo "Detected @charlie-labs/daemons@0.0.1."
+          echo "Skipping automated release artifacts and npm publish; follow the first publish / bootstrap runbook before enabling this workflow for later versions."
+
+  publish:
+    name: Validate, release, and publish to npm
+    needs: package
+    if: ${{ needs.package.outputs.package_version != '0.0.1' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.22
+
+      - name: Setup Node.js and npm
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Validate existing release artifacts
+        id: guardrails
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_NAME: ${{ needs.package.outputs.package_name }}
+          PACKAGE_VERSION: ${{ needs.package.outputs.package_version }}
+          RELEASE_TAG: ${{ needs.package.outputs.release_tag }}
+          IS_PRERELEASE: ${{ needs.package.outputs.is_prerelease }}
+        run: |
+          set -euo pipefail
+
+          current_sha="$(git rev-parse HEAD)"
+          if [[ "$current_sha" != "$GITHUB_SHA" ]]; then
+            echo "Checked-out commit $current_sha does not match push commit $GITHUB_SHA." >&2
+            exit 1
+          fi
+
+          git fetch --tags --force origin
+
+          tag_exists=false
+          release_exists=false
+          npm_exists=false
+
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version --registry=https://registry.npmjs.org --json > /tmp/npm-version.json 2>/tmp/npm-view.err; then
+            npm_exists=true
+            found_version="$(tr -d '"[:space:]' < /tmp/npm-version.json)"
+            if [[ "$found_version" != "$PACKAGE_VERSION" ]]; then
+              echo "npm returned version ${found_version}, expected ${PACKAGE_VERSION}." >&2
+              exit 1
+            fi
+          elif grep -Eiq 'E404|404' /tmp/npm-view.err; then
+            npm_exists=false
+          else
+            cat /tmp/npm-view.err >&2
+            exit 1
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            tag_exists=true
+            git fetch --force origin "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+            tag_object_type="$(git cat-file -t "${RELEASE_TAG}")"
+            tag_commit="$(git rev-parse "${RELEASE_TAG}^{commit}")"
+            if [[ "$tag_object_type" != "tag" ]]; then
+              echo "Existing ${RELEASE_TAG} is ${tag_object_type}, not an annotated tag." >&2
+              exit 1
+            fi
+            if [[ "$tag_commit" != "$current_sha" ]]; then
+              if [[ "$npm_exists" == "true" ]]; then
+                echo "Existing ${RELEASE_TAG} points at ${tag_commit}, not current commit ${current_sha}; npm already contains ${PACKAGE_NAME}@${PACKAGE_VERSION}, so continuing without moving the tag."
+              else
+                echo "Existing ${RELEASE_TAG} points at ${tag_commit}, not current commit ${current_sha}, and npm does not contain ${PACKAGE_NAME}@${PACKAGE_VERSION}." >&2
+                exit 1
+              fi
+            fi
+          fi
+
+          if gh release view "$RELEASE_TAG" --json isPrerelease,tagName,url > /tmp/release.json 2>/tmp/release.err; then
+            release_exists=true
+            release_tag="$(jq -r '.tagName' /tmp/release.json)"
+            release_prerelease="$(jq -r '.isPrerelease' /tmp/release.json)"
+            expected_prerelease=false
+            if [[ "$IS_PRERELEASE" == "true" ]]; then
+              expected_prerelease=true
+            fi
+            if [[ "$release_tag" != "$RELEASE_TAG" ]]; then
+              echo "Existing GitHub Release tag ${release_tag} does not match ${RELEASE_TAG}." >&2
+              exit 1
+            fi
+            if [[ "$release_prerelease" != "$expected_prerelease" ]]; then
+              echo "Existing ${RELEASE_TAG} GitHub Release prerelease=${release_prerelease}, expected ${expected_prerelease}." >&2
+              exit 1
+            fi
+            if [[ "$tag_exists" != "true" ]]; then
+              echo "GitHub Release ${RELEASE_TAG} exists, but the matching Git tag is missing." >&2
+              exit 1
+            fi
+          else
+            if ! grep -Eiq 'not found|could not resolve|404' /tmp/release.err; then
+              cat /tmp/release.err >&2
+              exit 1
+            fi
+          fi
+
+          echo "tag_exists=${tag_exists}" >> "$GITHUB_OUTPUT"
+          echo "release_exists=${release_exists}" >> "$GITHUB_OUTPUT"
+          echo "npm_exists=${npm_exists}" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --registry https://registry.npmjs.org/
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun run test
+
+      - name: Build
+        run: bun run build
+
+      - name: Smoke-test daemon binary
+        run: bun run smoke:daemon
+
+      - name: Generate examples catalog
+        run: bun run generate:examples
+
+      - name: Validate examples catalog
+        run: bun run validate:examples
+
+      - name: Ensure generated examples catalog is committed
+        run: git diff --exit-code examples.json
+
+      - name: Dry-run npm package
+        run: npm pack --dry-run
+
+      - name: Prepare release notes
+        id: release_notes
+        shell: bash
+        env:
+          PACKAGE_NAME: ${{ needs.package.outputs.package_name }}
+          PACKAGE_VERSION: ${{ needs.package.outputs.package_version }}
+        run: |
+          node <<'NODE' > /tmp/release-notes.md
+          const fs = require('node:fs');
+          const name = process.env.PACKAGE_NAME;
+          const version = process.env.PACKAGE_VERSION;
+
+          function escapeRegex(value) {
+            return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          }
+
+          let notes = '';
+          if (fs.existsSync('CHANGELOG.md')) {
+            const lines = fs.readFileSync('CHANGELOG.md', 'utf8').split(/\r?\n/);
+            const headingPattern = new RegExp(`^##\\s+\\[?${escapeRegex(version)}\\]?(?:\\s|$)`);
+            const start = lines.findIndex((line) => headingPattern.test(line));
+            if (start !== -1) {
+              const collected = [];
+              for (let index = start + 1; index < lines.length; index += 1) {
+                if (/^##\s+/.test(lines[index])) {
+                  break;
+                }
+                collected.push(lines[index]);
+              }
+              notes = collected.join('\n').trim();
+            }
+          }
+
+          if (!notes) {
+            notes = `Release ${name} ${version}.`;
+          }
+
+          console.log(notes);
+          NODE
+          echo "path=/tmp/release-notes.md" >> "$GITHUB_OUTPUT"
+
+      - name: Create annotated tag
+        if: ${{ steps.guardrails.outputs.tag_exists == 'false' }}
+        shell: bash
+        env:
+          PACKAGE_NAME: ${{ needs.package.outputs.package_name }}
+          PACKAGE_VERSION: ${{ needs.package.outputs.package_version }}
+          RELEASE_TAG: ${{ needs.package.outputs.release_tag }}
+        run: |
+          git tag -a "$RELEASE_TAG" -m "${PACKAGE_NAME} ${PACKAGE_VERSION}" "$GITHUB_SHA"
+          git push origin "refs/tags/${RELEASE_TAG}"
+
+      - name: Create GitHub Release
+        if: ${{ steps.guardrails.outputs.release_exists == 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_NAME: ${{ needs.package.outputs.package_name }}
+          PACKAGE_VERSION: ${{ needs.package.outputs.package_version }}
+          RELEASE_TAG: ${{ needs.package.outputs.release_tag }}
+          IS_PRERELEASE: ${{ needs.package.outputs.is_prerelease }}
+          RELEASE_NOTES_PATH: ${{ steps.release_notes.outputs.path }}
+        run: |
+          args=(
+            "$RELEASE_TAG"
+            --title "${PACKAGE_NAME} ${PACKAGE_VERSION}"
+            --notes-file "$RELEASE_NOTES_PATH"
+          )
+          if [[ "$IS_PRERELEASE" == "true" ]]; then
+            args+=(--prerelease)
+          fi
+          gh release create "${args[@]}"
+
+      - name: Publish to npm
+        if: ${{ steps.guardrails.outputs.npm_exists == 'false' }}
+        shell: bash
+        env:
+          PACKAGE_VERSION: ${{ needs.package.outputs.package_version }}
+          IS_PRERELEASE: ${{ needs.package.outputs.is_prerelease }}
+        run: |
+          if [[ "$IS_PRERELEASE" == "true" ]]; then
+            npm publish --access public --tag next --registry=https://registry.npmjs.org
+          else
+            npm publish --access public --registry=https://registry.npmjs.org
+          fi
+
+      - name: Skip npm publish for existing version
+        if: ${{ steps.guardrails.outputs.npm_exists == 'true' }}
+        run: echo "npm already contains this exact package version; leaving the registry unchanged."
