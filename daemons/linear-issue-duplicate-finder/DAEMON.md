@@ -9,7 +9,7 @@ routines:
   - Search linked GitHub work for corroborating pull requests, issues, branches, or commits.
   - Comment on the triggering Linear issue with up to five candidate matches, confidence, and evidence when useful candidates exist.
 deny:
-  - Do not close, merge, cancel, archive, relabel, reassign, reprioritize, or otherwise mutate Linear issues.
+  - Do not close, merge, cancel, archive, relabel, reassign, or reprioritize Linear issues.
   - Do not edit, close, label, assign, or comment on GitHub issues or pull requests.
   - Do not claim that an issue is definitely duplicate unless the evidence is conclusive.
   - Do not post more than five candidate duplicate or related items.
