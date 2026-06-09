@@ -64,7 +64,7 @@ For high-risk examples:
 
 If a platform changes the daemon's source of truth, routines, output surface, or required permissions, prefer a separate example instead of hiding branches inside one daemon. `requirements.optionalIntegrations` means the daemon can still perform its core role without that integration; it must not encode one-of-many required alternatives.
 
-Do not imply unsupported event wakes. Today, GitHub-native events are the best fit for `watch`; use `schedule` for surveys, reconciliation, reports, or sources without a supported event wake.
+Do not imply unsupported event wakes. Routed GitHub, Linear, and Slack events can be used for `watch` when Charlie can infer the repository and daemon inventory. Write `watch` around observable provider-visible events, and use `schedule` for surveys, reconciliation, reports, or sources without a supported routed event wake.
 
 ## Authoring workflow
 
@@ -332,7 +332,7 @@ Avoid these common failures:
 - `requirements.other` lists broad repo hygiene instead of daemon-specific prerequisites.
 - `mustCustomize` contains rollout, verification, or repo setup instructions instead of daemon customization.
 - Optional integrations are used to encode required alternatives.
-- The daemon assumes unsupported non-GitHub event wakes.
+- The daemon assumes event wakes outside supported routed GitHub, Linear, Slack, or scheduled activation paths.
 - The daemon requires production secrets or mutating infra commands to be useful.
 - The daemon mostly produces noise or restates known information.
 - The daemon is so broad that every activation requires judgment outside its authored policy.

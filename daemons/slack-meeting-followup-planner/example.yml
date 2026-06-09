@@ -1,0 +1,28 @@
+id: slack-meeting-followup-planner
+title: Slack Meeting Follow-up Planner
+status: ready
+summary: Turns Slack meeting notes or transcripts into concise, repo-aware follow-up options Charlie can help execute.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: true
+fit:
+  jobsToBeDone:
+    - plan
+    - organize
+  bestFor:
+    - Teams that share meeting notes, transcripts, or recording summaries in Slack and want concrete follow-up options.
+    - Workspaces mapped to repositories where GitHub and Linear context can distinguish new actions from already tracked work.
+  notFor:
+    - Private, sensitive, social, or status-only conversations where an automated follow-up summary would be inappropriate.
+    - Teams that want Charlie to create issues, edit pull requests, assign owners, or message people without an explicit follow-up request.
+requirements:
+  requiredIntegrations:
+    - slack
+    - github
+  optionalIntegrations:
+    - linear
+  other:
+    - Slack workspaces are mapped to the repositories discussed in meeting notes.
+    - Transcript text, transcript links, or uploaded note files are accessible to Charlie under the workspace policy.
+adaptation:
+  mustCustomize: []

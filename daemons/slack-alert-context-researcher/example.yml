@@ -1,0 +1,29 @@
+id: slack-alert-context-researcher
+title: Slack Alert Context Researcher
+status: ready
+summary: Replies to alert-like Slack bot messages with compact GitHub and incident context for triage.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: true
+fit:
+  jobsToBeDone:
+    - operate
+    - explain
+  bestFor:
+    - Teams that receive monitoring or incident alerts in Slack and want faster first-pass context.
+    - Workspaces mapped to repositories where recent code changes help explain operational alerts.
+  notFor:
+    - Teams that want Charlie to acknowledge, resolve, escalate, page, or mutate incident state automatically.
+    - Channels where alert content is too sensitive to summarize in-thread.
+requirements:
+  requiredIntegrations:
+    - slack
+    - github
+  optionalIntegrations:
+    - linear
+    - sentry
+  other:
+    - Slack workspaces are mapped to the repositories that own the alerted services.
+    - Monitoring or incident notifications arrive as Slack app or bot messages with enough text or metadata to infer the affected service.
+adaptation:
+  mustCustomize: []
