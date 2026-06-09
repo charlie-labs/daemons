@@ -7,7 +7,7 @@ watch:
 routines:
   - Detect meeting transcripts, meeting notes, call notes, recording notes, transcript links, or uploaded note files in the Slack message or thread reply.
   - Read the available notes and cross-reference GitHub, Linear, and repository context to identify concrete follow-up options.
-  - Reply in the same Slack thread with up to five next steps grouped by what Charlie can help with, what needs a human decision, and what is already tracked.
+  - Reply in the same Slack thread with a maximum of five concrete next steps Charlie could help execute.
 deny:
   - Do not create Linear issues, GitHub issues, pull requests, commits, branches, comments, labels, assignments, or reviewer requests.
   - Do not message people, assign owners, schedule meetings, or move work between systems.
@@ -52,28 +52,22 @@ Do not invent owners, deadlines, or commitments. Mark uncertainty explicitly.
 
 ## Slack reply format
 
-Reply in the same Slack thread using Slack `mrkdwn`. Keep the whole reply short and include at most five concrete next steps Charlie could help execute.
+Reply in the same Slack thread using Slack `mrkdwn`. Keep the whole reply short and include a maximum of five concrete next steps Charlie could help execute. Each next step must be 1-2 sentences long.
 
 ```mrkdwn
 *Meeting follow-up options*
 
 *Charlie can help*
-- <specific executable next step, with relevant link or context>
-
-*Needs human decision*
-- <decision, options, or missing owner needed before Charlie should act>
-
-*Already tracked*
-- <existing GitHub or Linear item and why it appears to cover the action>
+- <specific executable next step in 1-2 sentences, with relevant link or context>
 ```
 
-Omit any empty group. Use Slack link syntax for links. Do not use Markdown headings, tables, nested bullets, or long transcript quotes.
+Use Slack link syntax for links. Do not use Markdown headings, tables, nested bullets, separate decision/tracking sections, or long transcript quotes.
 
 ## Action boundary
 
 This daemon plans follow-up only. It must not create issues, edit pull requests, assign owners, message people, or update trackers automatically.
 
-Each item under `Charlie can help` should be phrased as a task a human could ask Charlie to perform next. Each `Needs human decision` item should name the decision or missing authority. Each `Already tracked` item should link to existing work when available.
+Each item under `Charlie can help` should be phrased as a task a human could ask Charlie to perform next. Omit items that only record an existing tracked issue or require a human decision before Charlie could reasonably act.
 
 ## Idempotency
 
