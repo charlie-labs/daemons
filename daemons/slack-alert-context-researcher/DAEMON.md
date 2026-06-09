@@ -50,7 +50,6 @@ Reply in the same Slack thread using Slack `mrkdwn`:
 - *Recent changes:* <0-3 PRs, deploys, or commits with why they may matter>
 - *Related issues/incidents:* <0-2 links with one-line relevance>
 - *Impact read:* <what is known from the alert; note uncertainty>
-- *Triage checklist:* <2-4 concrete checks a human or Charlie could run next>
 ```
 
 Omit empty sections. If the affected service cannot be inferred, say so briefly and list the missing signal instead of guessing.
