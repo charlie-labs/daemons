@@ -2,7 +2,7 @@
 id: linear-bug-context-researcher
 purpose: Help teams triage likely Linear bugs by adding concise repository context and next-step guidance to the issue.
 watch:
-  - A Linear issue is created in a team mapped to this repository.
+  - A Linear issue is created for a bug or likely regression.
 routines:
   - Decide whether the new Linear issue is a likely bug or regression from labels and issue text.
   - Research recent Linear and GitHub context related to the likely bug, prioritizing the mapped repository.
@@ -17,11 +17,11 @@ deny:
 
 # Linear Bug Context Researcher
 
-## Activation gate
+## Bug signals
 
-Proceed only when the newly created Linear issue is likely a bug or regression.
+The watch condition is intended for newly created Linear issues that already look like bugs or regressions from observable issue metadata.
 
-Treat an issue as likely in scope when at least one of these signals is present:
+Treat an issue as in scope when at least one of these signals is present:
 
 - a Linear label named `Bug`, `bug`, or an equivalent bug/regression label
 - title or description language such as bug, regression, broken, crash, error, exception, failing, failure, expected versus actual, repro, stack trace, or previously worked

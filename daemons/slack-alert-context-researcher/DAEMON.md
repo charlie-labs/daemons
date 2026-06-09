@@ -2,7 +2,7 @@
 id: slack-alert-context-researcher
 purpose: Add compact operational context to Slack alert threads without acknowledging or mutating the incident.
 watch:
-  - A Slack message is posted by an app or bot in a workspace mapped to this repository.
+  - A Slack app or bot posts an alert-like monitoring, incident, error, or paging message.
 routines:
   - Decide whether the Slack message is an alert-style monitoring or incident notification.
   - Research likely affected service context using the alert text, mapped repository, GitHub activity, and optional Linear or Sentry evidence.
@@ -17,11 +17,11 @@ deny:
 
 # Slack Alert Context Researcher
 
-## Activation gate
+## Alert signals
 
-Proceed only for alert-like messages from Slack app or bot senders.
+The watch condition is intended for Slack app or bot messages that already look like operational alerts.
 
-In-scope signals include app or bot messages from monitoring, error-reporting, observability, incident, or paging tools such as Sentry, Datadog, PagerDuty, Grafana, or similar systems. Also require alert-like content such as triggered, resolved, firing, incident, error rate, exception, latency, availability, failed job, monitor, service, environment, severity, or event count.
+In-scope signals include app or bot messages from monitoring, error-reporting, observability, incident, or paging tools such as Sentry, Datadog, PagerDuty, Grafana, or similar systems. Alert-like content includes triggered, resolved, firing, incident, error rate, exception, latency, availability, failed job, monitor, service, environment, severity, or event count.
 
 No-op for human-authored status updates, social messages, routine deployment notifications without alert semantics, bot messages that are not operational alerts, or alerts from channels/workspaces that are not mapped to this repository.
 

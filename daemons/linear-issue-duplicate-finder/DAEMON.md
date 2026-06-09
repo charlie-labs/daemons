@@ -2,7 +2,7 @@
 id: linear-issue-duplicate-finder
 purpose: Reduce duplicate Linear issue triage by suggesting likely matches without changing issue state.
 watch:
-  - A Linear issue is created in a team mapped to this repository.
+  - A Linear issue is created with enough title, description, label, project, or linked GitHub context to search for likely duplicates.
 routines:
   - Skip the new issue when it is already completed, canceled, or otherwise inactive.
   - Search likely duplicate or related Linear issues, checking the same Linear team before broader mapped repository context.
@@ -18,9 +18,11 @@ deny:
 
 # Linear Issue Duplicate Finder
 
-## State gate
+## Trigger quality and state policy
 
-Inspect the triggering issue before searching. No-op when the issue state is completed, canceled, archived, or otherwise clearly inactive.
+The watch condition is intended for newly created Linear issues that include concrete searchable signals, such as a symptom, task, project, component, error text, named entity, or linked GitHub URL.
+
+Inspect the triggering issue before searching. No-op when the issue state is completed, canceled, archived, or otherwise clearly inactive, or when the issue title/body is too thin to support meaningful duplicate search.
 
 Do not infer state from state name alone when Linear exposes a state type. Prefer Linear state type metadata when available.
 
@@ -78,6 +80,7 @@ If candidates changed materially after issue edits, post a new concise follow-up
 ## No-op when
 
 - the triggering issue is completed, canceled, archived, or inactive
+- the issue title/body is too thin to support meaningful duplicate search
 - no candidate reaches medium confidence
 - issue identity or mapped repository context is unavailable
 - search results are broad keyword matches without concrete duplicate evidence
