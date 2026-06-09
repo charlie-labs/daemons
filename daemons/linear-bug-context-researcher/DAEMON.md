@@ -37,7 +37,7 @@ Search in this order:
 
 1. Related Linear issues in the same mapped team from the last 180 days.
 2. Related Linear issues in adjacent mapped teams when the issue text names the same component or error.
-3. Recent GitHub pull requests in the mapped repository from the last 30 days.
+3. Recent GitHub pull requests from the last 30 days.
 4. GitHub issues, commits, files, or documentation only when they directly explain the symptom, ownership, or likely changed area.
 
 Prefer fresh, specific evidence over broad matches. At most five total links may appear in the comment. Use fewer links when fewer are useful.
