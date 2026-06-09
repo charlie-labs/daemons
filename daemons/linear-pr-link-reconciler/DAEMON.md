@@ -64,7 +64,7 @@ Prefer Linear comments over automatic link edits.
 Post a comment only when it reduces uncertainty. Use one of these shapes:
 
 ```md
-Likely related GitHub work
+**Likely related GitHub work**
 
 - <candidate link> — <why it matches>
 

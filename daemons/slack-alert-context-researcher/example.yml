@@ -2,7 +2,7 @@ id: slack-alert-context-researcher
 title: Slack Alert Context Researcher
 status: ready
 summary: Replies to alert-like Slack bot messages with compact GitHub and incident context for triage.
-readiness: direct-copy
+readiness: adapt-before-use
 showOnWebsite: true
 showInDashboard: true
 fit:
@@ -26,4 +26,5 @@ requirements:
     - Slack workspaces are mapped to the repositories that own the alerted services.
     - Monitoring or incident notifications arrive as Slack app or bot messages with enough text or metadata to infer the affected service.
 adaptation:
-  mustCustomize: []
+  mustCustomize:
+    - Replace `#alerts` in the watch condition with the Slack channel where your team receives monitoring or incident alerts.

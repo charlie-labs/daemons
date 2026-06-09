@@ -47,13 +47,12 @@ Prefer fresh, specific evidence over broad matches. At most five total links may
 Post one Linear issue comment only when it adds useful triage value. Keep it concise and use this shape:
 
 ```md
-Bug triage context
+**Bug triage context**
 
 Related items: <0-2 most relevant Linear or GitHub links with one-line relevance>
 Recent changes: <0-2 recent PRs or commits that may matter>
 Suspicious areas: <files, modules, services, or ownership clues with evidence>
 Missing repro details: <specific details needed, if any>
-Suggested next actions: <1-3 concrete next triage steps>
 ```
 
 Omit empty sections. Do not include raw log dumps, long search transcripts, or speculative blame. Phrase findings as evidence and uncertainty, not final root cause, unless the root cause is directly proven.
