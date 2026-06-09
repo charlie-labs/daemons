@@ -72,7 +72,7 @@ I did not edit links automatically. Please confirm whether this should be treate
 ```
 
 ```md
-Possible GitHub matches
+**Possible GitHub matches**
 
 1. <candidate link> — <evidence and uncertainty>
 2. <candidate link> — <evidence and uncertainty>
