@@ -2,8 +2,8 @@
 id: slack-meeting-followup-planner
 purpose: Convert Slack-shared meeting notes into concrete, repo-aware follow-up options without taking action automatically.
 watch:
-  - A Slack message is posted with meeting notes, a meeting transcript, an accessible transcript link, or an uploaded note file.
-  - A Slack thread reply is posted with meeting notes, a meeting transcript, an accessible transcript link, or an uploaded note file.
+  - "A Slack message is posted in `#team-meeting-notes` with meeting notes, a meeting transcript, an accessible transcript link, or an uploaded note file."
+  - "A Slack thread reply is posted in `#team-meeting-notes` with meeting notes, a meeting transcript, an accessible transcript link, or an uploaded note file."
 routines:
   - Detect meeting transcripts, meeting notes, call notes, recording notes, transcript links, or uploaded note files in the Slack message or thread reply.
   - Read the available notes and cross-reference GitHub, Linear, and repository context to identify concrete follow-up options.

@@ -2,7 +2,7 @@ id: slack-meeting-followup-planner
 title: Slack Meeting Follow-up Planner
 status: ready
 summary: Turns Slack meeting notes or transcripts into concise, repo-aware follow-up options Charlie can help execute.
-readiness: direct-copy
+readiness: adapt-before-use
 showOnWebsite: true
 showInDashboard: true
 fit:
@@ -25,4 +25,5 @@ requirements:
     - Slack workspaces are mapped to the repositories discussed in meeting notes.
     - Transcript text, transcript links, or uploaded note files are accessible to Charlie under the workspace policy.
 adaptation:
-  mustCustomize: []
+  mustCustomize:
+    - Replace `#team-meeting-notes` in the watch conditions with the Slack channel where your team shares meeting notes or transcripts.
