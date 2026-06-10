@@ -1,0 +1,27 @@
+id: linear-issue-duplicate-finder
+title: Linear Issue Duplicate Finder
+status: ready
+summary: Suggests likely duplicate or related Linear issues when new issues are created.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: true
+fit:
+  jobsToBeDone:
+    - organize
+    - operate
+  bestFor:
+    - Teams with enough Linear issue volume that duplicates or near-duplicates slow triage.
+    - Workspaces where Linear teams are mapped to the GitHub repositories that contain related implementation work.
+  notFor:
+    - Teams that want automatic issue closure, merging, status changes, or deduplication decisions.
+    - Workspaces where similar-looking issues frequently represent intentionally separate customer, project, or compliance work.
+requirements:
+  requiredIntegrations:
+    - linear
+    - github
+  optionalIntegrations: []
+  other:
+    - Linear issue teams are mapped to the repositories that own their work.
+    - Completed and canceled Linear workflow states are identifiable through Linear state metadata.
+adaptation:
+  mustCustomize: []

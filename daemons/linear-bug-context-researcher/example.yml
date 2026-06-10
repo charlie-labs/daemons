@@ -1,0 +1,27 @@
+id: linear-bug-context-researcher
+title: Linear Bug Context Researcher
+status: ready
+summary: Adds concise repo-aware triage context to newly created Linear bugs and regressions.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: true
+fit:
+  jobsToBeDone:
+    - operate
+    - explain
+  bestFor:
+    - Teams that receive bug reports in Linear and want fast repository context before manual triage.
+    - Workspaces where Linear issues can be mapped to the GitHub repository that owns the affected code.
+  notFor:
+    - Teams that want Charlie to assign, prioritize, close, or otherwise manage bug lifecycle state automatically.
+    - Issues that require customer-private logs or production access that Charlie cannot inspect safely.
+requirements:
+  requiredIntegrations:
+    - linear
+    - github
+  optionalIntegrations: []
+  other:
+    - Linear issue teams are mapped to the repositories that own their work.
+    - Linear issue titles, descriptions, or labels contain enough signal to distinguish likely bugs from other work.
+adaptation:
+  mustCustomize: []

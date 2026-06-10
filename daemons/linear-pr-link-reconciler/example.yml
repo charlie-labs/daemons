@@ -1,0 +1,27 @@
+id: linear-pr-link-reconciler
+title: Linear PR Link Reconciler
+status: ready
+summary: Finds likely GitHub code work for Linear issues and asks for confirmation without editing links automatically.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: true
+fit:
+  jobsToBeDone:
+    - organize
+    - operate
+  bestFor:
+    - Teams that discuss active code work in Linear before every related GitHub PR or branch is linked.
+    - Workspaces where Linear teams are mapped to the repositories that contain their implementation work.
+  notFor:
+    - Teams that want Charlie to automatically edit Linear links, PR descriptions, issue state, or GitHub metadata.
+    - Issues spanning many repositories where the correct repository cannot be inferred confidently from team mapping.
+requirements:
+  requiredIntegrations:
+    - linear
+    - github
+  optionalIntegrations: []
+  other:
+    - Linear issue teams are mapped to the repositories that own their implementation work.
+    - GitHub branches, pull requests, commits, or descriptions contain enough issue or title signal to support safe matching.
+adaptation:
+  mustCustomize: []
