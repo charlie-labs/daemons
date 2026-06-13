@@ -4,7 +4,7 @@ export function getRootHelpText(): string {
 Usage:
   daemon list [--ref <sha|branch|tag>] [--json]
   daemon show <example-id> [--ref <sha|branch|tag>] [--json]
-  daemon add <example-id> [--ref <sha|branch|tag>] [--dry-run] [--force] [--allow-deprecated] [--json]
+  daemon add <example-id> [--ref <sha|branch|tag>] [--adapt key=value] [--adapt-file adaptations.json] [--dry-run] [--force] [--allow-deprecated] [--json]
   daemon install <example-id> [same flags as add]
   daemon validate <path> [--dry-run] [--json]
   daemon validate --all [--dry-run] [--json]
@@ -26,7 +26,7 @@ export function getCommandHelpText(command: string): string {
   }
 
   if (command === 'add') {
-    return 'Usage: daemon add <example-id> [--ref <sha|branch|tag>] [--dry-run] [--force] [--allow-deprecated] [--json]\n\nScaffolds catalog-listed files into .agents/daemons/<id>/ without activating the daemon.';
+    return 'Usage: daemon add <example-id> [--ref <sha|branch|tag>] [--adapt key=value] [--adapt-file adaptations.json] [--dry-run] [--force] [--allow-deprecated] [--json]\n\nScaffolds catalog-listed files into .agents/daemons/<id>/ without activating the daemon. Adaptation values render documented {{adapt.key}} tokens before validation and writes.';
   }
 
   if (command === 'validate') {

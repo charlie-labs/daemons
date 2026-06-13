@@ -110,6 +110,18 @@ requirements:
 adaptation:
   mustCustomize:
     - Replace placeholder repository paths and output destinations.
+adaptations:
+  - key: target_branch
+    label: Target branch
+    description: Branch name the installed daemon should use for generated work.
+    required: false
+    default: daemon/example
+  - key: destination_channel
+    label: Destination channel
+    description: Slack channel or other destination for daemon output.
+    required: true
+    suggestions:
+      - '#team-alerts'
 ```
 
 ### Required top-level fields
@@ -126,6 +138,7 @@ adaptation:
 | `fit` | object | Required strict object describing where this example fits. |
 | `requirements` | object | Required strict object describing prerequisites. |
 | `adaptation` | object | Required strict object describing required customization. |
+| `adaptations` | array of objects | Optional structured render inputs. Defaults to `[]`; generated `examples.json` always includes it. |
 
 Unknown top-level keys are rejected.
 
@@ -216,6 +229,27 @@ List an integration as required only when the daemon cannot perform its core job
 
 Use `mustCustomize` for concrete changes a customer must make to the example or daemon before using the pattern, such as replacing path globs, destination channels, issue-state names, label taxonomies, configured commands, thresholds, or ownership boundaries. Do not use it for generic rollout instructions, repo setup work, or broad verification reminders.
 
+
+### `adaptations`
+
+`adaptations` is optional structured metadata for values that can be rendered by install consumers such as `daemon add`. It complements `adaptation.mustCustomize`; it does not replace the legacy human-readable notes or the `adaptationsRequired[]` compatibility field.
+
+Each item is a strict object with:
+
+| Field | Type | Rules |
+| --- | --- | --- |
+| `key` | string | Required. Must match `^[a-z][a-z0-9_]*$`; duplicate keys are rejected. |
+| `label` | string | Required non-empty display label. |
+| `description` | string | Required non-empty description for authors and consumers. |
+| `required` | boolean | Required. `true` means the install flow must receive a value. |
+| `default` | string | Required for optional adaptations; forbidden for required adaptations. |
+| `suggestions` | array of strings | Optional. Every value must be a string. |
+
+Structured values are string-only. Objects, arrays, numbers, booleans, and `null` are invalid. The generated catalog sorts `adaptations[]` by `key` for deterministic output.
+
+Use the exact token syntax `{{adapt.key}}` in `DAEMON.md`, `scripts/**`, or `references/**` when a value should be rendered during install. Consumers must reject unknown input keys, unknown adaptation tokens, missing required values, non-string file values, and unresolved `{{adapt.*}}` tokens after rendering.
+
+
 ## Support files
 
 Support files are optional and live under `scripts/**` or `references/**` inside the package.
@@ -243,9 +277,9 @@ Examples are reference patterns, not automatically installed daemons. Catalog co
 
 Customer copies include:
 
-- `DAEMON.md`;
-- files listed in catalog `scripts[]`;
-- files listed in catalog `references[]`.
+- rendered `DAEMON.md`;
+- rendered files listed in catalog `scripts[]`;
+- rendered files listed in catalog `references[]`.
 
 Customer copies exclude:
 
@@ -254,7 +288,7 @@ Customer copies exclude:
 
 `example.yml` is public catalog metadata for discovery, recommendation, docs, dashboard, and adaptation flows. It is not part of the daemon runtime contract and must not be copied into customer repositories.
 
-Catalog-based consumers must not recursively copy the whole upstream `daemons/<id>/` directory. They should install from one `examples.json` entry by writing `daemon.content` to `.agents/daemons/<id>/DAEMON.md`, then fetching only the listed `scripts[]` and `references[]` support files from the same source ref used to fetch the catalog.
+Catalog-based consumers must not recursively copy the whole upstream `daemons/<id>/` directory. They should install from one `examples.json` entry by rendering `daemon.content` to `.agents/daemons/<id>/DAEMON.md`, then fetching and rendering only the listed `scripts[]` and `references[]` support files from the same source ref used to fetch the catalog.
 
 Before enabling a copied example in a customer repo:
 

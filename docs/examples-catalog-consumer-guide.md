@@ -73,6 +73,7 @@ Each `examples[]` entry includes the validated `example.yml` metadata plus gener
 | `id`, `title`, `summary`, `status`, `readiness` | Display, filtering, matching, and adaptation guidance. |
 | `showOnWebsite`, `showInDashboard` | Publication controls for specific surfaces. |
 | `fit`, `requirements`, `adaptation` | Recommendation, prerequisites, and required customization copy. |
+| `adaptations` | Structured string-only inputs for rendering `{{adapt.key}}` tokens. Always present in generated catalog entries; may be empty. |
 | `daemon.path` | Currently always `DAEMON.md`. |
 | `daemon.content` | Embedded `DAEMON.md` content for rendering and install. |
 | `scripts` | Package-relative support script paths to fetch separately. |
@@ -126,7 +127,22 @@ entry.showInDashboard === true && entry.status === "ready"
 | Readiness | Meaning for consumers |
 | --- | --- |
 | `direct-copy` | The catalog declares no required `adaptation.mustCustomize` items. Consumers still need local verification before enabling the daemon. |
-| `adapt-before-use` | The consumer should surface or enforce every item in `adaptation.mustCustomize` before install or enablement. |
+| `adapt-before-use` | The consumer should surface or enforce every item in `adaptation.mustCustomize` before install or enablement. If `adaptations[]` contains required items, collect string values before rendering. |
+
+
+## Structured adaptations
+
+`adaptations[]` describes renderable inputs for examples that contain `{{adapt.key}}` tokens in `DAEMON.md`, `scripts[]`, or `references[]` support files.
+
+Each entry has:
+
+- `key`: token-safe identifier matching `^[a-z][a-z0-9_]*$`;
+- `label` and `description`: display/help copy;
+- `required`: whether a caller must provide a value;
+- `default`: required for optional inputs and forbidden for required inputs;
+- `suggestions`: optional string examples.
+
+Install consumers should merge values deterministically in this order: optional defaults, then adaptation-file values, then explicit CLI/UI values. Values are strings only. Reject unknown input keys, missing required keys, non-string values, unknown `{{adapt.*}}` tokens, and rendered files that still contain `{{adapt.*}}` tokens. Do not echo raw caller-provided adaptation values in logs or JSON output; reporting applied keys is sufficient.
 
 ## Install algorithm
 
@@ -143,9 +159,9 @@ Recommended flow:
 3. Validate `catalog.schemaVersion === 1`.
 4. Select an entry from `catalog.examples`.
 5. Require `entry.daemon.content` to be present.
-6. Write `entry.daemon.content` to `.agents/daemons/<id>/DAEMON.md`.
+6. Render `entry.daemon.content`, validate the rendered runtime daemon, then write it to `.agents/daemons/<id>/DAEMON.md`.
 7. Fetch each listed support file in `entry.scripts` and `entry.references` from the same ref.
-8. Write support files under `.agents/daemons/<id>/` using the same package-relative paths.
+8. Render support files and write them under `.agents/daemons/<id>/` using the same package-relative paths.
 9. Apply planned file modes when the write surface supports them (`100644` for `DAEMON.md`/references, `100755` for scripts).
 10. Exclude `example.yml` and all unlisted upstream files.
 11. Run the consumer's preflight, collision, review, and rollout checks before enabling the daemon.
@@ -171,18 +187,22 @@ if (!entry?.daemon?.content) {
   throw new Error(`Catalog entry ${exampleId} is missing daemon.content`);
 }
 
+const renderedDaemon = renderAdaptationTokens(entry.daemon.content, values);
+await validateRuntimeDaemonMarkdown(renderedDaemon);
+
 await writeFile(
   `.agents/daemons/${entry.id}/DAEMON.md`,
-  entry.daemon.content,
+  renderedDaemon,
 );
 
 for (const supportPath of [...entry.scripts, ...entry.references]) {
   const sourcePath = `${entry.source.directory}/${supportPath}`;
   const content = await fetchText("charlie-labs/daemons", ref, sourcePath);
+  const renderedContent = renderAdaptationTokens(content, values);
 
   await writeFile(
     `.agents/daemons/${entry.id}/${supportPath}`,
-    content,
+    renderedContent,
   );
 }
 ```
@@ -220,7 +240,9 @@ Consumers should fail closed when:
 - `entry.daemon.content` is missing or empty;
 - a listed support path cannot be fetched from the selected ref;
 - install preflight detects collisions or unsafe local conditions;
-- an `adapt-before-use` example has not had required customization reviewed.
+- an `adapt-before-use` example has not had required customization reviewed;
+- required structured adaptation values are missing or not strings;
+- rendered content still contains `{{adapt.*}}` tokens.
 
 Consumers may still display a non-installable entry for browsing if the surface clearly separates browsing from installation. Do not convert browsing eligibility into install eligibility.
 
@@ -234,8 +256,10 @@ Before shipping a catalog integration, verify that it:
 - records that ref externally when auditability matters;
 - uses the correct surface filter;
 - treats surface flags as publication controls only;
-- uses `entry.daemon.content` for rendered or installed `DAEMON.md`;
+- renders `entry.daemon.content` before installing `DAEMON.md`;
 - fetches only listed `scripts` and `references` support paths;
+- renders `{{adapt.key}}` tokens in `DAEMON.md`, scripts, and references;
+- validates rendered `DAEMON.md` before writing files;
 - preserves package-relative paths under `.agents/daemons/<id>/`;
 - excludes `example.yml` and unlisted files;
 - handles support script executable mode intentionally;

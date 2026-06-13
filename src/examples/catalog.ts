@@ -7,6 +7,7 @@ import { parseDaemonMarkdown, parseExampleYaml } from './schema';
 import type {
   CatalogExample,
   DaemonPackage,
+  ExampleAdaptation,
   ExampleMetadata,
   ExamplesCatalog,
   ValidationError,
@@ -110,6 +111,20 @@ export async function validateCatalogFile(repoRoot: string): Promise<ValidationR
 
 export function serializeCatalog(catalog: ExamplesCatalog): string {
   return `${JSON.stringify(catalog, null, 2)}\n`;
+}
+
+
+function catalogAdaptations(adaptations: readonly ExampleAdaptation[]): ExampleAdaptation[] {
+  return [...adaptations]
+    .sort((left, right) => left.key.localeCompare(right.key))
+    .map((adaptation) => ({
+      key: adaptation.key,
+      label: adaptation.label,
+      description: adaptation.description,
+      required: adaptation.required,
+      ...(adaptation.default !== undefined ? { default: adaptation.default } : {}),
+      ...(adaptation.suggestions !== undefined ? { suggestions: [...adaptation.suggestions] } : {}),
+    }));
 }
 
 type LoadedPackageResult = {
@@ -310,6 +325,7 @@ async function loadCatalogExample(
       adaptation: {
         mustCustomize: exampleMetadata.adaptation.mustCustomize,
       },
+      adaptations: catalogAdaptations(exampleMetadata.adaptations),
       daemon: {
         path: 'DAEMON.md',
         content: daemonContent.value,

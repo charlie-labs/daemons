@@ -51,6 +51,7 @@ export type ShowData = CatalogListItem & {
   sourceDirectory: string;
   sourceUrl: string;
   adaptationsRequired: string[];
+  adaptations: CatalogExample['adaptations'];
   activationRequired: string;
 };
 
@@ -77,6 +78,7 @@ export type AddData = {
   status: CatalogExample['status'];
   readiness: CatalogExample['readiness'];
   adaptationsRequired: string[];
+  adaptationsApplied: string[];
   activationRequired: string;
   filesPlanned: InstallFilePlan[];
   filesWritten: string[];

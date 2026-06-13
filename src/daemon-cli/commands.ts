@@ -22,6 +22,14 @@ import {
   toDisplayPath,
   writeTextFileEnsuringDirectory,
 } from './fs-utils';
+import {
+  knownAdaptationKeys,
+  parseAdaptFileContent,
+  parseAdaptFlags,
+  renderAdaptationTokens,
+  resolveAdaptations,
+  type AdaptationResolution,
+} from './adaptations';
 import { createDaemonInstallPlan } from './install-plan';
 import { issue, normalizeErrorMessage } from './issues';
 import type {
@@ -46,6 +54,18 @@ function usageResult(command: string, summary: string): CliCommandResult {
     summary,
     warnings: [],
     errors: [issue({ code: 'USAGE_ERROR', message: summary })],
+    data: null,
+  };
+}
+
+function usageIssuesResult(command: string, summary: string, errors: CliIssue[]): CliCommandResult {
+  return {
+    command,
+    ok: false,
+    exitCode: EXIT_CODE_USAGE,
+    summary,
+    warnings: [],
+    errors,
     data: null,
   };
 }
@@ -204,6 +224,7 @@ export async function runShowCommand(args: {
         sourceDirectory: entry.source.directory,
         sourceUrl: entry.source.url,
         adaptationsRequired: adaptationsFor(entry),
+        adaptations: [...(entry.adaptations ?? [])],
         activationRequired: ACTIVATION_CAVEAT,
       },
     };
@@ -234,6 +255,7 @@ function addDataForBlocked(args: {
   force: boolean;
   collisions: string[];
   deprecatedBlocked: boolean;
+  adaptationsApplied?: string[] | undefined;
 }): AddData {
   const destinationDirectory = path.join(args.installRoot, DEFAULT_DAEMON_ROOT, args.entry.id);
   return {
@@ -250,6 +272,7 @@ function addDataForBlocked(args: {
     status: args.entry.status,
     readiness: args.entry.readiness,
     adaptationsRequired: adaptationsFor(args.entry),
+    adaptationsApplied: args.adaptationsApplied ?? [],
     activationRequired: ACTIVATION_CAVEAT,
     filesPlanned: args.files.map((file) => ({
       ...file,
@@ -259,6 +282,104 @@ function addDataForBlocked(args: {
     collisions: args.collisions,
     deprecatedBlocked: args.deprecatedBlocked,
   };
+}
+
+
+type RenderedInstallFile = InstallFilePlan & {
+  content: string;
+};
+
+function dataErrorResult<TData>(command: string, summary: string, errors: CliIssue[], data: TData | null): CliCommandResult<TData> {
+  return {
+    command,
+    ok: false,
+    exitCode: EXIT_CODE_DATA,
+    summary,
+    warnings: [],
+    errors,
+    data,
+  };
+}
+
+async function loadAdaptFileValues(args: { cwd: string; adaptFile: string | undefined }): Promise<
+  | { ok: true; fileValues: Map<string, string>; displayPath: string | null }
+  | { ok: false; errors: CliIssue[] }
+> {
+  if (!args.adaptFile) {
+    return { ok: true, fileValues: new Map(), displayPath: null };
+  }
+
+  const absolutePath = path.resolve(args.cwd, args.adaptFile);
+  const displayPath = toDisplayPath(args.cwd, absolutePath);
+  try {
+    const content = await readUtf8File(absolutePath);
+    const parsed = parseAdaptFileContent({ content, path: displayPath });
+    if (!parsed.ok) {
+      return { ok: false, errors: parsed.errors };
+    }
+    return { ok: true, fileValues: parsed.values, displayPath };
+  } catch (error) {
+    return {
+      ok: false,
+      errors: [issue({ code: 'ADAPT_FILE_READ_FAILED', message: normalizeErrorMessage(error), path: displayPath })],
+    };
+  }
+}
+
+async function renderInstallFiles(args: {
+  entry: CatalogExample;
+  ref: string;
+  catalogClient: CatalogClient;
+  installRoot: string;
+  files: readonly InstallFilePlan[];
+  resolution: AdaptationResolution;
+}): Promise<{ ok: true; files: RenderedInstallFile[] } | { ok: false; errors: CliIssue[] }> {
+  const renderedFiles: RenderedInstallFile[] = [];
+  const errors: CliIssue[] = [];
+  const knownKeys = knownAdaptationKeys(args.entry);
+
+  for (const file of args.files) {
+    const content =
+      file.kind === 'daemon'
+        ? args.entry.daemon.content
+        : await args.catalogClient.readTextFile(args.ref, file.sourcePath);
+    const displayPath = toDisplayPath(args.installRoot, file.destinationPath);
+    const rendered = renderAdaptationTokens({
+      content,
+      values: args.resolution.values,
+      knownKeys,
+      path: displayPath,
+    });
+    if (!rendered.ok) {
+      errors.push(...rendered.errors);
+      continue;
+    }
+    renderedFiles.push({ ...file, content: rendered.content });
+  }
+
+  if (errors.length > 0) {
+    return { ok: false, errors };
+  }
+
+  const daemonFile = renderedFiles.find((file) => file.kind === 'daemon');
+  if (!daemonFile) {
+    return {
+      ok: false,
+      errors: [issue({ code: 'INSTALL_PLAN_MISSING_DAEMON', message: 'Install plan did not include DAEMON.md.' })],
+    };
+  }
+
+  const daemonDisplayPath = toDisplayPath(args.installRoot, daemonFile.destinationPath);
+  const validation = validateRuntimeDaemonMarkdown({
+    content: daemonFile.content,
+    path: daemonDisplayPath,
+    expectedId: expectedDaemonIdFromPath(daemonDisplayPath),
+  });
+  if (!validation.ok) {
+    return { ok: false, errors: validation.errors };
+  }
+
+  return { ok: true, files: renderedFiles };
 }
 
 export async function runAddCommand(args: {
@@ -276,6 +397,8 @@ export async function runAddCommand(args: {
         force: { type: 'boolean', default: false },
         'dry-run': { type: 'boolean', default: false },
         'allow-deprecated': { type: 'boolean', default: false },
+        adapt: { type: 'string', multiple: true },
+        'adapt-file': { type: 'string' },
       },
       allowPositionals: true,
       strict: true,
@@ -297,6 +420,11 @@ export async function runAddCommand(args: {
   const force = parsed.values.force === true;
   const dryRun = parsed.values['dry-run'] === true;
   const allowDeprecated = parsed.values['allow-deprecated'] === true;
+  const adaptFile = parsed.values['adapt-file'];
+  const parsedAdaptFlags = parseAdaptFlags(parsed.values.adapt);
+  if (!parsedAdaptFlags.ok) {
+    return usageIssuesResult(args.commandName, 'Invalid adaptation flags.', parsedAdaptFlags.errors) as CliCommandResult<AddData>;
+  }
 
   try {
     const [catalog, installRoot] = await Promise.all([
@@ -356,18 +484,66 @@ export async function runAddCommand(args: {
       };
     }
 
+    const fileValues = await loadAdaptFileValues({ cwd: args.cwd, adaptFile });
+    if (!fileValues.ok) {
+      return dataErrorResult(
+        args.commandName,
+        'Unable to read adaptation inputs.',
+        fileValues.errors,
+        addDataForBlocked({ entry, ref, installRoot, files: installPlan.files, dryRun, force, collisions, deprecatedBlocked: false })
+      );
+    }
+
+    const adaptationResolution = resolveAdaptations({
+      entry,
+      fileValues: fileValues.fileValues,
+      cliValues: parsedAdaptFlags.values,
+      filePath: fileValues.displayPath,
+    });
+    if (!adaptationResolution.ok) {
+      return dataErrorResult(
+        args.commandName,
+        `Adaptation inputs for '${exampleId}' are incomplete or invalid.`,
+        adaptationResolution.errors,
+        addDataForBlocked({ entry, ref, installRoot, files: installPlan.files, dryRun, force, collisions, deprecatedBlocked: false })
+      );
+    }
+
+    const rendered = await renderInstallFiles({
+      entry,
+      ref,
+      catalogClient: args.catalogClient,
+      installRoot,
+      files: installPlan.files,
+      resolution: adaptationResolution.resolution,
+    });
+    if (!rendered.ok) {
+      return dataErrorResult(
+        args.commandName,
+        `Rendered daemon example '${exampleId}' is invalid.`,
+        rendered.errors,
+        addDataForBlocked({
+          entry,
+          ref,
+          installRoot,
+          files: installPlan.files,
+          dryRun,
+          force,
+          collisions,
+          deprecatedBlocked: false,
+          adaptationsApplied: adaptationResolution.resolution.appliedKeys,
+        })
+      );
+    }
+
     const filesWritten: string[] = [];
 
     if (!dryRun) {
       await mkdir(destinationDirectory, { recursive: true });
-      for (const file of installPlan.files) {
-        const content =
-          file.kind === 'daemon'
-            ? entry.daemon.content
-            : await args.catalogClient.readTextFile(ref, file.sourcePath);
+      for (const file of rendered.files) {
         await writeTextFileEnsuringDirectory({
           path: file.destinationPath,
-          content,
+          content: file.content,
           mode: file.mode,
         });
         filesWritten.push(toDisplayPath(installRoot, file.destinationPath));
@@ -388,6 +564,7 @@ export async function runAddCommand(args: {
       status: entry.status,
       readiness: entry.readiness,
       adaptationsRequired: adaptationsFor(entry),
+      adaptationsApplied: adaptationResolution.resolution.appliedKeys,
       activationRequired: ACTIVATION_CAVEAT,
       filesPlanned: installPlan.files.map((file) => ({ ...file, destinationPath: toDisplayPath(installRoot, file.destinationPath) })),
       filesWritten,
@@ -400,8 +577,8 @@ export async function runAddCommand(args: {
       ok: true,
       exitCode: EXIT_CODE_SUCCESS,
       summary: dryRun
-        ? `Dry run: would scaffold '${entry.id}' into ${data.filePath}. Adaptation required before use.`
-        : `Scaffolded '${entry.id}' into ${data.filePath}. Adaptation required before use; daemon is not active yet.`,
+        ? `Dry run: would scaffold '${entry.id}' into ${data.filePath}. Applied adaptation keys: ${data.adaptationsApplied.length.toString()}.`
+        : `Scaffolded '${entry.id}' into ${data.filePath}. Applied adaptation keys: ${data.adaptationsApplied.length.toString()}; daemon is not active yet.`,
       warnings: [],
       errors: [],
       data,

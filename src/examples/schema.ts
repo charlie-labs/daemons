@@ -3,7 +3,15 @@ import { z, type ZodIssue } from 'zod';
 import { validateCronExpression } from '../daemon-cli/validation/cron';
 import { findPublicSafetyErrors } from './public-safety';
 import { isKebabCaseSlug, isSupportPath } from './paths';
-import type { CatalogExample, DaemonFrontmatter, ExampleMetadata, ExamplesCatalog, ValidationError, ValidationResult } from './types';
+import type {
+  CatalogExample,
+  DaemonFrontmatter,
+  ExampleAdaptation,
+  ExampleMetadata,
+  ExamplesCatalog,
+  ValidationError,
+  ValidationResult,
+} from './types';
 import { formatFieldPath, machineError } from './validation';
 
 const STALE_METADATA_FIELDS = new Set([
@@ -24,6 +32,58 @@ const slugSchema = z.string().min(1).refine(isKebabCaseSlug, {
 
 const nonEmptyStringSchema = z.string().trim().min(1);
 const stringListSchema = z.array(nonEmptyStringSchema);
+const ADAPTATION_KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
+
+const adaptationKeySchema = z.string().regex(ADAPTATION_KEY_PATTERN, {
+  message: 'Expected a token-safe adaptation key matching ^[a-z][a-z0-9_]*$.',
+});
+
+const exampleAdaptationSchema: z.ZodType<ExampleAdaptation> = z
+  .object({
+    key: adaptationKeySchema,
+    label: nonEmptyStringSchema,
+    description: nonEmptyStringSchema,
+    required: z.boolean(),
+    default: z.string().optional(),
+    suggestions: z.array(z.string()).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.required && value.default !== undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['default'],
+        message: 'Required adaptations must not declare a default value.',
+      });
+    }
+
+    if (!value.required && value.default === undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['default'],
+        message: 'Optional adaptations must declare a default value.',
+      });
+    }
+  });
+
+const adaptationsSchema = z
+  .array(exampleAdaptationSchema)
+  .default([])
+  .superRefine((value, context) => {
+    const seen = new Map<string, number>();
+    for (const [index, adaptation] of value.entries()) {
+      const firstIndex = seen.get(adaptation.key);
+      if (firstIndex !== undefined) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, 'key'],
+          message: `Duplicate adaptation key '${adaptation.key}' also appears at adaptations[${firstIndex.toString()}].`,
+        });
+      } else {
+        seen.set(adaptation.key, index);
+      }
+    }
+  });
 
 const jobToBeDoneSchema = z.enum([
   'maintain-and-modernize',
@@ -67,6 +127,7 @@ const exampleMetadataSchema = z
         mustCustomize: stringListSchema,
       })
       .strict(),
+    adaptations: adaptationsSchema,
   })
   .strict()
   .superRefine((value, context) => {
@@ -117,7 +178,7 @@ const daemonFrontmatterSchema = z
     }
   });
 
-const catalogExampleSchema: z.ZodType<CatalogExample> = z
+const catalogExampleSchema = z
   .object({
     id: slugSchema,
     title: nonEmptyStringSchema,
@@ -145,6 +206,7 @@ const catalogExampleSchema: z.ZodType<CatalogExample> = z
         mustCustomize: stringListSchema,
       })
       .strict(),
+    adaptations: adaptationsSchema,
     daemon: z
       .object({
         path: z.literal('DAEMON.md'),
@@ -196,7 +258,7 @@ const catalogExampleSchema: z.ZodType<CatalogExample> = z
     }
   });
 
-const examplesCatalogSchema: z.ZodType<ExamplesCatalog> = z
+const examplesCatalogSchema = z
   .object({
     schemaVersion: z.literal(1),
     source: z

@@ -176,6 +176,16 @@ function formatHumanResult(result: CliCommandResult, verbose: boolean): string {
     } else {
       for (const adaptation of adaptations) lines.push(`- ${String(adaptation)}`);
     }
+    const structuredAdaptations = Array.isArray(data.adaptations) ? data.adaptations : [];
+    if (structuredAdaptations.length > 0) {
+      lines.push('Adaptation inputs:');
+      for (const adaptation of structuredAdaptations) {
+        if (typeof adaptation === 'object' && adaptation !== null && 'key' in adaptation) {
+          const record = adaptation as Record<string, unknown>;
+          lines.push(`- ${String(record.key)} (${record.required === true ? 'required' : 'optional'}): ${String(record.label)}`);
+        }
+      }
+    }
     lines.push(`Activation: ${String(data.activationRequired)}`);
   }
 
@@ -191,6 +201,13 @@ function formatHumanResult(result: CliCommandResult, verbose: boolean): string {
       lines.push('- none declared');
     } else {
       for (const adaptation of adaptations) lines.push(`- ${String(adaptation)}`);
+    }
+    const appliedKeys = Array.isArray(data.adaptationsApplied) ? data.adaptationsApplied : [];
+    lines.push('Adaptation keys applied:');
+    if (appliedKeys.length === 0) {
+      lines.push('- none');
+    } else {
+      for (const key of appliedKeys) lines.push(`- ${String(key)}`);
     }
     lines.push(`Activation: ${String(data.activationRequired)}`);
   }

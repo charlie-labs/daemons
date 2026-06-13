@@ -30,6 +30,15 @@ export type JobToBeDone =
   | 'daemon-operations';
 export type IntegrationSlug = 'github' | 'linear' | 'slack' | 'sentry';
 
+export type ExampleAdaptation = {
+  key: string;
+  label: string;
+  description: string;
+  required: boolean;
+  default?: string | undefined;
+  suggestions?: string[] | undefined;
+};
+
 export type ExampleMetadata = {
   id: string;
   title: string;
@@ -51,6 +60,7 @@ export type ExampleMetadata = {
   adaptation: {
     mustCustomize: string[];
   };
+  adaptations: ExampleAdaptation[];
 };
 
 export type CatalogExample = ExampleMetadata & {

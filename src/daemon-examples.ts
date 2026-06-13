@@ -2,9 +2,10 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseExamplesCatalogContent } from './examples/schema';
-import type { CatalogExample, ExamplesCatalog, ValidationError } from './examples/types';
+import type { CatalogExample, ExampleAdaptation, ExamplesCatalog, ValidationError } from './examples/types';
 
 export type DaemonExample = CatalogExample;
+export type DaemonExampleAdaptation = ExampleAdaptation;
 export type DaemonExamplesCatalog = ExamplesCatalog;
 
 export type LoadDaemonExamplesCatalogOptions = {

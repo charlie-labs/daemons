@@ -21,19 +21,19 @@ schedule: '0 8 * * 1'
 
 Use these repository-specific values:
 
-- Package manager: `<package-manager>`
-- Dependency manifests: `<manifest-globs>`
-- Lockfile: `<lockfile-path>`
-- Outdated scan: `<outdated-command>`
-- Runtime dependency update: `<runtime-update-command>`
-- Development dependency update: `<development-update-command>`
-- Install or lockfile refresh: `<install-command>`
+- Package manager: `{{adapt.package_manager}}`
+- Dependency manifests: `{{adapt.manifest_globs}}`
+- Lockfile: `{{adapt.lockfile_path}}`
+- Outdated scan: `{{adapt.outdated_command}}`
+- Runtime dependency update: `{{adapt.runtime_update_command}}`
+- Development dependency update: `{{adapt.development_update_command}}`
+- Install or lockfile refresh: `{{adapt.install_command}}`
 - Verification:
-  - `<verification-command>`
-- Runtime dependency branch: `daemon/deps-runtime-minor-patch`
-- Development dependency branch: `daemon/deps-dev-minor-patch`
-- Runtime dependency title: `deps: update runtime dependencies`
-- Development dependency title: `deps(dev): update development dependencies`
+  - `{{adapt.verification_command}}`
+- Runtime dependency branch: `{{adapt.runtime_branch}}`
+- Development dependency branch: `{{adapt.development_branch}}`
+- Runtime dependency title: `{{adapt.runtime_title}}`
+- Development dependency title: `{{adapt.development_title}}`
 
 ## Update policy
 

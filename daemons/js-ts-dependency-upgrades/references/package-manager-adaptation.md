@@ -1,6 +1,20 @@
 # Package manager configuration
 
-Use repository evidence to replace the `DAEMON.md` configuration placeholders before enabling the daemon. Keep the runtime daemon focused on the configured commands rather than package-manager auto-detection.
+Use repository evidence to choose adaptation values before enabling the daemon. The `daemon add` command renders the documented adaptation tokens into `DAEMON.md` and this reference file. Keep the runtime daemon focused on the configured commands rather than package-manager auto-detection.
+
+## Rendered configuration
+
+The installed copy records the chosen values here for reviewer visibility:
+
+- Package manager: `{{adapt.package_manager}}`
+- Dependency manifests: `{{adapt.manifest_globs}}`
+- Lockfile: `{{adapt.lockfile_path}}`
+- Outdated scan: `{{adapt.outdated_command}}`
+- Runtime dependency update: `{{adapt.runtime_update_command}}`
+- Development dependency update: `{{adapt.development_update_command}}`
+- Install or lockfile refresh: `{{adapt.install_command}}`
+- Verification: `{{adapt.verification_command}}`
+
 
 ## Lockfile hints
 

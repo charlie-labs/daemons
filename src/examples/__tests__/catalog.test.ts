@@ -137,6 +137,194 @@ describe('examples catalog generator and validator', () => {
     });
   });
 
+  test('emits structured adaptations in deterministic key order', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/example.yml'),
+        `id: no-support
+title: no support fixture
+status: ready
+summary: Demonstrates structured adaptation metadata for catalog validation.
+readiness: adapt-before-use
+showOnWebsite: true
+showInDashboard: false
+fit:
+  jobsToBeDone:
+    - daemon-operations
+  bestFor:
+    - Teams validating the examples catalog generator.
+  notFor:
+    - Production daemon deployments without local review.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other: []
+adaptation:
+  mustCustomize:
+    - Provide the required target and review the optional default.
+adaptations:
+  - key: target_repo
+    label: Target repository
+    description: Repository slug to mention in rendered daemon files.
+    required: true
+    suggestions:
+      - owner/repo
+  - key: branch_prefix
+    label: Branch prefix
+    description: Branch prefix for generated work.
+    required: false
+    default: daemon/example
+`,
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        throw new TypeError('Expected fixture to be valid.');
+      }
+
+      expect(result.value.examples[0]?.adaptations).toEqual([
+        {
+          key: 'branch_prefix',
+          label: 'Branch prefix',
+          description: 'Branch prefix for generated work.',
+          required: false,
+          default: 'daemon/example',
+        },
+        {
+          key: 'target_repo',
+          label: 'Target repository',
+          description: 'Repository slug to mention in rendered daemon files.',
+          required: true,
+          suggestions: ['owner/repo'],
+        },
+      ]);
+    });
+  });
+
+  test('reports duplicate structured adaptation keys', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/example.yml'),
+        `id: no-support
+title: no support fixture
+status: ready
+summary: Demonstrates duplicate structured adaptation keys.
+readiness: adapt-before-use
+showOnWebsite: true
+showInDashboard: false
+fit:
+  jobsToBeDone:
+    - daemon-operations
+  bestFor:
+    - Teams validating the examples catalog generator.
+  notFor:
+    - Production daemon deployments without local review.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other: []
+adaptation:
+  mustCustomize:
+    - Provide local values.
+adaptations:
+  - key: duplicate_key
+    label: Duplicate key one
+    description: First duplicate.
+    required: false
+    default: one
+  - key: duplicate_key
+    label: Duplicate key two
+    description: Second duplicate.
+    required: false
+    default: two
+`,
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new TypeError('Expected fixture to be invalid.');
+      }
+
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({ code: 'invalid_field_value', fieldPath: 'adaptations[1].key' })
+      );
+    });
+  });
+
+  test('reports structured adaptation metadata validation failures', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/example.yml'),
+        `id: no-support
+title: no support fixture
+status: ready
+summary: Demonstrates invalid structured adaptation metadata.
+readiness: adapt-before-use
+showOnWebsite: true
+showInDashboard: false
+fit:
+  jobsToBeDone:
+    - daemon-operations
+  bestFor:
+    - Teams validating the examples catalog generator.
+  notFor:
+    - Production daemon deployments without local review.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other: []
+adaptation:
+  mustCustomize:
+    - Provide local values.
+adaptations:
+  - key: 9bad
+    label: Bad key
+    description: This key is not token safe.
+    required: true
+    default: should-not-exist
+  - key: duplicate_key
+    label: Duplicate key one
+    description: First duplicate.
+    required: false
+  - key: duplicate_key
+    label: Duplicate key two
+    description: Second duplicate.
+    required: false
+    default: ok
+    suggestions:
+      - valid
+      - 123
+`,
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new TypeError('Expected fixture to be invalid.');
+      }
+
+      expect(result.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'invalid_schema', fieldPath: 'adaptations[0].key' }),
+          expect.objectContaining({ code: 'invalid_field_value', fieldPath: 'adaptations[0].default' }),
+          expect.objectContaining({ code: 'invalid_field_value', fieldPath: 'adaptations[1].default' }),
+          expect.objectContaining({ code: 'invalid_schema', fieldPath: 'adaptations[2].suggestions[1]' }),
+        ])
+      );
+    });
+  });
+
   test('reports public-safety failures in package contents', async () => {
     await withFixture('invalid-public-safety', async (repoRoot) => {
       const result = await generateCatalogFromRepository(repoRoot);

@@ -6,6 +6,7 @@ export {
 } from './daemon-examples';
 export type {
   DaemonExample,
+  DaemonExampleAdaptation,
   DaemonExamplesCatalog,
   LoadDaemonExamplesCatalogOptions,
 } from './daemon-examples';

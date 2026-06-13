@@ -73,6 +73,7 @@ Shows catalog details for one example:
 - required and optional integrations
 - support files from `scripts[]` and `references[]`
 - required adaptation notes from `adaptation.mustCustomize`
+- structured adaptation inputs from `adaptations[]`
 - the activation caveat
 
 ```bash
@@ -81,7 +82,7 @@ daemon show pr-metadata
 daemon show pr-metadata --json
 ```
 
-`show` always returns `data.adaptationsRequired[]` in JSON, including for `adapt-before-use` examples. No explicit acknowledgement flag is required; the adaptation list is prominent in both human and JSON output.
+`show` always returns `data.adaptationsRequired[]` in JSON, including for `adapt-before-use` examples. It also returns `data.adaptations[]` for structured render inputs. No explicit acknowledgement flag is required; the adaptation lists are prominent in both human and JSON output.
 
 ### `daemon add <example-id>` / `daemon install <example-id>`
 
@@ -98,7 +99,7 @@ If the current working directory is inside a git repository, the destination roo
 
 Install behavior is intentionally narrow:
 
-- writes `DAEMON.md` from `entry.daemon.content`
+- writes rendered `DAEMON.md` from `entry.daemon.content`
 - fetches only paths listed in `entry.scripts[]` and `entry.references[]`
 - fetches support files from the same catalog ref as `examples.json`
 - never copies `example.yml`
@@ -107,11 +108,20 @@ Install behavior is intentionally narrow:
 - refuses to use an existing destination directory or overwrite existing destination files unless `--force` is provided
 - blocks deprecated examples unless `--allow-deprecated` is provided
 - supports `--dry-run` for read-only planning
+- renders `{{adapt.key}}` tokens in `DAEMON.md`, scripts, and references before validating and writing
 
 Examples:
 
 ```bash
-daemon add js-ts-dependency-upgrades --dry-run
+daemon add js-ts-dependency-upgrades --dry-run \
+  --adapt package_manager=npm \
+  --adapt manifest_globs=package.json \
+  --adapt lockfile_path=package-lock.json \
+  --adapt outdated_command='npm outdated' \
+  --adapt runtime_update_command='npm update <runtime-package>' \
+  --adapt development_update_command='npm update <dev-package> --save-dev' \
+  --adapt install_command='npm install --package-lock-only' \
+  --adapt verification_command='npm test'
 
 daemon install docs-drift-maintainer --ref master
 
@@ -120,9 +130,34 @@ daemon add pr-merge-conflict-repair --allow-deprecated --dry-run
 daemon add js-ts-dependency-upgrades --force
 ```
 
+
+Structured adaptation inputs:
+
+- repeat `--adapt key=value` for explicit values;
+- use `--adapt-file adaptations.json` for a JSON object of string values;
+- optional defaults from the catalog are applied first, then file values, then CLI flag values;
+- empty string values are accepted when explicitly provided, but rendered `DAEMON.md` must still pass runtime validation;
+- unknown keys, non-string file values, missing required values, unknown `{{adapt.*}}` tokens, and unresolved adaptation tokens fail before any files are written.
+
+`adaptations.json` example:
+
+```json
+{
+  "package_manager": "npm",
+  "manifest_globs": "package.json",
+  "lockfile_path": "package-lock.json",
+  "outdated_command": "npm outdated",
+  "runtime_update_command": "npm update <runtime-package>",
+  "development_update_command": "npm update <dev-package> --save-dev",
+  "install_command": "npm install --package-lock-only",
+  "verification_command": "npm test"
+}
+```
+
 JSON data includes:
 
 - `adaptationsRequired[]`
+- `adaptationsApplied[]` (keys only, not raw values)
 - `activationRequired`
 - `filesPlanned[]`, where each item includes `sourcePath`, `destinationPath`, `kind`, and `mode` (`100644` or `100755`)
 - `filesWritten[]`

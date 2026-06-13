@@ -42,6 +42,24 @@ deny:
 Deprecated fixture content.
 `;
 
+
+const templatedDaemon = `---
+id: templated-daemon
+purpose: Keep {{ adapt.required_value }} healthy.
+watch:
+  - when {{adapt.required_value}} changes
+routines:
+  - run {{adapt.optional_value}} checks
+deny:
+  - do not expose raw adaptation values in CLI output
+---
+
+# Templated daemon
+
+Target: {{adapt.required_value}}
+Optional: {{ adapt.optional_value }}
+`;
+
 const catalog: ExamplesCatalog = {
   schemaVersion: 1,
   source: {
@@ -70,6 +88,7 @@ const catalog: ExamplesCatalog = {
       adaptation: {
         mustCustomize: ['Replace fixture paths.', 'Confirm verification commands.'],
       },
+      adaptations: [],
       daemon: {
         path: 'DAEMON.md',
         content: readyDaemon,
@@ -102,6 +121,7 @@ const catalog: ExamplesCatalog = {
       adaptation: {
         mustCustomize: ['Confirm this deprecated pattern is still wanted.'],
       },
+      adaptations: [],
       daemon: {
         path: 'DAEMON.md',
         content: deprecatedDaemon,
@@ -113,15 +133,71 @@ const catalog: ExamplesCatalog = {
         url: 'https://github.com/charlie-labs/daemons/tree/master/daemons/deprecated-daemon',
       },
     },
+    {
+      id: 'templated-daemon',
+      title: 'Templated daemon',
+      status: 'ready',
+      summary: 'A daemon fixture with structured adaptations.',
+      readiness: 'adapt-before-use',
+      showOnWebsite: true,
+      showInDashboard: true,
+      fit: {
+        jobsToBeDone: ['operate'],
+        bestFor: ['tests with adaptation values'],
+        notFor: ['production without edits'],
+      },
+      requirements: {
+        requiredIntegrations: ['github'],
+        optionalIntegrations: [],
+        other: [],
+      },
+      adaptation: {
+        mustCustomize: ['Provide structured adaptation values.'],
+      },
+      adaptations: [
+        {
+          key: 'required_value',
+          label: 'Required value',
+          description: 'Required string rendered into the daemon and support files.',
+          required: true,
+          suggestions: ['from-cli', 'from-file'],
+        },
+        {
+          key: 'optional_value',
+          label: 'Optional value',
+          description: 'Optional string rendered into the daemon and support files.',
+          required: false,
+          default: 'from-default',
+          suggestions: ['from-default', 'from-file', 'from-cli'],
+        },
+      ],
+      daemon: {
+        path: 'DAEMON.md',
+        content: templatedDaemon,
+      },
+      scripts: ['scripts/render.sh'],
+      references: ['references/render.md'],
+      source: {
+        directory: 'daemons/templated-daemon',
+        url: 'https://github.com/charlie-labs/daemons/tree/master/daemons/templated-daemon',
+      },
+    },
   ],
 };
 
-function memoryCatalogClient(overrides: Partial<Record<string, string>> = {}): CatalogClient {
+function memoryCatalogClient(
+  overrides: Partial<Record<string, string>> = {},
+  catalogValue: ExamplesCatalog = catalog
+): CatalogClient {
   const files = new Map<string, string>([
     ['test-ref:daemons/ready-daemon/scripts/run.sh', '#!/usr/bin/env bash\necho ready\n'],
     ['test-ref:daemons/ready-daemon/references/guide.md', '# Guide\n\nAdapt me.\n'],
     ['master:daemons/ready-daemon/scripts/run.sh', '#!/usr/bin/env bash\necho ready\n'],
     ['master:daemons/ready-daemon/references/guide.md', '# Guide\n\nAdapt me.\n'],
+    ['test-ref:daemons/templated-daemon/scripts/render.sh', '#!/usr/bin/env bash\necho {{adapt.required_value}} {{adapt.optional_value}}\n'],
+    ['test-ref:daemons/templated-daemon/references/render.md', '# Rendered\n\nTarget: {{ adapt.required_value }}\nOptional: {{adapt.optional_value}}\n'],
+    ['master:daemons/templated-daemon/scripts/render.sh', '#!/usr/bin/env bash\necho {{adapt.required_value}} {{adapt.optional_value}}\n'],
+    ['master:daemons/templated-daemon/references/render.md', '# Rendered\n\nTarget: {{ adapt.required_value }}\nOptional: {{adapt.optional_value}}\n'],
   ]);
   for (const [key, value] of Object.entries(overrides)) {
     if (value !== undefined) {
@@ -131,7 +207,7 @@ function memoryCatalogClient(overrides: Partial<Record<string, string>> = {}): C
 
   return {
     async loadCatalog(): Promise<ExamplesCatalog> {
-      return catalog;
+      return catalogValue;
     },
     async readTextFile(ref: string, filePath: string): Promise<string> {
       const key = `${ref}:${filePath}`;
@@ -185,7 +261,7 @@ describe('daemon CLI catalog commands', () => {
         exitCode: 0,
         data: {
           sourceRef: 'test-ref',
-          exampleIds: ['ready-daemon', 'deprecated-daemon'],
+          exampleIds: ['ready-daemon', 'deprecated-daemon', 'templated-daemon'],
         },
       });
     });
@@ -207,6 +283,192 @@ describe('daemon CLI catalog commands', () => {
         adaptationsRequired: ['Replace fixture paths.', 'Confirm verification commands.'],
       });
       expect(result.json.data.activationRequired).toContain('not active until');
+    });
+  });
+
+  test('show exposes structured adaptation metadata without replacing legacy notes', async () => {
+    await withTempDir(async (directory) => {
+      const result = await runJson(['show', 'templated-daemon', '--ref', 'test-ref'], directory);
+
+      expect(result.code).toBe(0);
+      expect(result.json.data.adaptationsRequired).toEqual(['Provide structured adaptation values.']);
+      expect(result.json.data.adaptations).toEqual([
+        {
+          key: 'required_value',
+          label: 'Required value',
+          description: 'Required string rendered into the daemon and support files.',
+          required: true,
+          suggestions: ['from-cli', 'from-file'],
+        },
+        {
+          key: 'optional_value',
+          label: 'Optional value',
+          description: 'Optional string rendered into the daemon and support files.',
+          required: false,
+          default: 'from-default',
+          suggestions: ['from-default', 'from-file', 'from-cli'],
+        },
+      ]);
+    });
+  });
+
+  test('add renders adaptations into daemon and support files with deterministic precedence', async () => {
+    await withTempDir(async (directory) => {
+      const adaptFile = path.join(directory, 'adaptations.json');
+      await writeFile(
+        adaptFile,
+        JSON.stringify({ required_value: 'from-file', optional_value: 'from-file' }),
+        'utf8'
+      );
+
+      const result = await runJson([
+        'add',
+        'templated-daemon',
+        '--ref',
+        'test-ref',
+        '--adapt-file',
+        adaptFile,
+        '--adapt',
+        'optional_value=from-cli',
+        '--adapt',
+        'required_value=from-cli',
+      ], directory);
+
+      expect(result.code).toBe(0);
+      expect(result.json.data.adaptationsApplied).toEqual(['optional_value', 'required_value']);
+      expect(result.stdout).not.toContain('from-cli');
+      expect(result.stdout).not.toContain('from-file');
+      expect(result.stdout).not.toContain('from-default');
+      await expect(readFile(path.join(directory, '.agents/daemons/templated-daemon/DAEMON.md'), 'utf8')).resolves.toContain('Keep from-cli healthy');
+      await expect(readFile(path.join(directory, '.agents/daemons/templated-daemon/scripts/render.sh'), 'utf8')).resolves.toContain('echo from-cli from-cli');
+      await expect(readFile(path.join(directory, '.agents/daemons/templated-daemon/references/render.md'), 'utf8')).resolves.toContain('Optional: from-cli');
+      const scriptMode = (await stat(path.join(directory, '.agents/daemons/templated-daemon/scripts/render.sh'))).mode;
+      expect(scriptMode & 0o777).toBe(0o755);
+    });
+  });
+
+  test('add dry-run renders and validates adaptations without writing files', async () => {
+    await withTempDir(async (directory) => {
+      const result = await runJson([
+        'add',
+        'templated-daemon',
+        '--ref',
+        'test-ref',
+        '--dry-run',
+        '--adapt',
+        'required_value=from-cli',
+      ], directory);
+
+      expect(result.code).toBe(0);
+      expect(result.json.data).toMatchObject({ dryRun: true, filesWritten: [] });
+      expect(result.json.data.adaptationsApplied).toEqual(['optional_value', 'required_value']);
+      await expect(readFile(path.join(directory, '.agents/daemons/templated-daemon/DAEMON.md'), 'utf8')).rejects.toThrow();
+    });
+  });
+
+  test('add rejects missing required and unknown adaptation input keys', async () => {
+    await withTempDir(async (directory) => {
+      const missing = await runJson(['add', 'templated-daemon', '--ref', 'test-ref', '--dry-run'], directory);
+      expect(missing.code).toBe(65);
+      expect(missing.json.errors).toContainEqual(expect.objectContaining({ code: 'MISSING_REQUIRED_ADAPTATION', field: 'required_value' }));
+
+      const unknown = await runJson([
+        'add',
+        'templated-daemon',
+        '--ref',
+        'test-ref',
+        '--dry-run',
+        '--adapt',
+        'required_value=ok',
+        '--adapt',
+        'unknown_key=value',
+      ], directory);
+      expect(unknown.code).toBe(65);
+      expect(unknown.json.errors).toContainEqual(expect.objectContaining({ code: 'UNKNOWN_ADAPTATION_INPUT_KEY', field: 'unknown_key' }));
+    });
+  });
+
+  test('add rejects invalid adaptation files and flag syntax', async () => {
+    await withTempDir(async (directory) => {
+      const adaptFile = path.join(directory, 'adaptations.json');
+      await writeFile(adaptFile, JSON.stringify({ required_value: 123 }), 'utf8');
+
+      const invalidFile = await runJson([
+        'add',
+        'templated-daemon',
+        '--ref',
+        'test-ref',
+        '--dry-run',
+        '--adapt-file',
+        adaptFile,
+      ], directory);
+      expect(invalidFile.code).toBe(65);
+      expect(invalidFile.json.errors).toContainEqual(expect.objectContaining({ code: 'ADAPT_FILE_VALUE_INVALID_TYPE', field: 'required_value' }));
+
+      const invalidFlag = await runJson(['add', 'templated-daemon', '--adapt', 'required_value'], directory);
+      expect(invalidFlag.code).toBe(64);
+      expect(invalidFlag.json.errors).toContainEqual(expect.objectContaining({ code: 'ADAPT_FLAG_INVALID' }));
+    });
+  });
+
+  test('add rejects unknown and unresolved adaptation tokens before writing', async () => {
+    await withTempDir(async (directory) => {
+      const withUnknownSupportToken = memoryCatalogClient({
+        'test-ref:daemons/templated-daemon/references/render.md': 'Unknown {{adapt.unknown_key}}\n',
+      });
+      const unknown = await runJson([
+        'add',
+        'templated-daemon',
+        '--ref',
+        'test-ref',
+        '--dry-run',
+        '--adapt',
+        'required_value=ok',
+      ], directory, withUnknownSupportToken);
+      expect(unknown.code).toBe(65);
+      expect(unknown.json.errors).toContainEqual(expect.objectContaining({ code: 'UNKNOWN_ADAPTATION_TOKEN', field: 'unknown_key' }));
+
+      const unresolved = await runJson([
+        'add',
+        'templated-daemon',
+        '--ref',
+        'test-ref',
+        '--dry-run',
+        '--adapt',
+        'required_value={{adapt.optional_value}}',
+      ], directory);
+      expect(unresolved.code).toBe(65);
+      expect(unresolved.json.errors).toContainEqual(expect.objectContaining({ code: 'UNRESOLVED_ADAPTATION_TOKEN' }));
+    });
+  });
+
+  test('add validates rendered DAEMON.md before writing any files', async () => {
+    await withTempDir(async (directory) => {
+      const invalidRenderedCatalog: ExamplesCatalog = {
+        ...catalog,
+        examples: catalog.examples.map((example) =>
+          example.id === 'templated-daemon'
+            ? {
+                ...example,
+                daemon: {
+                  path: 'DAEMON.md',
+                  content: `---\nid: templated-daemon\npurpose: {{adapt.required_value}}\nwatch: []\nroutines: []\n---\n`,
+                },
+              }
+            : example
+        ),
+      };
+      const result = await runJson([
+        'add',
+        'templated-daemon',
+        '--dry-run',
+        '--adapt',
+        'required_value=ok',
+      ], directory, memoryCatalogClient({}, invalidRenderedCatalog));
+
+      expect(result.code).toBe(65);
+      expect(result.json.errors).toContainEqual(expect.objectContaining({ code: 'FRONTMATTER_ROUTINES_EMPTY' }));
+      await expect(readFile(path.join(directory, '.agents/daemons/templated-daemon/DAEMON.md'), 'utf8')).rejects.toThrow();
     });
   });
 

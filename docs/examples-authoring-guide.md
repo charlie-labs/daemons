@@ -168,6 +168,12 @@ requirements:
 adaptation:
   mustCustomize:
     - Replace placeholder paths, scopes, thresholds, and output destinations.
+adaptations:
+  - key: target_branch
+    label: Target branch
+    description: Branch name the installed daemon should use for generated work.
+    required: false
+    default: daemon/example
 ```
 
 #### Summary
@@ -265,8 +271,12 @@ Some examples intentionally require local values, such as package-manager comman
 For configurable examples:
 
 - keep runtime placeholder values in one obvious configuration block or support reference when possible;
+- use `adaptations[]` for structured string values that `daemon add` or another installer can render;
+- use token-safe keys matching `^[a-z][a-z0-9_]*$` and exact render tokens like `{{adapt.target_branch}}`;
+- declare required inputs with `required: true` and no `default`; declare optional inputs with `required: false` and a string `default`;
+- keep `suggestions[]` string-only, public-safe, and useful as examples rather than hidden configuration;
 - refer to configured values from the rest of the daemon instead of repeating placeholders throughout the body;
-- declare the required replacement or review in `adaptation.mustCustomize`;
+- declare the required replacement or review in `adaptation.mustCustomize` for compatibility with existing consumers;
 - avoid putting "change this before enabling" prose inside runtime daemon policy.
 
 ### 5. Add support files only when they help
@@ -378,6 +388,7 @@ Use this checklist before approving example changes.
 - `requirements.other` names daemon-specific non-integration prerequisites.
 - `readiness` matches `adaptation.mustCustomize`.
 - `adaptation.mustCustomize` names required daemon/example changes, not generic rollout or repo setup work.
+- `adaptations[]` keys are unique, token-safe, string-only, and have correct required/default behavior.
 - Surface flags are intentional.
 
 ### Support files
@@ -417,6 +428,7 @@ Use this checklist before approving example changes.
 | Shebang script failure | Make the script executable or remove the shebang. |
 | Public-safety failure | Replace private or credential-like content with public-safe placeholders. |
 | Catalog drift | Run `bun run generate:examples` and commit `examples.json`. |
+| Adaptation metadata error | Use unique `^[a-z][a-z0-9_]*$` keys, string-only fields/suggestions, no default on required items, and a default on optional items. |
 
 ## Quality bar
 

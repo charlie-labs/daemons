@@ -71,7 +71,7 @@ daemon list
 
 daemon show js-ts-dependency-upgrades --json
 
-daemon add js-ts-dependency-upgrades --dry-run
+daemon add js-ts-dependency-upgrades --dry-run --adapt-file adaptations.json
 
 daemon validate .agents/daemons/js-ts-dependency-upgrades/DAEMON.md
 
@@ -87,6 +87,7 @@ Key safety defaults:
 - existing destination directories/files require `--force`;
 - deprecated examples require `--allow-deprecated`;
 - add/install/show always surface `adaptationsRequired[]` in JSON;
+- show surfaces structured `adaptations[]`, and add/install render `{{adapt.key}}` tokens with string-only values before validation;
 - scaffolding does not activate a daemon until the change is merged and ingested by Charlie.
 
 See [Daemon catalog CLI](docs/daemon-cli.md) for command details, JSON envelope, validation semantics, and exit codes.
