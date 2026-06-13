@@ -152,6 +152,78 @@ JSON data includes:
 
 Scaffolding does **not** activate a daemon. The daemon becomes eligible only after the change is merged to the target repository default branch and Charlie ingests that merged version.
 
+
+
+### `daemon pr open <example-id>`
+
+Renders a catalog example the same way as `daemon add`, but writes the install as a GitHub pull request in a target repository instead of writing to the local filesystem:
+
+```bash
+daemon pr open js-ts-dependency-upgrades \
+  --repo owner/repo \
+  --base main \
+  --adapt package_manager=pnpm
+```
+
+Options:
+
+- `--repo owner/repo` is required and selects the target GitHub repository.
+- `--ref <sha|branch|tag>` pins the daemon catalog source ref. It defaults to `master`.
+- `--base <branch>` selects the target PR base branch. If omitted, the GitHub repository default branch is used.
+- `--adapt key=value` and `--adapt-file adaptations.json` use the same structured adaptation rules and precedence as `daemon add`.
+- `--force` allows the PR commit to write catalog-managed install paths even when the target base already contains `.agents/daemons/<example-id>/`. Without `--force`, existing target files or directories are reported as collisions and no branch is created.
+
+The command uses `GITHUB_TOKEN` or `GH_TOKEN` for GitHub API authentication. Node callers can pass an explicit token or injected GitHub client to `createDaemonInstallPullRequest()`.
+
+PR creation is idempotent for a given target repo and example ID:
+
+- the install branch is deterministic: `charlie/daemon-installs/<example-id>`;
+- if an exact-head open PR already exists for that branch and base, the command returns it instead of opening another PR;
+- if the branch exists without a PR and its files match the rendered install, the command opens a PR from that existing branch;
+- if the branch exists but does not match the rendered install, the command fails closed with a branch-collision error;
+- if another caller creates the branch or PR concurrently, the command re-reads the branch/PR and returns the existing open PR when possible.
+
+The implementation writes via GitHub's tree, commit, ref, and pull-request REST APIs. The PR body includes a hidden marker in this format:
+
+```html
+<!-- charlie-daemon-install-v1 {"adaptationKeys":["package_manager"],"...":"..."} -->
+```
+
+The marker is used for reconciliation and intentionally stores only adaptation keys, never raw adaptation values. JSON output likewise reports `adaptationsApplied[]` keys only.
+
+JSON data includes:
+
+- `repository`, `daemonId`, `sourceRepo`, `sourceRef`, and `catalogSchemaVersion`;
+- `baseBranch`, deterministic `headBranch`, and `headSha`;
+- `pullRequest` number, URL, state, head/base refs, and merge metadata;
+- `filesPlanned[]` / `filesWritten[]` with destination paths and Git file modes;
+- `adaptationsApplied[]` key names;
+- parsed marker metadata.
+
+### `daemon pr list`
+
+Lists daemon install PRs and deterministic install branches in a target repository:
+
+```bash
+daemon pr list --repo owner/repo
+
+daemon pr list --repo owner/repo --json
+```
+
+The listing reconciles two sources:
+
+1. GitHub issue search for PR bodies containing the hidden `charlie-daemon-install-v1` marker.
+2. Git refs under `heads/charlie/daemon-installs/`.
+
+Each item is classified as:
+
+- `open` — an open install PR;
+- `merged` — a closed PR with `merged_at` set;
+- `closed_unmerged` — a closed PR that was not merged;
+- `branchWithoutPullRequest` — a deterministic install branch with no associated PR.
+
+If a PR body was edited and the hidden marker was removed, `daemon pr list` still reports the PR while the deterministic branch exists, with a warning that marker metadata is missing. If GitHub search is temporarily stale or unavailable, the command falls back to branch reconciliation and returns a warning.
+
 ## Runtime validation
 
 `daemon validate` validates runtime daemon files, not catalog metadata.

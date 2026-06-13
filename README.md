@@ -51,14 +51,29 @@ The root `examples.json` file is generated from each `daemons/<id>/example.yml`,
 Node consumers can import the packaged catalog API without shelling out to the CLI:
 
 ```ts
-import { getDaemonExample, listDaemonExamples, loadDaemonExamplesCatalog } from "@charlie-labs/daemons";
+import {
+  createDaemonInstallPullRequest,
+  getDaemonExample,
+  listDaemonExamples,
+  listDaemonInstallPullRequests,
+  loadDaemonExamplesCatalog,
+} from "@charlie-labs/daemons";
 
 const catalog = await loadDaemonExamplesCatalog();
 const examples = await listDaemonExamples();
 const example = await getDaemonExample("js-ts-dependency-upgrades");
+
+await createDaemonInstallPullRequest({
+  repo: "owner/repo",
+  exampleId: "js-ts-dependency-upgrades",
+  base: "main",
+  adaptations: { package_manager: "pnpm" },
+});
+
+await listDaemonInstallPullRequests({ repo: "owner/repo" });
 ```
 
-The API reads the package-root `examples.json`, so it works from the built npm package and keeps dashboard or other Node consumers on the same generated catalog contract as the CLI.
+The catalog APIs read the package-root `examples.json`, so they work from the built npm package. The install-PR APIs render from the same catalog contract and use GitHub authentication through an explicit token/client or `GITHUB_TOKEN` / `GH_TOKEN`.
 
 ## Daemon catalog CLI
 
@@ -73,6 +88,10 @@ daemon show js-ts-dependency-upgrades --json
 
 daemon add js-ts-dependency-upgrades --dry-run --adapt package_manager=pnpm
 
+daemon pr open js-ts-dependency-upgrades --repo owner/repo --base main --adapt package_manager=pnpm
+
+daemon pr list --repo owner/repo
+
 daemon validate .agents/daemons/js-ts-dependency-upgrades/DAEMON.md
 
 daemon validate --all --json
@@ -86,7 +105,8 @@ Key safety defaults:
 - install plans include destination paths and file modes (`100644`/`100755`);
 - existing destination directories/files require `--force`;
 - deprecated examples require `--allow-deprecated`;
-- show surfaces structured `adaptations[]` and optional `specializationIdeas[]`, and add/install render `{{adapt.key}}` tokens with string-only values before validation;
+- show surfaces structured `adaptations[]` and optional `specializationIdeas[]`, and add/install/PR-open render `{{adapt.key}}` tokens with string-only values before validation;
+- `daemon pr open` writes an atomic GitHub commit on a deterministic `charlie/daemon-installs/<example-id>` branch, opens an install PR, and records only adaptation keys (not raw values) in the hidden PR marker and CLI output;
 - scaffolding does not activate a daemon until the change is merged and ingested by Charlie.
 
 See [Daemon catalog CLI](docs/daemon-cli.md) for command details, JSON envelope, validation semantics, and exit codes.

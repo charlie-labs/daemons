@@ -34,16 +34,35 @@ Consumers should not:
 Node consumers can use the package API instead of fetching and parsing `examples.json` manually:
 
 ```ts
-import { getDaemonExample, listDaemonExamples, loadDaemonExamplesCatalog } from "@charlie-labs/daemons";
+import {
+  createDaemonInstallPullRequest,
+  getDaemonExample,
+  listDaemonExamples,
+  listDaemonInstallPullRequests,
+  loadDaemonExamplesCatalog,
+} from "@charlie-labs/daemons";
 
 const catalog = await loadDaemonExamplesCatalog();
 const examples = await listDaemonExamples();
 const example = await getDaemonExample("js-ts-dependency-upgrades");
+
+await createDaemonInstallPullRequest({
+  repo: "owner/repo",
+  exampleId: "js-ts-dependency-upgrades",
+  base: "main",
+  adaptations: { package_manager: "pnpm" },
+});
+
+await listDaemonInstallPullRequests({ repo: "owner/repo" });
 ```
 
 `loadDaemonExamplesCatalog()` reads the package-root `examples.json` in Node, validates the catalog schema, and returns the same catalog shape documented below. `listDaemonExamples()` returns `catalog.examples`, and `getDaemonExample(id)` returns the matching catalog entry or `null`.
 
 For install flows, the package also exports `createDaemonInstallPlan({ entry, installRoot })`. The planner validates source/support paths, maps catalog files into `.agents/daemons/<id>/`, excludes `example.yml`, and includes Git tree-compatible file modes (`100644`/`100755`) before any writes.
+
+Install-PR consumers can use `createDaemonInstallPullRequest()` to render the same install plan into a GitHub pull request. The API writes via GitHub tree/commit/ref/PR REST APIs, uses deterministic `charlie/daemon-installs/<example-id>` branches, and stores a hidden `charlie-daemon-install-v1` marker in the PR body for reconciliation. Marker and result metadata include adaptation key names only; callers must not log or persist raw adaptation values unless their own product flow explicitly requires it.
+
+Use `listDaemonInstallPullRequests()` to reconcile install PRs by hidden marker plus deterministic refs. Listing results classify installs as `open`, `merged`, `closed_unmerged`, or `branchWithoutPullRequest`, and include warnings when a marker was removed or GitHub search had to fall back to branch reconciliation.
 
 ## Catalog shape
 

@@ -23,15 +23,19 @@ import {
   writeTextFileEnsuringDirectory,
 } from './fs-utils';
 import {
-  knownAdaptationKeys,
   parseAdaptFileContent,
   parseAdaptFlags,
-  renderAdaptationTokens,
   resolveAdaptations,
-  type AdaptationResolution,
 } from './adaptations';
 import { createDaemonInstallPlan } from './install-plan';
+import { prepareDaemonInstallFiles } from './install-rendering';
 import { issue, normalizeErrorMessage } from './issues';
+import {
+  createDaemonInstallPullRequest,
+  DaemonInstallPullRequestError,
+  listDaemonInstallPullRequests,
+  type DaemonInstallPrGitHubClient,
+} from '../daemon-install-pr';
 import type {
   AddData,
   CatalogClient,
@@ -39,6 +43,8 @@ import type {
   CliIssue,
   InstallFilePlan,
   ListData,
+  PrListData,
+  PrOpenData,
   ShowData,
   ValidateData,
   ValidateFileResult,
@@ -280,9 +286,6 @@ function addDataForBlocked(args: {
 }
 
 
-type RenderedInstallFile = InstallFilePlan & {
-  content: string;
-};
 
 function dataErrorResult<TData>(command: string, summary: string, errors: CliIssue[], data: TData | null): CliCommandResult<TData> {
   return {
@@ -319,62 +322,6 @@ async function loadAdaptFileValues(args: { cwd: string; adaptFile: string | unde
       errors: [issue({ code: 'ADAPT_FILE_READ_FAILED', message: normalizeErrorMessage(error), path: displayPath })],
     };
   }
-}
-
-async function renderInstallFiles(args: {
-  entry: CatalogExample;
-  ref: string;
-  catalogClient: CatalogClient;
-  installRoot: string;
-  files: readonly InstallFilePlan[];
-  resolution: AdaptationResolution;
-}): Promise<{ ok: true; files: RenderedInstallFile[] } | { ok: false; errors: CliIssue[] }> {
-  const renderedFiles: RenderedInstallFile[] = [];
-  const errors: CliIssue[] = [];
-  const knownKeys = knownAdaptationKeys(args.entry);
-
-  for (const file of args.files) {
-    const content =
-      file.kind === 'daemon'
-        ? args.entry.daemon.content
-        : await args.catalogClient.readTextFile(args.ref, file.sourcePath);
-    const displayPath = toDisplayPath(args.installRoot, file.destinationPath);
-    const rendered = renderAdaptationTokens({
-      content,
-      values: args.resolution.values,
-      knownKeys,
-      path: displayPath,
-    });
-    if (!rendered.ok) {
-      errors.push(...rendered.errors);
-      continue;
-    }
-    renderedFiles.push({ ...file, content: rendered.content });
-  }
-
-  if (errors.length > 0) {
-    return { ok: false, errors };
-  }
-
-  const daemonFile = renderedFiles.find((file) => file.kind === 'daemon');
-  if (!daemonFile) {
-    return {
-      ok: false,
-      errors: [issue({ code: 'INSTALL_PLAN_MISSING_DAEMON', message: 'Install plan did not include DAEMON.md.' })],
-    };
-  }
-
-  const daemonDisplayPath = toDisplayPath(args.installRoot, daemonFile.destinationPath);
-  const validation = validateRuntimeDaemonMarkdown({
-    content: daemonFile.content,
-    path: daemonDisplayPath,
-    expectedId: expectedDaemonIdFromPath(daemonDisplayPath),
-  });
-  if (!validation.ok) {
-    return { ok: false, errors: validation.errors };
-  }
-
-  return { ok: true, files: renderedFiles };
 }
 
 export async function runAddCommand(args: {
@@ -504,7 +451,7 @@ export async function runAddCommand(args: {
       );
     }
 
-    const rendered = await renderInstallFiles({
+    const rendered = await prepareDaemonInstallFiles({
       entry,
       ref,
       catalogClient: args.catalogClient,
@@ -582,6 +529,164 @@ export async function runAddCommand(args: {
       return catalogErrorResult(args.commandName, error) as CliCommandResult<AddData>;
     }
     return internalResult(args.commandName, error) as CliCommandResult<AddData>;
+  }
+}
+
+
+function prErrorResult<TData>(command: string, error: DaemonInstallPullRequestError): CliCommandResult<TData> {
+  const exitCode = error.code === 'INVALID_REPOSITORY' || error.code === 'INVALID_DAEMON_ID' || error.code === 'INVALID_INSTALL_BRANCH'
+    ? EXIT_CODE_USAGE
+    : EXIT_CODE_DATA;
+  return {
+    command,
+    ok: false,
+    exitCode,
+    summary: error.message,
+    warnings: [],
+    errors: error.errors,
+    data: (error.data ?? null) as TData | null,
+  };
+}
+
+function stripMarkerText(result: Awaited<ReturnType<typeof createDaemonInstallPullRequest>>): PrOpenData {
+  const { markerText: _markerText, ...data } = result;
+  return data;
+}
+
+export async function runPrCommand(args: {
+  commandArgs: readonly string[];
+  cwd: string;
+  catalogClient: CatalogClient;
+  githubClient?: DaemonInstallPrGitHubClient | undefined;
+}): Promise<CliCommandResult<PrOpenData | PrListData>> {
+  const subcommand = args.commandArgs[0];
+  if (subcommand !== 'open' && subcommand !== 'list') {
+    return usageResult('pr', 'Expected daemon pr open <example-id> or daemon pr list.') as CliCommandResult<PrOpenData | PrListData>;
+  }
+
+  if (subcommand === 'open') {
+    let parsed;
+    try {
+      parsed = parseArgs({
+        args: [...args.commandArgs.slice(1)],
+        options: {
+          repo: { type: 'string' },
+          ref: { type: 'string' },
+          base: { type: 'string' },
+          force: { type: 'boolean', default: false },
+          'allow-deprecated': { type: 'boolean', default: false },
+          adapt: { type: 'string', multiple: true },
+          'adapt-file': { type: 'string' },
+        },
+        allowPositionals: true,
+        strict: true,
+      });
+    } catch (error) {
+      return usageResult('pr open', normalizeErrorMessage(error)) as CliCommandResult<PrOpenData | PrListData>;
+    }
+
+    if (parsed.positionals.length !== 1) {
+      return usageResult('pr open', 'Expected exactly one example id: daemon pr open <example-id> --repo owner/repo.') as CliCommandResult<PrOpenData | PrListData>;
+    }
+    const repo = parsed.values.repo;
+    if (!repo) {
+      return usageResult('pr open', 'Missing required --repo owner/repo.') as CliCommandResult<PrOpenData | PrListData>;
+    }
+
+    const exampleId = parsed.positionals[0] ?? '';
+    if (!DAEMON_ID_PATTERN.test(exampleId)) {
+      return usageResult('pr open', `Invalid example id '${exampleId}'. Expected kebab-case.`) as CliCommandResult<PrOpenData | PrListData>;
+    }
+
+    const parsedAdaptFlags = parseAdaptFlags(parsed.values.adapt);
+    if (!parsedAdaptFlags.ok) {
+      return usageIssuesResult('pr open', 'Invalid adaptation flags.', parsedAdaptFlags.errors) as CliCommandResult<PrOpenData | PrListData>;
+    }
+
+    const fileValues = await loadAdaptFileValues({ cwd: args.cwd, adaptFile: parsed.values['adapt-file'] });
+    if (!fileValues.ok) {
+      return {
+        command: 'pr open',
+        ok: false,
+        exitCode: EXIT_CODE_DATA,
+        summary: 'Unable to read adaptation inputs.',
+        warnings: [],
+        errors: fileValues.errors,
+        data: null,
+      };
+    }
+
+    try {
+      const opened = await createDaemonInstallPullRequest({
+        repo,
+        exampleId,
+        sourceRef: parsed.values.ref ?? DEFAULT_CATALOG_REF,
+        base: parsed.values.base,
+        adaptations: parsedAdaptFlags.values,
+        adaptationFileValues: fileValues.fileValues,
+        allowDeprecated: parsed.values['allow-deprecated'] === true,
+        force: parsed.values.force === true,
+        catalogClient: args.catalogClient,
+        githubClient: args.githubClient,
+      });
+      const data = stripMarkerText(opened);
+      return {
+        command: 'pr open',
+        ok: true,
+        exitCode: EXIT_CODE_SUCCESS,
+        summary: `${opened.status === 'created' ? 'Opened' : opened.status === 'existing_open' ? 'Found existing open' : 'Recovered existing branch and opened'} daemon install PR #${opened.pullRequest.number.toString()} for '${opened.daemonId}'.`,
+        warnings: opened.warnings,
+        errors: [],
+        data,
+      };
+    } catch (error) {
+      if (error instanceof DaemonInstallPullRequestError) {
+        return prErrorResult('pr open', error) as CliCommandResult<PrOpenData | PrListData>;
+      }
+      return internalResult('pr open', error) as CliCommandResult<PrOpenData | PrListData>;
+    }
+  }
+
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: [...args.commandArgs.slice(1)],
+      options: {
+        repo: { type: 'string' },
+      },
+      allowPositionals: false,
+      strict: true,
+    });
+  } catch (error) {
+    return usageResult('pr list', normalizeErrorMessage(error)) as CliCommandResult<PrOpenData | PrListData>;
+  }
+
+  const repo = parsed.values.repo;
+  if (!repo) {
+    return usageResult('pr list', 'Missing required --repo owner/repo.') as CliCommandResult<PrOpenData | PrListData>;
+  }
+
+  try {
+    const listed = await listDaemonInstallPullRequests({ repo, githubClient: args.githubClient });
+    return {
+      command: 'pr list',
+      ok: true,
+      exitCode: EXIT_CODE_SUCCESS,
+      summary: `Found ${listed.count.toString()} daemon install pull request${listed.count === 1 ? '' : 's'} or branches.`,
+      warnings: listed.warnings,
+      errors: [],
+      data: {
+        repository: listed.repository,
+        branchPrefix: listed.branchPrefix,
+        count: listed.count,
+        installPullRequests: listed.installPullRequests,
+      },
+    };
+  } catch (error) {
+    if (error instanceof DaemonInstallPullRequestError) {
+      return prErrorResult('pr list', error) as CliCommandResult<PrOpenData | PrListData>;
+    }
+    return internalResult('pr list', error) as CliCommandResult<PrOpenData | PrListData>;
   }
 }
 
