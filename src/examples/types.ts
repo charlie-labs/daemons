@@ -61,6 +61,7 @@ export type ExampleMetadata = {
     mustCustomize: string[];
   };
   adaptations: ExampleAdaptation[];
+  specializationIdeas: string[];
 };
 
 export type CatalogExample = ExampleMetadata & {

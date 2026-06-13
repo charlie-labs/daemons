@@ -326,6 +326,7 @@ async function loadCatalogExample(
         mustCustomize: exampleMetadata.adaptation.mustCustomize,
       },
       adaptations: catalogAdaptations(exampleMetadata.adaptations),
+      specializationIdeas: [...exampleMetadata.specializationIdeas],
       daemon: {
         path: 'DAEMON.md',
         content: daemonContent.value,

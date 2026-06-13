@@ -2,16 +2,16 @@
 id: js-ts-dependency-upgrades
 purpose: Keep JavaScript and TypeScript dependencies current with low-noise grouped upgrade pull requests.
 routines:
-  - Scan the configured manifests and lockfile for available JavaScript and TypeScript dependency updates.
+  - Detect JavaScript and TypeScript dependency manifests and the configured package manager's lockfile.
+  - Scan for available JavaScript and TypeScript dependency updates using the configured package manager.
   - Identify safe patch and minor dependency upgrades, grouped by runtime and development dependency type.
   - Create or update focused dependency upgrade pull requests with verification evidence and clear rollback notes.
 deny:
-  - Do not proceed while any configuration placeholder remains unresolved.
   - Do not auto-merge dependency pull requests.
   - Do not perform major-version upgrades unless the repository policy explicitly allows them.
   - Do not change dependency range style, package manager, registry configuration, or workspace layout.
   - Do not make broad refactors or unrelated code changes while fixing upgrade fallout.
-  - Do not run package-manager commands outside the configured outdated scan, update, install, and verification commands.
+  - Do not run package-manager commands from a package manager other than the configured package manager.
 schedule: '0 8 * * 1'
 ---
 
@@ -22,18 +22,8 @@ schedule: '0 8 * * 1'
 Use these repository-specific values:
 
 - Package manager: `{{adapt.package_manager}}`
-- Dependency manifests: `{{adapt.manifest_globs}}`
-- Lockfile: `{{adapt.lockfile_path}}`
-- Outdated scan: `{{adapt.outdated_command}}`
-- Runtime dependency update: `{{adapt.runtime_update_command}}`
-- Development dependency update: `{{adapt.development_update_command}}`
-- Install or lockfile refresh: `{{adapt.install_command}}`
-- Verification:
-  - `{{adapt.verification_command}}`
-- Runtime dependency branch: `{{adapt.runtime_branch}}`
-- Development dependency branch: `{{adapt.development_branch}}`
-- Runtime dependency title: `{{adapt.runtime_title}}`
-- Development dependency title: `{{adapt.development_title}}`
+
+Use the configured package manager's standard commands and lockfile behavior for outdated scans, patch/minor dependency updates, installs, and lockfile refreshes. Infer workspace layout from package manager metadata and repository manifests.
 
 ## Update policy
 
@@ -46,7 +36,7 @@ Default scope:
 
 Major upgrades are out of scope unless the repository has an explicit policy for major upgrade pull requests.
 
-Run the configured outdated scan before choosing updates. Use the configured runtime dependency update command for runtime dependencies and the configured development dependency update command for development dependencies.
+Run the configured package manager's outdated or update discovery command before choosing updates. Use the package manager's normal update and install workflow for runtime dependencies and development dependencies.
 
 ## PR policy
 
@@ -55,7 +45,12 @@ Create or update at most two pull requests per run:
 1. runtime dependency patch/minor updates
 2. development dependency patch/minor updates
 
-Use the configured branch and title for each dependency bucket.
+Use these branch names and pull request titles:
+
+- Runtime dependency branch: `daemon/deps-runtime-minor-patch`
+- Development dependency branch: `daemon/deps-dev-minor-patch`
+- Runtime dependency title: `deps: update runtime dependencies`
+- Development dependency title: `deps(dev): update development dependencies`
 
 Each PR body must include:
 
@@ -87,6 +82,6 @@ If verification fails and the fix is not a small dependency-related adjustment, 
 ## No-op when
 
 - no patch or minor upgrades are available
-- any configuration placeholder remains unresolved
+- the configured package manager or matching lockfile cannot be identified
 - verification cannot be run safely
 - an existing human-owned dependency upgrade is already active for the same dependency bucket

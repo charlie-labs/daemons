@@ -1,7 +1,7 @@
 id: js-ts-dependency-upgrades
 title: JavaScript/TypeScript Dependency Update Maintainer
 status: ready
-summary: Opens low-noise JavaScript/TypeScript dependency upgrade PRs with configured package-manager commands.
+summary: Opens low-noise JavaScript/TypeScript dependency upgrade PRs with a configured package manager.
 readiness: adapt-before-use
 showOnWebsite: true
 showInDashboard: true
@@ -20,11 +20,10 @@ requirements:
     - github
   optionalIntegrations: []
   other:
-    - A configured JavaScript/TypeScript package manager, lockfile, manifests, update commands, and install command.
+    - A JavaScript or TypeScript package manager and matching lockfile are present.
 adaptation:
   mustCustomize:
-    - Replace all package-manager configuration placeholders in DAEMON.md with the repository's npm, pnpm, Yarn, or Bun commands.
-    - Adjust branch, title, and label conventions to the team.
+    - Provide the JavaScript or TypeScript package manager Charlie should use.
 adaptations:
   - key: package_manager
     label: Package manager
@@ -35,84 +34,7 @@ adaptations:
       - pnpm
       - Yarn
       - Bun
-  - key: manifest_globs
-    label: Dependency manifest globs
-    description: Repository-relative manifest paths or globs Charlie should inspect for dependency updates.
-    required: true
-    suggestions:
-      - package.json
-      - packages/*/package.json
-  - key: lockfile_path
-    label: Lockfile path
-    description: Repository-relative lockfile path Charlie should refresh after dependency updates.
-    required: true
-    suggestions:
-      - package-lock.json
-      - pnpm-lock.yaml
-      - yarn.lock
-      - bun.lock
-  - key: outdated_command
-    label: Outdated scan command
-    description: Command Charlie should run to discover available dependency updates.
-    required: true
-    suggestions:
-      - npm outdated
-      - pnpm outdated
-      - yarn outdated
-      - bun outdated
-  - key: runtime_update_command
-    label: Runtime dependency update command
-    description: Command template Charlie should use for runtime dependency patch/minor updates.
-    required: true
-    suggestions:
-      - npm update <runtime-package>
-      - pnpm update <runtime-package>
-      - yarn up <runtime-package>
-      - bun update <runtime-package>
-  - key: development_update_command
-    label: Development dependency update command
-    description: Command template Charlie should use for development dependency patch/minor updates.
-    required: true
-    suggestions:
-      - npm update <dev-package> --save-dev
-      - pnpm update <dev-package> --dev
-      - yarn up <dev-package>
-      - bun update <dev-package>
-  - key: install_command
-    label: Install or lockfile refresh command
-    description: Command Charlie should run after applying dependency updates to refresh the lockfile.
-    required: true
-    suggestions:
-      - npm install --package-lock-only
-      - pnpm install --lockfile-only
-      - yarn install
-      - bun install
-  - key: verification_command
-    label: Verification command
-    description: Command Charlie should run after refreshing dependency files.
-    required: true
-    suggestions:
-      - npm test
-      - pnpm test
-      - yarn test
-      - bun test
-  - key: runtime_branch
-    label: Runtime dependency branch
-    description: Branch name Charlie should use for runtime dependency update pull requests.
-    required: false
-    default: daemon/deps-runtime-minor-patch
-  - key: development_branch
-    label: Development dependency branch
-    description: Branch name Charlie should use for development dependency update pull requests.
-    required: false
-    default: daemon/deps-dev-minor-patch
-  - key: runtime_title
-    label: Runtime dependency pull request title
-    description: Pull request title Charlie should use for runtime dependency updates.
-    required: false
-    default: 'deps: update runtime dependencies'
-  - key: development_title
-    label: Development dependency pull request title
-    description: Pull request title Charlie should use for development dependency updates.
-    required: false
-    default: 'deps(dev): update development dependencies'
+specializationIdeas:
+  - Customize branch names, pull request titles, or labels for dependency update pull requests.
+  - Restrict updates to specific workspaces, package scopes, or dependency groups.
+  - Add package allowlists, blocklists, or security-only update behavior.

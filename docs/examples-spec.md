@@ -122,6 +122,8 @@ adaptations:
     required: true
     suggestions:
       - '#team-alerts'
+specializationIdeas:
+  - Narrow this daemon to a specific path area, label, channel, or review policy.
 ```
 
 ### Required top-level fields
@@ -139,6 +141,7 @@ adaptations:
 | `requirements` | object | Required strict object describing prerequisites. |
 | `adaptation` | object | Required strict object describing required customization. |
 | `adaptations` | array of objects | Optional structured render inputs. Defaults to `[]`; generated `examples.json` always includes it. |
+| `specializationIdeas` | array of strings | Optional non-required ideas for future behavior changes or team-specific variants. Defaults to `[]`; generated `examples.json` always includes it. |
 
 Unknown top-level keys are rejected.
 
@@ -248,6 +251,15 @@ Each item is a strict object with:
 Structured values are string-only. Objects, arrays, numbers, booleans, and `null` are invalid. The generated catalog sorts `adaptations[]` by `key` for deterministic output.
 
 Use the exact token syntax `{{adapt.key}}` in `DAEMON.md`, `scripts/**`, or `references/**` when a value should be rendered during install. Consumers must reject unknown input keys, unknown adaptation tokens, missing required values, non-string file values, and unresolved `{{adapt.*}}` tokens after rendering.
+
+
+### `specializationIdeas`
+
+`specializationIdeas` is optional catalog metadata for non-required ways a team might further tune an example after deterministic install. It is a list of non-empty strings.
+
+Use it for suggestions such as narrowing scope, adding team-specific output formats, changing conservative policies, or integrating additional evidence sources. Do not use it for required install inputs, placeholders that must be rendered, generic rollout advice, or warnings that belong in `fit.notFor`, `requirements.other`, or runtime deny rules.
+
+Install consumers must not treat `specializationIdeas[]` as required work. It is display guidance only and is not rendered into installed files.
 
 
 ## Support files

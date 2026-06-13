@@ -1,14 +1,14 @@
 import { spawnSync } from "node:child_process";
 
 const USAGE =
-  "Usage: bun .agents/daemons/pr-review-triage/scripts/bootstrap-data.ts --repo <owner/repo> --pr <number>";
+  "Usage: bun .agents/daemons/pr-review-triage/scripts/bootstrap-data.ts [--repo <owner/repo>] --pr <number>";
 
 const HELP_TEXT = `Bootstrap baseline data for the pr-review-triage daemon.
 
 ${USAGE}
 
 Options:
-  --repo <owner/repo>   Required repository identity.
+  --repo <owner/repo>   Optional repository identity. Defaults to the current GitHub repository.
   --pr <number>         Required pull request number (positive integer).
   -h, --help            Show this help text.
 `;
@@ -166,8 +166,12 @@ function parseArgs(argv: readonly string[]): CliArgs {
     throw new TypeError(`Unknown argument: ${token}\n${USAGE}`);
   }
 
-  if (!repoRaw || !prRaw) {
-    throw new TypeError(`Both --repo and --pr are required.\n${USAGE}`);
+  if (!repoRaw) {
+    repoRaw = inferCurrentRepository();
+  }
+
+  if (!prRaw) {
+    throw new TypeError(`--pr is required.\n${USAGE}`);
   }
 
   const [repoOwner, repoName, extra] = repoRaw.split("/");
@@ -185,6 +189,40 @@ function parseArgs(argv: readonly string[]): CliArgs {
   }
 
   return { repoOwner, repoName, prNumber };
+}
+
+function inferCurrentRepository(): string {
+  const result = spawnSync(
+    "gh",
+    ["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"],
+    {
+      encoding: "utf8",
+      maxBuffer: 1024 * 1024,
+    },
+  );
+
+  if (result.error) {
+    throw new TypeError(
+      `Failed to infer repository with gh repo view: ${result.error.message}`,
+    );
+  }
+
+  if (result.status !== 0) {
+    const stderr = result.stderr?.trim();
+    throw new TypeError(
+      stderr && stderr.length > 0
+        ? `Failed to infer repository with gh repo view: ${stderr}`
+        : `Failed to infer repository with gh repo view; pass --repo <owner/repo>.`,
+    );
+  }
+
+  const repo = result.stdout.trim();
+  if (!repo) {
+    throw new TypeError(
+      `Failed to infer repository with gh repo view; pass --repo <owner/repo>.`,
+    );
+  }
+  return repo;
 }
 
 function parseIntegerString(value: string, flag: string): number {

@@ -2,7 +2,7 @@ id: docs-drift-maintainer
 title: Recent Docs Drift Maintainer
 status: ready
 summary: Runs each weekday to repair docs drift from recent merged source changes with small source-backed PRs.
-readiness: adapt-before-use
+readiness: direct-copy
 showOnWebsite: true
 showInDashboard: true
 fit:
@@ -20,8 +20,10 @@ requirements:
     - github
   optionalIntegrations: []
   other:
-    - Documentation and source path patterns for the repository.
-    - A defined boundary between hand-authored and generated documentation.
+    - Repository documentation and source evidence are accessible through GitHub.
 adaptation:
-  mustCustomize:
-    - Replace repository configuration placeholders for source paths, documentation paths, generated-docs policy, and documentation verification behavior.
+  mustCustomize: []
+specializationIdeas:
+  - Restrict documentation target selection to a specific docs family such as API docs, runbooks, or onboarding docs.
+  - Add a repository-specific generated-docs workflow if generated documentation should be updated instead of skipped.
+  - Add a docs lint, link check, or preview command when the repository has one.

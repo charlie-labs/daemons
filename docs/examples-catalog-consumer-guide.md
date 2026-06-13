@@ -74,6 +74,7 @@ Each `examples[]` entry includes the validated `example.yml` metadata plus gener
 | `showOnWebsite`, `showInDashboard` | Publication controls for specific surfaces. |
 | `fit`, `requirements`, `adaptation` | Recommendation, prerequisites, and required customization copy. |
 | `adaptations` | Structured string-only inputs for rendering `{{adapt.key}}` tokens. Always present in generated catalog entries; may be empty. |
+| `specializationIdeas` | Optional non-blocking ideas for further team-specific behavior changes. Always present in generated catalog entries; may be empty. |
 | `daemon.path` | Currently always `DAEMON.md`. |
 | `daemon.content` | Embedded `DAEMON.md` content for rendering and install. |
 | `scripts` | Package-relative support script paths to fetch separately. |
@@ -144,6 +145,10 @@ Each entry has:
 
 Install consumers should merge values deterministically in this order: optional defaults, then adaptation-file values, then explicit CLI/UI values. Values are strings only. Reject unknown input keys, missing required keys, non-string values, unknown `{{adapt.*}}` tokens, and rendered files that still contain `{{adapt.*}}` tokens. Do not echo raw caller-provided adaptation values in logs or JSON output; reporting applied keys is sufficient.
 
+## Specialization ideas
+
+`specializationIdeas[]` is display metadata for optional behavior changes a team may consider after install. Consumers may show these ideas in browsing, docs, or review surfaces, but must not treat them as install blockers or adaptation inputs.
+
 ## Install algorithm
 
 Install consumers should copy from one catalog entry into:
@@ -169,8 +174,8 @@ Recommended flow:
 Path mapping example:
 
 ```text
-source:      daemons/js-ts-dependency-upgrades/references/package-manager-adaptation.md
-installed:   .agents/daemons/js-ts-dependency-upgrades/references/package-manager-adaptation.md
+source:      daemons/github-activity-digest/references/digest-template.md
+installed:   .agents/daemons/github-activity-digest/references/digest-template.md
 ```
 
 TypeScript-shaped pseudocode:
@@ -216,7 +221,7 @@ Catalog v1 lists support file paths, not file contents or mode metadata. The pac
 If a consumer works directly from raw catalog JSON without the planner, support scripts may still need explicit executable handling through tree APIs or invocation through an interpreter. For example, the current catalog includes:
 
 ```text
-daemons/js-ts-dependency-upgrades/references/package-manager-adaptation.md
+daemons/github-activity-digest/references/digest-template.md
 ```
 
 That support file is listed in the catalog, but v1 does not include support file contents in `examples.json`.

@@ -34,6 +34,7 @@ describe('examples catalog generator and validator', () => {
       expect(result.value.examples).toHaveLength(1);
       expect(result.value.examples[0]?.scripts).toEqual([]);
       expect(result.value.examples[0]?.references).toEqual([]);
+      expect(result.value.examples[0]?.specializationIdeas).toEqual([]);
     });
   });
 
@@ -202,6 +203,96 @@ adaptations:
           suggestions: ['owner/repo'],
         },
       ]);
+    });
+  });
+
+  test('emits optional specialization ideas', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/example.yml'),
+        `id: no-support
+title: no support fixture
+status: ready
+summary: Demonstrates optional specialization ideas for catalog validation.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: false
+fit:
+  jobsToBeDone:
+    - daemon-operations
+  bestFor:
+    - Teams validating the examples catalog generator.
+  notFor:
+    - Production daemon deployments without local review.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other: []
+adaptation:
+  mustCustomize: []
+specializationIdeas:
+  - Restrict the daemon to a narrower repository area.
+  - Add a team-specific output format.
+`,
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        throw new TypeError('Expected fixture to be valid.');
+      }
+
+      expect(result.value.examples[0]?.specializationIdeas).toEqual([
+        'Restrict the daemon to a narrower repository area.',
+        'Add a team-specific output format.',
+      ]);
+    });
+  });
+
+  test('reports invalid specialization ideas', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/example.yml'),
+        `id: no-support
+title: no support fixture
+status: ready
+summary: Demonstrates invalid specialization ideas.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: false
+fit:
+  jobsToBeDone:
+    - daemon-operations
+  bestFor:
+    - Teams validating the examples catalog generator.
+  notFor:
+    - Production daemon deployments without local review.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other: []
+adaptation:
+  mustCustomize: []
+specializationIdeas:
+  - ''
+`,
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new TypeError('Expected fixture to be invalid.');
+      }
+
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({ code: 'invalid_schema', fieldPath: 'specializationIdeas[0]' })
+      );
     });
   });
 

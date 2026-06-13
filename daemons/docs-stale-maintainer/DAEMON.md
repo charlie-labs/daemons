@@ -2,13 +2,13 @@
 id: docs-stale-maintainer
 purpose: Repair older stale documentation with bounded, source-backed documentation pull requests.
 routines:
-  - Survey configured documentation paths for older stale claims using source evidence.
+  - Survey repository documentation for older stale claims using source evidence.
+  - Infer relevant documentation targets and source evidence from repository structure, filenames, headings, links, implementation, tests, configuration, and workflows.
   - Select one high-confidence stale-documentation theme for a bounded documentation pull request.
   - Create or update one bounded documentation pull request with source links.
 deny:
-  - Do not proceed while any repository configuration placeholder remains unresolved.
   - Do not modify runtime code, tests, migrations, build outputs, or repository configuration.
-  - Do not manually edit generated documentation outputs; use the documented generator only when the generated-docs policy says generated docs must change.
+  - Do not manually edit generated documentation outputs; no-op when the needed documentation target is generated.
   - Do not include more than 3 documentation files or more than one stale-documentation theme in a pull request.
   - Do not bundle unrelated stale findings, broad rewrites, formatting-only cleanup, or style-only edits.
   - Do not invent product behavior, API contracts, ownership, or setup steps.
@@ -17,14 +17,6 @@ schedule: '0 10 * * 1'
 ---
 
 # Stale Docs Maintainer
-
-## Repository configuration
-
-Use these repository-specific values:
-
-- Documentation paths: `<docs_globs>`
-- Source evidence locations: `<source_evidence_globs>`
-- Generated documentation policy: `<generated_docs_policy>`
 
 ## Source of truth
 
@@ -40,9 +32,11 @@ Skip stale claims when current behavior is unclear, the update would require bro
 
 ## Candidate discovery
 
-On each scheduled run, survey the configured documentation paths for older stale claims independent of recent pull requests.
+On each scheduled run, survey repository documentation for older stale claims independent of recent pull requests.
 
 Look for stale setup commands, API examples, configuration references, environment variables, CLI commands, routes, runbooks, alerts, examples, templates, and generated starter-code instructions.
+
+Infer documentation surfaces from repository conventions such as README files, docs directories, package docs, API reference pages, runbooks, examples, and links from implementation or tests. If the right documentation target or source evidence cannot be identified confidently, no-op.
 
 ## Selection and limits
 
@@ -54,7 +48,7 @@ When more candidates exist, choose the highest-confidence, highest-impact theme 
 
 ## PR policy
 
-The PR must contain only documentation changes unless the generated-docs policy requires running a documented generator for generated documentation output.
+The PR must contain only hand-authored documentation changes. If the correct target is generated documentation, no-op instead of editing generated output or inventing a generator workflow.
 
 The PR body must include:
 
@@ -79,9 +73,9 @@ Surface blockers only in the documentation PR body when opening or updating a PR
 
 ## No-op when
 
-- any repository configuration placeholder remains unresolved
 - no stale claim can be verified against source evidence
 - the correct docs target cannot be identified
+- the correct docs target is generated documentation
 - updating docs would require guessing behavior
 - the stale claim requires product, legal, security, compliance, or policy judgment
 - another active PR already updates the same docs for the same stale claim

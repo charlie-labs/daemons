@@ -225,6 +225,7 @@ export async function runShowCommand(args: {
         sourceUrl: entry.source.url,
         adaptationsRequired: adaptationsFor(entry),
         adaptations: [...(entry.adaptations ?? [])],
+        specializationIdeas: [...entry.specializationIdeas],
         activationRequired: ACTIVATION_CAVEAT,
       },
     };

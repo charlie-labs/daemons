@@ -128,6 +128,7 @@ const exampleMetadataSchema = z
       })
       .strict(),
     adaptations: adaptationsSchema,
+    specializationIdeas: stringListSchema.default([]),
   })
   .strict()
   .superRefine((value, context) => {
@@ -207,6 +208,7 @@ const catalogExampleSchema = z
       })
       .strict(),
     adaptations: adaptationsSchema,
+    specializationIdeas: stringListSchema.default([]),
     daemon: z
       .object({
         path: z.literal('DAEMON.md'),

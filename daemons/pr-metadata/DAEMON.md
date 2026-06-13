@@ -21,9 +21,11 @@ deny:
 
 # PR Metadata
 
-## Repository Configuration
+## Issue Identity
 
-The configured issue ID pattern is `<issue-id-pattern>`. PR title suffixes and PR body issue-reference lines must use issue IDs that match this pattern.
+Use the platform issue identifier as the PR metadata unit. A platform issue identifier is the issue key, number, or provider-native linked issue reference that the connected issue platform and repository context expose for the work.
+
+Prefer identifiers that come from platform-linked issue metadata. When linked metadata is unavailable, infer identifiers from branch names, PR titles, and PR bodies only when the format is already established by existing repository history or the identifier is unambiguous from the triggering PR context.
 
 ## Issue Inference
 
@@ -36,11 +38,11 @@ Use the strongest available source first:
 
 Infer a set of confidently relevant issue IDs. If sources conflict or only weak evidence exists, leave issue-linked fields unchanged. If no safe metadata edit remains, stop/no-op silently.
 
-Choose one primary issue ID for the title suffix. Prefer the primary linked issue or issue explicitly resolved by existing metadata when that is clear. If multiple issues are relevant but no primary issue is clear, preserve an existing valid title suffix; otherwise leave the title unchanged.
+Choose one primary platform issue identifier for the title suffix. Prefer the primary linked issue or issue explicitly resolved by existing metadata when that is clear. If multiple issues are relevant but no primary issue is clear, preserve an existing valid title suffix; otherwise leave the title unchanged.
 
 ## Title Policy
 
-The PR title should end with exactly one issue ID token that matches `<issue-id-pattern>`, represented here as `<issue-id>`.
+The PR title should end with exactly one platform issue identifier token, represented here as `<issue-id>`.
 
 When the primary issue is clear, patch only the trailing issue suffix:
 
@@ -65,7 +67,7 @@ On `synchronize` events, refresh existing sections only when they are clearly st
 
 ## Issue References
 
-The PR body should end with one explicit issue reference per line for every confidently relevant issue ID.
+The PR body should end with one explicit issue reference per line for every confidently relevant platform issue identifier.
 
 Use:
 

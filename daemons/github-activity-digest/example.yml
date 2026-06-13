@@ -21,8 +21,17 @@ requirements:
   optionalIntegrations: []
   other:
     - A configured Slack channel for the digest.
-    - Agreed signal thresholds and privacy rules for what belongs in the digest.
 adaptation:
   mustCustomize:
-    - Replace the Slack channel placeholder with the destination channel name.
-    - Configure the duplicate-post detection strategy.
+    - Provide the Slack channel where the digest should be posted.
+adaptations:
+  - key: slack_channel
+    label: Slack channel
+    description: Slack channel where Charlie should post the GitHub activity digest.
+    required: true
+    suggestions:
+      - '#team-updates'
+specializationIdeas:
+  - Tune the signal threshold for teams that want quiet-day confirmations or more aggressive digesting.
+  - Add release, incident, or deployment sections when those GitHub events matter to the team.
+  - Specialize duplicate detection around a channel-specific digest marker or thread convention.

@@ -174,6 +174,8 @@ adaptations:
     description: Branch name the installed daemon should use for generated work.
     required: false
     default: daemon/example
+specializationIdeas:
+  - Narrow this daemon to one repository area if the default scope is too broad.
 ```
 
 #### Summary
@@ -278,6 +280,12 @@ For configurable examples:
 - refer to configured values from the rest of the daemon instead of repeating placeholders throughout the body;
 - declare the required replacement or review in `adaptation.mustCustomize` for compatibility with existing consumers;
 - avoid putting "change this before enabling" prose inside runtime daemon policy.
+
+#### Specialization ideas
+
+Use `specializationIdeas` for optional ways a team could tune the daemon after install, such as narrowing scope, changing conservative defaults, adding an evidence source, or adopting a team-specific output format.
+
+Do not use `specializationIdeas` for required install inputs, placeholder replacement, rollout advice, or safety warnings. If a value must be supplied for deterministic install, use `adaptations[]`. If a condition determines whether the example is appropriate, use `fit.bestFor`, `fit.notFor`, or `requirements.other`.
 
 ### 5. Add support files only when they help
 
@@ -389,6 +397,7 @@ Use this checklist before approving example changes.
 - `readiness` matches `adaptation.mustCustomize`.
 - `adaptation.mustCustomize` names required daemon/example changes, not generic rollout or repo setup work.
 - `adaptations[]` keys are unique, token-safe, string-only, and have correct required/default behavior.
+- `specializationIdeas[]` contains only optional tuning ideas and does not describe required install work.
 - Surface flags are intentional.
 
 ### Support files

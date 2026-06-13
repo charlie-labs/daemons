@@ -74,6 +74,7 @@ Shows catalog details for one example:
 - support files from `scripts[]` and `references[]`
 - required adaptation notes from `adaptation.mustCustomize`
 - structured adaptation inputs from `adaptations[]`
+- optional specialization ideas from `specializationIdeas[]`
 - the activation caveat
 
 ```bash
@@ -82,7 +83,7 @@ daemon show pr-metadata
 daemon show pr-metadata --json
 ```
 
-`show` always returns `data.adaptationsRequired[]` in JSON, including for `adapt-before-use` examples. It also returns `data.adaptations[]` for structured render inputs. No explicit acknowledgement flag is required; the adaptation lists are prominent in both human and JSON output.
+`show` always returns `data.adaptationsRequired[]` in JSON, including for `adapt-before-use` examples. It also returns `data.adaptations[]` for structured render inputs and `data.specializationIdeas[]` for optional follow-up tuning ideas. No explicit acknowledgement flag is required; the adaptation lists are prominent in both human and JSON output.
 
 ### `daemon add <example-id>` / `daemon install <example-id>`
 
@@ -114,14 +115,7 @@ Examples:
 
 ```bash
 daemon add js-ts-dependency-upgrades --dry-run \
-  --adapt package_manager=npm \
-  --adapt manifest_globs=package.json \
-  --adapt lockfile_path=package-lock.json \
-  --adapt outdated_command='npm outdated' \
-  --adapt runtime_update_command='npm update <runtime-package>' \
-  --adapt development_update_command='npm update <dev-package> --save-dev' \
-  --adapt install_command='npm install --package-lock-only' \
-  --adapt verification_command='npm test'
+  --adapt package_manager=pnpm
 
 daemon install docs-drift-maintainer --ref master
 
@@ -143,14 +137,7 @@ Structured adaptation inputs:
 
 ```json
 {
-  "package_manager": "npm",
-  "manifest_globs": "package.json",
-  "lockfile_path": "package-lock.json",
-  "outdated_command": "npm outdated",
-  "runtime_update_command": "npm update <runtime-package>",
-  "development_update_command": "npm update <dev-package> --save-dev",
-  "install_command": "npm install --package-lock-only",
-  "verification_command": "npm test"
+  "package_manager": "pnpm"
 }
 ```
 

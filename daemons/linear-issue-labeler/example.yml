@@ -1,8 +1,8 @@
 id: linear-issue-labeler
 title: Issue Label Hygiene Helper
 status: ready
-summary: Keeps recently changed Linear issues aligned with a documented label taxonomy.
-readiness: adapt-before-use
+summary: Keeps recently changed Linear issues aligned with the current Linear label set.
+readiness: direct-copy
 showOnWebsite: true
 showInDashboard: true
 fit:
@@ -13,17 +13,17 @@ fit:
     - Teams using Linear labels for routing, reporting, or automation.
     - Workspaces where issue labels drift, conflict, or are often missing.
   notFor:
-    - Teams without a maintained label taxonomy.
+    - Teams whose Linear label names and descriptions are intentionally ambiguous.
     - Workflows where labels are intentionally ad hoc or owner-specific.
 requirements:
   requiredIntegrations:
     - linear
   optionalIntegrations: []
   other:
-    - A documented label taxonomy with required families, deprecated labels, and conflict rules.
-    - A configured issue scope such as team, project, or recently changed window.
+    - Linear label names and descriptions are available enough to support high-confidence label decisions.
 adaptation:
-  mustCustomize:
-    - Replace the label taxonomy template with the team's actual labels.
-    - Confirm which labels the daemon may add automatically.
-    - Confirm whether labels may be removed or only proposed for repair.
+  mustCustomize: []
+specializationIdeas:
+  - Restrict labeling to specific Linear teams or projects.
+  - Add explicit label-family rules if the workspace has strict type, area, priority, or source families.
+  - Allow safe label removals only after the team documents exact conflict rules.

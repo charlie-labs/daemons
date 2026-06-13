@@ -186,6 +186,11 @@ function formatHumanResult(result: CliCommandResult, verbose: boolean): string {
         }
       }
     }
+    const specializationIdeas = Array.isArray(data.specializationIdeas) ? data.specializationIdeas : [];
+    if (specializationIdeas.length > 0) {
+      lines.push('Specialization ideas:');
+      for (const specializationIdea of specializationIdeas) lines.push(`- ${String(specializationIdea)}`);
+    }
     lines.push(`Activation: ${String(data.activationRequired)}`);
   }
 

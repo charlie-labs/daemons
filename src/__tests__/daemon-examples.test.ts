@@ -13,6 +13,7 @@ describe('daemon examples package API', () => {
     expect(examples.map((example) => example.id)).toEqual(catalog.examples.map((example) => example.id));
     expect(firstExample).toBeDefined();
     expect(firstExample?.adaptations).toBeDefined();
+    expect(firstExample?.specializationIdeas).toBeDefined();
 
     const shown = await getDaemonExample(firstExample!.id);
     expect(shown).toMatchObject({

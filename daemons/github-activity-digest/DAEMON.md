@@ -20,7 +20,7 @@ schedule: "0 15 * * 1-5"
 
 Use this repository-specific value:
 
-- Slack channel: `<slack_channel_name>`
+- Slack channel: `{{adapt.slack_channel}}`
 
 ## Scope
 
@@ -57,6 +57,8 @@ If fewer than two meaningful items exist, do not post unless the single item is 
 If no item meets the signal threshold, no-op silently.
 
 No-op silently when there has been no repository activity since the previous scheduled run.
+
+Before posting, inspect the configured Slack channel for an equivalent digest for the same UTC date. If one exists, no-op silently.
 
 ## Output format
 

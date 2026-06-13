@@ -52,6 +52,7 @@ export type ShowData = CatalogListItem & {
   sourceUrl: string;
   adaptationsRequired: string[];
   adaptations: CatalogExample['adaptations'];
+  specializationIdeas: string[];
   activationRequired: string;
 };
 

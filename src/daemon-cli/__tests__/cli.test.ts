@@ -89,6 +89,7 @@ const catalog: ExamplesCatalog = {
         mustCustomize: ['Replace fixture paths.', 'Confirm verification commands.'],
       },
       adaptations: [],
+      specializationIdeas: ['Tighten fixture command scope for production tests.'],
       daemon: {
         path: 'DAEMON.md',
         content: readyDaemon,
@@ -122,6 +123,7 @@ const catalog: ExamplesCatalog = {
         mustCustomize: ['Confirm this deprecated pattern is still wanted.'],
       },
       adaptations: [],
+      specializationIdeas: [],
       daemon: {
         path: 'DAEMON.md',
         content: deprecatedDaemon,
@@ -171,6 +173,7 @@ const catalog: ExamplesCatalog = {
           suggestions: ['from-default', 'from-file', 'from-cli'],
         },
       ],
+      specializationIdeas: ['Render optional values into extra support files when needed.'],
       daemon: {
         path: 'DAEMON.md',
         content: templatedDaemon,
@@ -281,6 +284,7 @@ describe('daemon CLI catalog commands', () => {
         scripts: ['scripts/run.sh'],
         references: ['references/guide.md'],
         adaptationsRequired: ['Replace fixture paths.', 'Confirm verification commands.'],
+        specializationIdeas: ['Tighten fixture command scope for production tests.'],
       });
       expect(result.json.data.activationRequired).toContain('not active until');
     });
@@ -292,6 +296,7 @@ describe('daemon CLI catalog commands', () => {
 
       expect(result.code).toBe(0);
       expect(result.json.data.adaptationsRequired).toEqual(['Provide structured adaptation values.']);
+      expect(result.json.data.specializationIdeas).toEqual(['Render optional values into extra support files when needed.']);
       expect(result.json.data.adaptations).toEqual([
         {
           key: 'required_value',

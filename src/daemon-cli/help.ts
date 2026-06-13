@@ -22,7 +22,7 @@ export function getCommandHelpText(command: string): string {
   }
 
   if (command === 'show') {
-    return 'Usage: daemon show <example-id> [--ref <sha|branch|tag>] [--json]\n\nShows catalog metadata, support files, integrations, and required adaptations.';
+    return 'Usage: daemon show <example-id> [--ref <sha|branch|tag>] [--json]\n\nShows catalog metadata, support files, integrations, required adaptations, and optional specialization ideas.';
   }
 
   if (command === 'add') {
