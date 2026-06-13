@@ -3,8 +3,13 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2022"],
-    "types": ["bun", "vitest/globals"],
+    "lib": [
+      "ES2022"
+    ],
+    "types": [
+      "bun",
+      "vitest/globals"
+    ],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
@@ -16,5 +21,11 @@
     "resolveJsonModule": true,
     "noEmit": true
   },
-  "include": ["scripts/**/*.ts", "src/**/*.ts", "daemons/**/*.ts"]
+  "include": [
+    "bin.ts",
+    "index.ts",
+    "scripts/**/*.ts",
+    "src/**/*.ts",
+    "daemons/**/*.ts"
+  ]
 }
