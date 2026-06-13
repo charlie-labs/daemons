@@ -22,8 +22,6 @@ requirements:
   optionalIntegrations: []
   other:
     - GitHub mergeability metadata for open pull requests.
-adaptation:
-  mustCustomize: []
 specializationIdeas:
   - Allow maintainer-edit fork pull requests when the team is comfortable with that workflow.
   - Permit rebase-based repair or force-with-lease only for repositories that explicitly require it.

@@ -161,9 +161,6 @@ requirements:
     - github
   optionalIntegrations: []
   other: []
-adaptation:
-  mustCustomize:
-    - Provide the required target and review the optional default.
 adaptations:
   - key: target_repo
     label: Target repository
@@ -229,8 +226,6 @@ requirements:
     - github
   optionalIntegrations: []
   other: []
-adaptation:
-  mustCustomize: []
 specializationIdeas:
   - Restrict the daemon to a narrower repository area.
   - Add a team-specific output format.
@@ -275,8 +270,6 @@ requirements:
     - github
   optionalIntegrations: []
   other: []
-adaptation:
-  mustCustomize: []
 specializationIdeas:
   - ''
 `,
@@ -319,20 +312,15 @@ requirements:
     - github
   optionalIntegrations: []
   other: []
-adaptation:
-  mustCustomize:
-    - Provide local values.
 adaptations:
   - key: duplicate_key
     label: Duplicate key one
     description: First duplicate.
-    required: false
-    default: one
+    required: true
   - key: duplicate_key
     label: Duplicate key two
     description: Second duplicate.
-    required: false
-    default: two
+    required: true
 `,
         'utf8'
       );
@@ -373,9 +361,6 @@ requirements:
     - github
   optionalIntegrations: []
   other: []
-adaptation:
-  mustCustomize:
-    - Provide local values.
 adaptations:
   - key: 9bad
     label: Bad key

@@ -50,7 +50,6 @@ export type ShowData = CatalogListItem & {
   daemonPath: string;
   sourceDirectory: string;
   sourceUrl: string;
-  adaptationsRequired: string[];
   adaptations: CatalogExample['adaptations'];
   specializationIdeas: string[];
   activationRequired: string;
@@ -78,7 +77,6 @@ export type AddData = {
   sourceRef: string;
   status: CatalogExample['status'];
   readiness: CatalogExample['readiness'];
-  adaptationsRequired: string[];
   adaptationsApplied: string[];
   activationRequired: string;
   filesPlanned: InstallFilePlan[];

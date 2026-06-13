@@ -21,9 +21,6 @@ requirements:
   optionalIntegrations: []
   other:
     - A JavaScript or TypeScript package manager and matching lockfile are present.
-adaptation:
-  mustCustomize:
-    - Provide the JavaScript or TypeScript package manager Charlie should use.
 adaptations:
   - key: package_manager
     label: Package manager

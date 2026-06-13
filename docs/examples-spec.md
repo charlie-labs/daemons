@@ -107,9 +107,6 @@ requirements:
   optionalIntegrations: []
   other:
     - Daemon-specific local policy or command prerequisite.
-adaptation:
-  mustCustomize:
-    - Replace placeholder repository paths and output destinations.
 adaptations:
   - key: target_branch
     label: Target branch
@@ -139,7 +136,6 @@ specializationIdeas:
 | `showInDashboard` | boolean | Required surface-control flag. |
 | `fit` | object | Required strict object describing where this example fits. |
 | `requirements` | object | Required strict object describing prerequisites. |
-| `adaptation` | object | Required strict object describing required customization. |
 | `adaptations` | array of objects | Optional structured render inputs. Defaults to `[]`; generated `examples.json` always includes it. |
 | `specializationIdeas` | array of strings | Optional non-required ideas for future behavior changes or team-specific variants. Defaults to `[]`; generated `examples.json` always includes it. |
 
@@ -159,13 +155,13 @@ Allowed values:
 
 Allowed values:
 
-- `adapt-before-use`: the example is a reference pattern and has declared required customization.
-- `direct-copy`: the example declares no required customization.
+- `adapt-before-use`: the example declares at least one required structured adaptation input.
+- `direct-copy`: the example declares no required structured adaptation inputs.
 
 Readiness invariants:
 
-- `adapt-before-use` requires `adaptation.mustCustomize` to contain at least one item.
-- `direct-copy` requires `adaptation.mustCustomize` to be empty.
+- `adapt-before-use` requires `adaptations[]` to contain at least one item with `required: true`.
+- `direct-copy` must not declare required adaptations. Optional adaptations with defaults remain allowed.
 - `direct-copy` does not mean "safe without review." Customers must still verify the daemon against their repo, integrations, and rollout policy before using it.
 
 ### Surface flags
@@ -222,20 +218,9 @@ Allowed integration values:
 
 List an integration as required only when the daemon cannot perform its core job without it. Put daemon-specific non-integration prerequisites, such as a label taxonomy, branch convention, destination convention, or configured command that the daemon directly invokes, in `requirements.other`.
 
-### `adaptation`
-
-`adaptation` is a strict object with:
-
-| Field | Type | Rules |
-| --- | --- | --- |
-| `mustCustomize` | array of strings | Required. Empty only for `direct-copy`; non-empty for `adapt-before-use`. |
-
-Use `mustCustomize` for concrete changes a customer must make to the example or daemon before using the pattern, such as replacing path globs, destination channels, issue-state names, label taxonomies, configured commands, thresholds, or ownership boundaries. Do not use it for generic rollout instructions, repo setup work, or broad verification reminders.
-
-
 ### `adaptations`
 
-`adaptations` is optional structured metadata for values that can be rendered by install consumers such as `daemon add`. It complements `adaptation.mustCustomize`; it does not replace the legacy human-readable notes or the `adaptationsRequired[]` compatibility field.
+`adaptations` is optional structured metadata for values that can be rendered by install consumers such as `daemon add`.
 
 Each item is a strict object with:
 
@@ -306,7 +291,7 @@ Before enabling a copied example in a customer repo:
 
 - Treat `DAEMON.md` as a starting point that must be checked against the customer's desired behavior.
 - Review `example.yml` fit and requirements before using the pattern.
-- Follow `adaptation.mustCustomize` for `adapt-before-use` examples.
+- Provide required structured adaptation values for `adapt-before-use` examples.
 - Verify all watch conditions, schedules, routines, deny rules, output destinations, integration assumptions, and support files locally.
 - Keep public docs as the source of truth for `DAEMON.md` semantics and rollout guidance.
 
@@ -405,7 +390,7 @@ Common validation error categories include:
 | `invalid_example_yml` | `example.yml` YAML parsing failed. |
 | `missing_required_field` | A required schema field is missing. |
 | `invalid_enum_value` | A field uses a value outside the allowed enum. |
-| `invalid_field_value` | A custom invariant failed, such as readiness/adaptation mismatch. |
+| `invalid_field_value` | A custom invariant failed, such as readiness/required-adaptation mismatch. |
 | `unknown_key` | A strict schema object contains an unsupported key. |
 | `stale_metadata_field` | Deprecated catalog metadata was placed where it no longer belongs. |
 | `id_mismatch` | Directory, `example.yml`, and `DAEMON.md` IDs do not all match. |

@@ -72,7 +72,6 @@ Shows catalog details for one example:
 - status and readiness
 - required and optional integrations
 - support files from `scripts[]` and `references[]`
-- required adaptation notes from `adaptation.mustCustomize`
 - structured adaptation inputs from `adaptations[]`
 - optional specialization ideas from `specializationIdeas[]`
 - the activation caveat
@@ -83,7 +82,7 @@ daemon show pr-metadata
 daemon show pr-metadata --json
 ```
 
-`show` always returns `data.adaptationsRequired[]` in JSON, including for `adapt-before-use` examples. It also returns `data.adaptations[]` for structured render inputs and `data.specializationIdeas[]` for optional follow-up tuning ideas. No explicit acknowledgement flag is required; the adaptation lists are prominent in both human and JSON output.
+`show` returns `data.adaptations[]` for structured render inputs and `data.specializationIdeas[]` for optional follow-up tuning ideas. No explicit acknowledgement flag is required; the adaptation inputs are prominent in both human and JSON output.
 
 ### `daemon add <example-id>` / `daemon install <example-id>`
 
@@ -143,7 +142,6 @@ Structured adaptation inputs:
 
 JSON data includes:
 
-- `adaptationsRequired[]`
 - `adaptationsApplied[]` (keys only, not raw values)
 - `activationRequired`
 - `filesPlanned[]`, where each item includes `sourcePath`, `destinationPath`, `kind`, and `mode` (`100644` or `100755`)
@@ -181,7 +179,7 @@ Validation enforces the canonical runtime `DAEMON.md` contract:
 - Allowed frontmatter keys are exactly `id`, `purpose`, `watch`, `routines`, `deny`, and `schedule`.
 - Unknown keys are rejected.
 - Legacy keys such as `name`, `description`, `triggers`, `actions`, and `disallowed` are rejected with replacement guidance.
-- Catalog/example metadata keys such as `status`, `readiness`, `requirements`, and `adaptation` are rejected in runtime frontmatter.
+- Catalog/example metadata keys such as `status`, `readiness`, and `requirements` are rejected in runtime frontmatter.
 - `id`, `purpose`, and non-empty `routines[]` are required.
 - At least one activation path is required: non-empty `watch[]` or a valid `schedule`.
 - `schedule`, when present and non-blank, must be a standard five-field cron expression.
@@ -200,7 +198,7 @@ Validation enforces the canonical runtime `DAEMON.md` contract:
 
 ## Examples are patterns
 
-The catalog examples are reference patterns to adapt before production use. Treat `adaptationsRequired[]` as required local work before enabling or relying on a scaffolded daemon.
+The catalog examples are reference patterns to adapt before production use. Treat required `adaptations[]` entries as required local inputs before enabling or relying on a scaffolded daemon.
 
 Use the public daemon docs for the runtime contract:
 

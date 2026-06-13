@@ -23,8 +23,6 @@ requirements:
   other:
     - Linear issue teams are mapped to the repositories that own their work.
     - Linear issue titles, descriptions, or labels contain enough signal to distinguish likely bugs from other work.
-adaptation:
-  mustCustomize: []
 specializationIdeas:
   - Add Sentry, support-ticket, or incident-system lookup steps when bug reports commonly include those references.
   - Specialize bug signals around team-specific labels or issue templates.

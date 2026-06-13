@@ -72,7 +72,7 @@ const catalog: ExamplesCatalog = {
       title: 'Ready daemon',
       status: 'ready',
       summary: 'A ready daemon fixture.',
-      readiness: 'adapt-before-use',
+      readiness: 'direct-copy',
       showOnWebsite: true,
       showInDashboard: true,
       fit: {
@@ -84,9 +84,6 @@ const catalog: ExamplesCatalog = {
         requiredIntegrations: ['github'],
         optionalIntegrations: ['linear'],
         other: ['repo-specific commands'],
-      },
-      adaptation: {
-        mustCustomize: ['Replace fixture paths.', 'Confirm verification commands.'],
       },
       adaptations: [],
       specializationIdeas: ['Tighten fixture command scope for production tests.'],
@@ -106,7 +103,7 @@ const catalog: ExamplesCatalog = {
       title: 'Deprecated daemon',
       status: 'deprecated',
       summary: 'A deprecated daemon fixture.',
-      readiness: 'adapt-before-use',
+      readiness: 'direct-copy',
       showOnWebsite: false,
       showInDashboard: false,
       fit: {
@@ -118,9 +115,6 @@ const catalog: ExamplesCatalog = {
         requiredIntegrations: ['github'],
         optionalIntegrations: [],
         other: [],
-      },
-      adaptation: {
-        mustCustomize: ['Confirm this deprecated pattern is still wanted.'],
       },
       adaptations: [],
       specializationIdeas: [],
@@ -152,9 +146,6 @@ const catalog: ExamplesCatalog = {
         requiredIntegrations: ['github'],
         optionalIntegrations: [],
         other: [],
-      },
-      adaptation: {
-        mustCustomize: ['Provide structured adaptation values.'],
       },
       adaptations: [
         {
@@ -270,7 +261,7 @@ describe('daemon CLI catalog commands', () => {
     });
   });
 
-  test('show exposes support files, integrations, and adaptationsRequired', async () => {
+  test('show exposes support files, integrations, and specialization ideas', async () => {
     await withTempDir(async (directory) => {
       const result = await runJson(['show', 'ready-daemon', '--ref', 'test-ref'], directory);
 
@@ -278,24 +269,22 @@ describe('daemon CLI catalog commands', () => {
       expect(result.json.data).toMatchObject({
         id: 'ready-daemon',
         status: 'ready',
-        readiness: 'adapt-before-use',
+        readiness: 'direct-copy',
         requiredIntegrations: ['github'],
         optionalIntegrations: ['linear'],
         scripts: ['scripts/run.sh'],
         references: ['references/guide.md'],
-        adaptationsRequired: ['Replace fixture paths.', 'Confirm verification commands.'],
         specializationIdeas: ['Tighten fixture command scope for production tests.'],
       });
       expect(result.json.data.activationRequired).toContain('not active until');
     });
   });
 
-  test('show exposes structured adaptation metadata without replacing legacy notes', async () => {
+  test('show exposes structured adaptation metadata', async () => {
     await withTempDir(async (directory) => {
       const result = await runJson(['show', 'templated-daemon', '--ref', 'test-ref'], directory);
 
       expect(result.code).toBe(0);
-      expect(result.json.data.adaptationsRequired).toEqual(['Provide structured adaptation values.']);
       expect(result.json.data.specializationIdeas).toEqual(['Render optional values into extra support files when needed.']);
       expect(result.json.data.adaptations).toEqual([
         {
@@ -486,7 +475,6 @@ describe('daemon CLI catalog commands', () => {
         dryRun: true,
         fileCount: 3,
         filesWritten: [],
-        adaptationsRequired: ['Replace fixture paths.', 'Confirm verification commands.'],
       });
       expect(result.json.data.filesPlanned).toEqual([
         {
@@ -620,7 +608,7 @@ describe('daemon CLI catalog commands', () => {
       const blocked = await runJson(['add', 'deprecated-daemon'], directory);
       expect(blocked.code).toBe(65);
       expect(blocked.json.errors[0].code).toBe('DEPRECATED_EXAMPLE_BLOCKED');
-      expect(blocked.json.data.adaptationsRequired).toEqual(['Confirm this deprecated pattern is still wanted.']);
+      expect(blocked.json.data.adaptationsApplied).toEqual([]);
 
       const allowed = await runJson(['add', 'deprecated-daemon', '--allow-deprecated'], directory);
       expect(allowed.code).toBe(0);

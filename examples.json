@@ -36,9 +36,6 @@
           "Repository documentation and source evidence are accessible through GitHub."
         ]
       },
-      "adaptation": {
-        "mustCustomize": []
-      },
       "adaptations": [],
       "specializationIdeas": [
         "Restrict documentation target selection to a specific docs family such as API docs, runbooks, or onboarding docs.",
@@ -86,9 +83,6 @@
           "Repository documentation and source evidence are accessible through GitHub."
         ]
       },
-      "adaptation": {
-        "mustCustomize": []
-      },
       "adaptations": [],
       "specializationIdeas": [
         "Narrow stale-claim scans to a documentation area such as setup docs, API examples, or operational runbooks.",
@@ -135,11 +129,6 @@
         "optionalIntegrations": [],
         "other": [
           "A configured Slack channel for the digest."
-        ]
-      },
-      "adaptation": {
-        "mustCustomize": [
-          "Provide the Slack channel where the digest should be posted."
         ]
       },
       "adaptations": [
@@ -200,11 +189,6 @@
         "optionalIntegrations": [],
         "other": [
           "A JavaScript or TypeScript package manager and matching lockfile are present."
-        ]
-      },
-      "adaptation": {
-        "mustCustomize": [
-          "Provide the JavaScript or TypeScript package manager Charlie should use."
         ]
       },
       "adaptations": [
@@ -270,9 +254,6 @@
           "Linear issue titles, descriptions, or labels contain enough signal to distinguish likely bugs from other work."
         ]
       },
-      "adaptation": {
-        "mustCustomize": []
-      },
       "adaptations": [],
       "specializationIdeas": [
         "Add Sentry, support-ticket, or incident-system lookup steps when bug reports commonly include those references.",
@@ -323,9 +304,6 @@
           "Completed and canceled Linear workflow states are identifiable through Linear state metadata."
         ]
       },
-      "adaptation": {
-        "mustCustomize": []
-      },
       "adaptations": [],
       "specializationIdeas": [
         "Broaden or narrow duplicate search across Linear teams mapped to the same repository.",
@@ -373,9 +351,6 @@
         "other": [
           "Linear label names and descriptions are available enough to support high-confidence label decisions."
         ]
-      },
-      "adaptation": {
-        "mustCustomize": []
       },
       "adaptations": [],
       "specializationIdeas": [
@@ -427,9 +402,6 @@
           "GitHub branches, pull requests, commits, or descriptions contain enough issue or title signal to support safe matching."
         ]
       },
-      "adaptation": {
-        "mustCustomize": []
-      },
       "adaptations": [],
       "specializationIdeas": [
         "Use a team-specific branch naming convention as stronger matching evidence.",
@@ -480,9 +452,6 @@
           "Repository-local verification commands."
         ]
       },
-      "adaptation": {
-        "mustCustomize": []
-      },
       "adaptations": [],
       "specializationIdeas": [
         "Restrict repair to selected check names, path areas, or pull request authors.",
@@ -531,9 +500,6 @@
         "other": [
           "GitHub mergeability metadata for open pull requests."
         ]
-      },
-      "adaptation": {
-        "mustCustomize": []
       },
       "adaptations": [],
       "specializationIdeas": [
@@ -588,9 +554,6 @@
           "Issue identifiers are available from linked issue metadata or clear repository conventions."
         ]
       },
-      "adaptation": {
-        "mustCustomize": []
-      },
       "adaptations": [],
       "specializationIdeas": [
         "Customize required pull request body sections to match the team's template.",
@@ -636,9 +599,6 @@
         "other": [
           "GitHub pull request review threads and top-level PR comments are the source of truth for feedback state."
         ]
-      },
-      "adaptation": {
-        "mustCustomize": []
       },
       "adaptations": [],
       "specializationIdeas": [
@@ -693,11 +653,6 @@
         "other": [
           "Slack workspaces are mapped to the repositories that own the alerted services.",
           "Monitoring or incident notifications arrive as Slack app or bot messages with enough text or metadata to infer the affected service."
-        ]
-      },
-      "adaptation": {
-        "mustCustomize": [
-          "Provide the Slack channel where monitoring or incident alerts arrive."
         ]
       },
       "adaptations": [
@@ -760,11 +715,6 @@
         "other": [
           "Slack workspaces are mapped to the repositories discussed in meeting notes.",
           "Transcript text, transcript links, or uploaded note files are accessible to Charlie under the workspace policy."
-        ]
-      },
-      "adaptation": {
-        "mustCustomize": [
-          "Provide the Slack channel where meeting notes or transcripts are shared."
         ]
       },
       "adaptations": [

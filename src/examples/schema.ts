@@ -85,6 +85,10 @@ const adaptationsSchema = z
     }
   });
 
+function hasRequiredAdaptation(adaptations: readonly ExampleAdaptation[]): boolean {
+  return adaptations.some((adaptation) => adaptation.required);
+}
+
 const jobToBeDoneSchema = z.enum([
   'maintain-and-modernize',
   'organize',
@@ -122,29 +126,24 @@ const exampleMetadataSchema = z
         other: stringListSchema,
       })
       .strict(),
-    adaptation: z
-      .object({
-        mustCustomize: stringListSchema,
-      })
-      .strict(),
     adaptations: adaptationsSchema,
     specializationIdeas: stringListSchema.default([]),
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.readiness === 'adapt-before-use' && value.adaptation.mustCustomize.length === 0) {
+    if (value.readiness === 'adapt-before-use' && !hasRequiredAdaptation(value.adaptations)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['adaptation', 'mustCustomize'],
-        message: 'adapt-before-use examples must name at least one local customization.',
+        path: ['adaptations'],
+        message: 'adapt-before-use examples must declare at least one required structured adaptation.',
       });
     }
 
-    if (value.readiness === 'direct-copy' && value.adaptation.mustCustomize.length > 0) {
+    if (value.readiness === 'direct-copy' && hasRequiredAdaptation(value.adaptations)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['adaptation', 'mustCustomize'],
-        message: 'direct-copy examples must not require local customization.',
+        path: ['adaptations'],
+        message: 'direct-copy examples must not declare required structured adaptations.',
       });
     }
   });
@@ -202,11 +201,6 @@ const catalogExampleSchema = z
         other: stringListSchema,
       })
       .strict(),
-    adaptation: z
-      .object({
-        mustCustomize: stringListSchema,
-      })
-      .strict(),
     adaptations: adaptationsSchema,
     specializationIdeas: stringListSchema.default([]),
     daemon: z
@@ -234,19 +228,19 @@ const catalogExampleSchema = z
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.readiness === 'adapt-before-use' && value.adaptation.mustCustomize.length === 0) {
+    if (value.readiness === 'adapt-before-use' && !hasRequiredAdaptation(value.adaptations)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['adaptation', 'mustCustomize'],
-        message: 'adapt-before-use examples must name at least one local customization.',
+        path: ['adaptations'],
+        message: 'adapt-before-use examples must declare at least one required structured adaptation.',
       });
     }
 
-    if (value.readiness === 'direct-copy' && value.adaptation.mustCustomize.length > 0) {
+    if (value.readiness === 'direct-copy' && hasRequiredAdaptation(value.adaptations)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['adaptation', 'mustCustomize'],
-        message: 'direct-copy examples must not require local customization.',
+        path: ['adaptations'],
+        message: 'direct-copy examples must not declare required structured adaptations.',
       });
     }
 

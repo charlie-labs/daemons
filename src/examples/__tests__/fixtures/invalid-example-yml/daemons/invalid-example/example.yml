@@ -17,6 +17,4 @@ requirements:
     - github
   optionalIntegrations: []
   other: []
-adaptation:
-  mustCustomize: []
 unexpectedCatalogField: true

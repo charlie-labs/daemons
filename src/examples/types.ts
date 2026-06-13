@@ -57,9 +57,6 @@ export type ExampleMetadata = {
     optionalIntegrations: IntegrationSlug[];
     other: string[];
   };
-  adaptation: {
-    mustCustomize: string[];
-  };
   adaptations: ExampleAdaptation[];
   specializationIdeas: string[];
 };

@@ -23,8 +23,6 @@ requirements:
   other:
     - Pull request titles and bodies are editable by Charlie.
     - Issue identifiers are available from linked issue metadata or clear repository conventions.
-adaptation:
-  mustCustomize: []
 specializationIdeas:
   - Customize required pull request body sections to match the team's template.
   - Specialize issue-reference keywords such as Refs, Resolves, or tracker-specific syntax.

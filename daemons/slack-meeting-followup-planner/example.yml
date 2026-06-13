@@ -24,9 +24,6 @@ requirements:
   other:
     - Slack workspaces are mapped to the repositories discussed in meeting notes.
     - Transcript text, transcript links, or uploaded note files are accessible to Charlie under the workspace policy.
-adaptation:
-  mustCustomize:
-    - Provide the Slack channel where meeting notes or transcripts are shared.
 adaptations:
   - key: slack_channel
     label: Slack meeting notes channel

@@ -20,8 +20,6 @@ requirements:
   optionalIntegrations: []
   other:
     - Repository documentation and source evidence are accessible through GitHub.
-adaptation:
-  mustCustomize: []
 specializationIdeas:
   - Narrow stale-claim scans to a documentation area such as setup docs, API examples, or operational runbooks.
   - Adjust the age or confidence threshold before older documentation is considered stale.

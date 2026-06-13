@@ -19,8 +19,6 @@ requirements:
   optionalIntegrations: []
   other:
     - GitHub pull request review threads and top-level PR comments are the source of truth for feedback state.
-adaptation:
-  mustCustomize: []
 specializationIdeas:
   - Tune action policy for specific bot reviewers or code-review tools.
   - Restrict hiding or minimizing behavior to non-human comments only from known automation.

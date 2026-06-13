@@ -70,9 +70,9 @@ Each `examples[]` entry includes the validated `example.yml` metadata plus gener
 
 | Field | Consumer use |
 | --- | --- |
-| `id`, `title`, `summary`, `status`, `readiness` | Display, filtering, matching, and adaptation guidance. |
+| `id`, `title`, `summary`, `status`, `readiness` | Display, filtering, matching, and structured adaptation guidance. |
 | `showOnWebsite`, `showInDashboard` | Publication controls for specific surfaces. |
-| `fit`, `requirements`, `adaptation` | Recommendation, prerequisites, and required customization copy. |
+| `fit`, `requirements` | Recommendation and prerequisite copy. |
 | `adaptations` | Structured string-only inputs for rendering `{{adapt.key}}` tokens. Always present in generated catalog entries; may be empty. |
 | `specializationIdeas` | Optional non-blocking ideas for further team-specific behavior changes. Always present in generated catalog entries; may be empty. |
 | `daemon.path` | Currently always `DAEMON.md`. |
@@ -127,8 +127,8 @@ entry.showInDashboard === true && entry.status === "ready"
 
 | Readiness | Meaning for consumers |
 | --- | --- |
-| `direct-copy` | The catalog declares no required `adaptation.mustCustomize` items. Consumers still need local verification before enabling the daemon. |
-| `adapt-before-use` | The consumer should surface or enforce every item in `adaptation.mustCustomize` before install or enablement. If `adaptations[]` contains required items, collect string values before rendering. |
+| `direct-copy` | The catalog declares no required structured adaptation inputs. Consumers still need local verification before enabling the daemon. |
+| `adapt-before-use` | The consumer should collect required `adaptations[]` values before rendering and install. |
 
 
 ## Structured adaptations
@@ -245,7 +245,6 @@ Consumers should fail closed when:
 - `entry.daemon.content` is missing or empty;
 - a listed support path cannot be fetched from the selected ref;
 - install preflight detects collisions or unsafe local conditions;
-- an `adapt-before-use` example has not had required customization reviewed;
 - required structured adaptation values are missing or not strings;
 - rendered content still contains `{{adapt.*}}` tokens.
 

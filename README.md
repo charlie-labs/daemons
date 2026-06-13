@@ -86,7 +86,6 @@ Key safety defaults:
 - install plans include destination paths and file modes (`100644`/`100755`);
 - existing destination directories/files require `--force`;
 - deprecated examples require `--allow-deprecated`;
-- add/install/show always surface `adaptationsRequired[]` in JSON;
 - show surfaces structured `adaptations[]` and optional `specializationIdeas[]`, and add/install render `{{adapt.key}}` tokens with string-only values before validation;
 - scaffolding does not activate a daemon until the change is merged and ingested by Charlie.
 

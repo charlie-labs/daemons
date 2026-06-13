@@ -23,8 +23,6 @@ requirements:
   other:
     - Linear issue teams are mapped to the repositories that own their implementation work.
     - GitHub branches, pull requests, commits, or descriptions contain enough issue or title signal to support safe matching.
-adaptation:
-  mustCustomize: []
 specializationIdeas:
   - Use a team-specific branch naming convention as stronger matching evidence.
   - Allow automatic link edits for very high-confidence matches.

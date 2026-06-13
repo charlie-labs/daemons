@@ -322,9 +322,6 @@ async function loadCatalogExample(
         optionalIntegrations: exampleMetadata.requirements.optionalIntegrations,
         other: exampleMetadata.requirements.other,
       },
-      adaptation: {
-        mustCustomize: exampleMetadata.adaptation.mustCustomize,
-      },
       adaptations: catalogAdaptations(exampleMetadata.adaptations),
       specializationIdeas: [...exampleMetadata.specializationIdeas],
       daemon: {

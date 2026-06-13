@@ -17,5 +17,3 @@ requirements:
     - github
   optionalIntegrations: []
   other: []
-adaptation:
-  mustCustomize: []

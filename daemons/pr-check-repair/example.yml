@@ -23,8 +23,6 @@ requirements:
   other:
     - Access to check logs or provider data.
     - Repository-local verification commands.
-adaptation:
-  mustCustomize: []
 specializationIdeas:
   - Restrict repair to selected check names, path areas, or pull request authors.
   - Add repository-specific verification commands for common failure classes.

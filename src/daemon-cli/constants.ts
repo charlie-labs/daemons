@@ -46,7 +46,6 @@ export const catalogMetadataFrontmatterKeys = [
   'showInDashboard',
   'fit',
   'requirements',
-  'adaptation',
   'scripts',
   'references',
   'source',

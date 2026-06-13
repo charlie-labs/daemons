@@ -21,9 +21,6 @@ requirements:
   optionalIntegrations: []
   other:
     - A configured Slack channel for the digest.
-adaptation:
-  mustCustomize:
-    - Provide the Slack channel where the digest should be posted.
 adaptations:
   - key: slack_channel
     label: Slack channel

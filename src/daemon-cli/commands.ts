@@ -128,10 +128,6 @@ function listItem(entry: CatalogExample) {
   };
 }
 
-function adaptationsFor(entry: CatalogExample): string[] {
-  return [...entry.adaptation.mustCustomize];
-}
-
 export async function runListCommand(args: {
   commandArgs: readonly string[];
   catalogClient: CatalogClient;
@@ -223,7 +219,6 @@ export async function runShowCommand(args: {
         daemonPath: entry.daemon.path,
         sourceDirectory: entry.source.directory,
         sourceUrl: entry.source.url,
-        adaptationsRequired: adaptationsFor(entry),
         adaptations: [...(entry.adaptations ?? [])],
         specializationIdeas: [...entry.specializationIdeas],
         activationRequired: ACTIVATION_CAVEAT,
@@ -272,7 +267,6 @@ function addDataForBlocked(args: {
     sourceRef: args.ref,
     status: args.entry.status,
     readiness: args.entry.readiness,
-    adaptationsRequired: adaptationsFor(args.entry),
     adaptationsApplied: args.adaptationsApplied ?? [],
     activationRequired: ACTIVATION_CAVEAT,
     filesPlanned: args.files.map((file) => ({
@@ -564,7 +558,6 @@ export async function runAddCommand(args: {
       sourceRef: ref,
       status: entry.status,
       readiness: entry.readiness,
-      adaptationsRequired: adaptationsFor(entry),
       adaptationsApplied: adaptationResolution.resolution.appliedKeys,
       activationRequired: ACTIVATION_CAVEAT,
       filesPlanned: installPlan.files.map((file) => ({ ...file, destinationPath: toDisplayPath(installRoot, file.destinationPath) })),

@@ -21,8 +21,6 @@ requirements:
   optionalIntegrations: []
   other:
     - Linear label names and descriptions are available enough to support high-confidence label decisions.
-adaptation:
-  mustCustomize: []
 specializationIdeas:
   - Restrict labeling to specific Linear teams or projects.
   - Add explicit label-family rules if the workspace has strict type, area, priority, or source families.

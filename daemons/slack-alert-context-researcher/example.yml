@@ -25,9 +25,6 @@ requirements:
   other:
     - Slack workspaces are mapped to the repositories that own the alerted services.
     - Monitoring or incident notifications arrive as Slack app or bot messages with enough text or metadata to infer the affected service.
-adaptation:
-  mustCustomize:
-    - Provide the Slack channel where monitoring or incident alerts arrive.
 adaptations:
   - key: slack_channel
     label: Slack alert channel

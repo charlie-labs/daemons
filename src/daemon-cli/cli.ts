@@ -169,13 +169,6 @@ function formatHumanResult(result: CliCommandResult, verbose: boolean): string {
     lines.push(`Required integrations: ${Array.isArray(data.requiredIntegrations) && data.requiredIntegrations.length > 0 ? data.requiredIntegrations.join(', ') : 'none'}`);
     lines.push(`Optional integrations: ${Array.isArray(data.optionalIntegrations) && data.optionalIntegrations.length > 0 ? data.optionalIntegrations.join(', ') : 'none'}`);
     lines.push(`Support files: ${[...(Array.isArray(data.scripts) ? data.scripts : []), ...(Array.isArray(data.references) ? data.references : [])].length.toString()}`);
-    lines.push('Adaptations required:');
-    const adaptations = Array.isArray(data.adaptationsRequired) ? data.adaptationsRequired : [];
-    if (adaptations.length === 0) {
-      lines.push('- none declared');
-    } else {
-      for (const adaptation of adaptations) lines.push(`- ${String(adaptation)}`);
-    }
     const structuredAdaptations = Array.isArray(data.adaptations) ? data.adaptations : [];
     if (structuredAdaptations.length > 0) {
       lines.push('Adaptation inputs:');
@@ -200,13 +193,6 @@ function formatHumanResult(result: CliCommandResult, verbose: boolean): string {
     lines.push(`Files planned: ${String(data.fileCount)}`);
     lines.push(`Dry run: ${data.dryRun === true ? 'yes' : 'no'}`);
     lines.push(`Overwritten: ${data.overwritten === true ? 'yes' : 'no'}`);
-    lines.push('Adaptations required:');
-    const adaptations = Array.isArray(data.adaptationsRequired) ? data.adaptationsRequired : [];
-    if (adaptations.length === 0) {
-      lines.push('- none declared');
-    } else {
-      for (const adaptation of adaptations) lines.push(`- ${String(adaptation)}`);
-    }
     const appliedKeys = Array.isArray(data.adaptationsApplied) ? data.adaptationsApplied : [];
     lines.push('Adaptation keys applied:');
     if (appliedKeys.length === 0) {
