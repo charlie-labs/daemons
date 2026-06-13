@@ -19,7 +19,7 @@
     "test": "vitest run",
     "generate:examples": "bun scripts/generate-examples.ts",
     "validate:examples": "bun scripts/validate-examples.ts",
-    "build": "rm -rf dist && bun build src/daemon-cli/bin.ts src/daemon-cli/index.ts --target=node --outdir=dist --entry-naming=[name].js && chmod +x dist/bin.js",
+    "build": "rm -rf dist && bun build src/daemon-cli/bin.ts src/index.ts --target=node --outdir=dist --entry-naming=[name].js && chmod +x dist/bin.js && tsc -p tsconfig.declarations.json",
     "smoke:daemon": "bun scripts/smoke-daemon-bin.ts",
     "prepack": "bun run build"
   },
@@ -45,5 +45,19 @@
   "bugs": {
     "url": "https://github.com/charlie-labs/daemons/issues"
   },
-  "homepage": "https://github.com/charlie-labs/daemons#readme"
+  "homepage": "https://github.com/charlie-labs/daemons#readme",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./examples": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./examples.json": "./examples.json",
+    "./package.json": "./package.json"
+  }
 }

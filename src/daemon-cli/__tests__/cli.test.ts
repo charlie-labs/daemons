@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest';
 import { parseExamplesCatalogValue } from '../../examples/schema';
 import type { ExamplesCatalog } from '../../examples/types';
 import { executeCli } from '../cli';
+import { createDaemonInstallPlan } from '../install-plan';
 import type { CatalogClient } from '../types';
 import { validateCronExpression } from '../validation/cron';
 
@@ -220,6 +221,26 @@ describe('daemon CLI catalog commands', () => {
         filesWritten: [],
         adaptationsRequired: ['Replace fixture paths.', 'Confirm verification commands.'],
       });
+      expect(result.json.data.filesPlanned).toEqual([
+        {
+          sourcePath: 'daemons/ready-daemon/DAEMON.md',
+          destinationPath: '.agents/daemons/ready-daemon/DAEMON.md',
+          kind: 'daemon',
+          mode: '100644',
+        },
+        {
+          sourcePath: 'daemons/ready-daemon/scripts/run.sh',
+          destinationPath: '.agents/daemons/ready-daemon/scripts/run.sh',
+          kind: 'script',
+          mode: '100755',
+        },
+        {
+          sourcePath: 'daemons/ready-daemon/references/guide.md',
+          destinationPath: '.agents/daemons/ready-daemon/references/guide.md',
+          kind: 'reference',
+          mode: '100644',
+        },
+      ]);
       await expect(readFile(path.join(directory, '.agents/daemons/ready-daemon/DAEMON.md'), 'utf8')).rejects.toThrow();
     });
   });
@@ -238,8 +259,12 @@ describe('daemon CLI catalog commands', () => {
       await expect(readFile(path.join(directory, '.agents/daemons/ready-daemon/example.yml'), 'utf8')).rejects.toThrow();
       await expect(readFile(path.join(directory, '.agents/daemons/ready-daemon/DAEMON.md'), 'utf8')).resolves.toContain('id: ready-daemon');
       await expect(readFile(path.join(directory, '.agents/daemons/ready-daemon/scripts/run.sh'), 'utf8')).resolves.toContain('echo ready');
-      const mode = (await stat(path.join(directory, '.agents/daemons/ready-daemon/scripts/run.sh'))).mode;
-      expect((mode & 0o111) !== 0).toBe(true);
+      const daemonMode = (await stat(path.join(directory, '.agents/daemons/ready-daemon/DAEMON.md'))).mode;
+      const scriptMode = (await stat(path.join(directory, '.agents/daemons/ready-daemon/scripts/run.sh'))).mode;
+      const referenceMode = (await stat(path.join(directory, '.agents/daemons/ready-daemon/references/guide.md'))).mode;
+      expect(daemonMode & 0o777).toBe(0o644);
+      expect(scriptMode & 0o777).toBe(0o755);
+      expect(referenceMode & 0o777).toBe(0o644);
     });
   });
 
@@ -260,6 +285,66 @@ describe('daemon CLI catalog commands', () => {
       expect(forced.code).toBe(0);
       expect(forced.json.data.overwritten).toBe(true);
       await expect(readFile(path.join(directory, '.agents/daemons/ready-daemon/DAEMON.md'), 'utf8')).resolves.toContain('id: ready-daemon');
+    });
+  });
+
+  test('install planner validates paths, support files, and file modes before writes', async () => {
+    await withTempDir(async (directory) => {
+      const entry = catalog.examples[0]!;
+      const result = createDaemonInstallPlan({ entry, installRoot: directory });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        throw new TypeError('Expected install plan to be valid.');
+      }
+
+      expect(result.plan.destinationDirectory).toBe(path.join(directory, '.agents/daemons/ready-daemon'));
+      expect(result.plan.files).toEqual([
+        {
+          sourcePath: 'daemons/ready-daemon/DAEMON.md',
+          destinationPath: path.join(directory, '.agents/daemons/ready-daemon/DAEMON.md'),
+          kind: 'daemon',
+          mode: '100644',
+        },
+        {
+          sourcePath: 'daemons/ready-daemon/scripts/run.sh',
+          destinationPath: path.join(directory, '.agents/daemons/ready-daemon/scripts/run.sh'),
+          kind: 'script',
+          mode: '100755',
+        },
+        {
+          sourcePath: 'daemons/ready-daemon/references/guide.md',
+          destinationPath: path.join(directory, '.agents/daemons/ready-daemon/references/guide.md'),
+          kind: 'reference',
+          mode: '100644',
+        },
+      ]);
+      expect(result.plan.files.some((file) => file.sourcePath.endsWith('/example.yml'))).toBe(false);
+    });
+  });
+
+  test('install planner rejects unsafe catalog source and support paths', async () => {
+    await withTempDir(async (directory) => {
+      const unsafeEntry: ExamplesCatalog['examples'][number] = {
+        ...catalog.examples[0]!,
+        scripts: ['scripts/../escape.sh'],
+        references: ['other/guide.md'],
+        source: {
+          directory: 'daemons/other-daemon',
+          url: 'https://github.com/charlie-labs/daemons/tree/master/daemons/other-daemon',
+        },
+      };
+
+      const result = createDaemonInstallPlan({ entry: unsafeEntry, installRoot: directory });
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new TypeError('Expected install plan to be invalid.');
+      }
+
+      const codes = result.errors.map((error) => error.code);
+      expect(codes).toContain('INVALID_CATALOG_SOURCE_DIRECTORY');
+      expect(codes).toContain('INVALID_CATALOG_PATH');
+      expect(codes).toContain('INVALID_CATALOG_SUPPORT_PATH');
     });
   });
 

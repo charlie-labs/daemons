@@ -3,8 +3,6 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import {
   ACTIVATION_CAVEAT,
-  CATALOG_SOURCE_BASE_DIRECTORY,
-  DAEMON_FILENAME,
   DAEMON_ID_PATTERN,
   DEFAULT_CATALOG_REF,
   DEFAULT_DAEMON_ROOT,
@@ -24,6 +22,7 @@ import {
   toDisplayPath,
   writeTextFileEnsuringDirectory,
 } from './fs-utils';
+import { createDaemonInstallPlan } from './install-plan';
 import { issue, normalizeErrorMessage } from './issues';
 import type {
   AddData,
@@ -213,81 +212,6 @@ export async function runShowCommand(args: {
   }
 }
 
-function validateSafeRelativePath(pathValue: string, field: string): CliIssue | null {
-  if (pathValue.trim() !== pathValue || pathValue.length === 0) {
-    return issue({ code: 'INVALID_CATALOG_PATH', message: `Catalog path '${pathValue}' must be non-empty with no surrounding whitespace.`, field });
-  }
-  if (pathValue.includes('\\') || pathValue.startsWith('/') || pathValue.includes('//')) {
-    return issue({ code: 'INVALID_CATALOG_PATH', message: `Catalog path '${pathValue}' must be a normalized relative POSIX path.`, field });
-  }
-  const parts = pathValue.split('/');
-  if (parts.some((part) => part.length === 0 || part === '.' || part === '..')) {
-    return issue({ code: 'INVALID_CATALOG_PATH', message: `Catalog path '${pathValue}' must not contain empty, '.', or '..' segments.`, field });
-  }
-  return null;
-}
-
-function buildFilePlan(args: { entry: CatalogExample; installRoot: string }):
-  | { ok: true; files: InstallFilePlan[] }
-  | { ok: false; errors: CliIssue[] } {
-  const entry = args.entry;
-  const errors: CliIssue[] = [];
-  const sourceDirectoryError = validateSafeRelativePath(entry.source.directory, 'source.directory');
-  if (sourceDirectoryError) errors.push(sourceDirectoryError);
-  const expectedDirectory = `${CATALOG_SOURCE_BASE_DIRECTORY}/${entry.id}`;
-  if (entry.source.directory !== expectedDirectory) {
-    errors.push(issue({
-      code: 'INVALID_CATALOG_SOURCE_DIRECTORY',
-      message: `Catalog source directory '${entry.source.directory}' must match '${expectedDirectory}'.`,
-      field: 'source.directory',
-    }));
-  }
-
-  const destinationDirectory = path.join(args.installRoot, DEFAULT_DAEMON_ROOT, entry.id);
-  const files: InstallFilePlan[] = [
-    {
-      sourcePath: `${entry.source.directory}/${DAEMON_FILENAME}`,
-      destinationPath: path.join(destinationDirectory, DAEMON_FILENAME),
-      kind: 'daemon',
-    },
-  ];
-
-  for (const [index, scriptPath] of entry.scripts.entries()) {
-    const invalid = validateSafeRelativePath(scriptPath, `scripts[${index.toString()}]`);
-    if (invalid) errors.push(invalid);
-    if (!scriptPath.startsWith('scripts/')) {
-      errors.push(issue({ code: 'INVALID_CATALOG_SUPPORT_PATH', message: `Script path '${scriptPath}' must be under scripts/.`, field: `scripts[${index.toString()}]` }));
-    }
-    files.push({
-      sourcePath: `${entry.source.directory}/${scriptPath}`,
-      destinationPath: path.join(destinationDirectory, ...scriptPath.split('/')),
-      kind: 'script',
-    });
-  }
-
-  for (const [index, referencePath] of entry.references.entries()) {
-    const invalid = validateSafeRelativePath(referencePath, `references[${index.toString()}]`);
-    if (invalid) errors.push(invalid);
-    if (!referencePath.startsWith('references/')) {
-      errors.push(issue({ code: 'INVALID_CATALOG_SUPPORT_PATH', message: `Reference path '${referencePath}' must be under references/.`, field: `references[${index.toString()}]` }));
-    }
-    files.push({
-      sourcePath: `${entry.source.directory}/${referencePath}`,
-      destinationPath: path.join(destinationDirectory, ...referencePath.split('/')),
-      kind: 'reference',
-    });
-  }
-
-  if (files.some((file) => file.sourcePath.endsWith('/example.yml'))) {
-    errors.push(issue({ code: 'INVALID_INSTALL_PLAN', message: 'Install plan must never include example.yml.' }));
-  }
-
-  if (errors.length > 0) {
-    return { ok: false, errors };
-  }
-  return { ok: true, files };
-}
-
 async function findCollisions(files: readonly InstallFilePlan[], installRoot: string, destinationDirectory: string): Promise<string[]> {
   const collisions: string[] = [];
   if (await pathExists(destinationDirectory)) {
@@ -392,21 +316,22 @@ export async function runAddCommand(args: {
       };
     }
 
-    const plan = buildFilePlan({ entry, installRoot });
-    if (!plan.ok) {
+    const installPlanResult = createDaemonInstallPlan({ entry, installRoot });
+    if (!installPlanResult.ok) {
       return {
         command: args.commandName,
         ok: false,
         exitCode: EXIT_CODE_DATA,
         summary: `Catalog entry '${exampleId}' cannot be installed safely.`,
         warnings: [],
-        errors: plan.errors,
+        errors: installPlanResult.errors,
         data: null,
       };
     }
 
-    const destinationDirectory = path.join(installRoot, DEFAULT_DAEMON_ROOT, entry.id);
-    const collisions = await findCollisions(plan.files, installRoot, destinationDirectory);
+    const installPlan = installPlanResult.plan;
+    const destinationDirectory = installPlan.destinationDirectory;
+    const collisions = await findCollisions(installPlan.files, installRoot, destinationDirectory);
     if (entry.status === 'deprecated' && !allowDeprecated) {
       return {
         command: args.commandName,
@@ -415,7 +340,7 @@ export async function runAddCommand(args: {
         summary: `Refusing to install deprecated daemon example '${exampleId}'. Re-run with --allow-deprecated if you intentionally need it.`,
         warnings: [],
         errors: [issue({ code: 'DEPRECATED_EXAMPLE_BLOCKED', message: `Example '${exampleId}' is deprecated.` })],
-        data: addDataForBlocked({ entry, ref, installRoot, files: plan.files, dryRun, force, collisions, deprecatedBlocked: true }),
+        data: addDataForBlocked({ entry, ref, installRoot, files: installPlan.files, dryRun, force, collisions, deprecatedBlocked: true }),
       };
     }
 
@@ -427,7 +352,7 @@ export async function runAddCommand(args: {
         summary: `Refusing to overwrite ${collisions.length.toString()} existing daemon file${collisions.length === 1 ? '' : 's'}. Re-run with --force to overwrite catalog-managed files.`,
         warnings: [],
         errors: collisions.map((collision) => issue({ code: 'INSTALL_COLLISION', message: `Destination already exists: ${collision}`, path: collision })),
-        data: addDataForBlocked({ entry, ref, installRoot, files: plan.files, dryRun, force, collisions, deprecatedBlocked: false }),
+        data: addDataForBlocked({ entry, ref, installRoot, files: installPlan.files, dryRun, force, collisions, deprecatedBlocked: false }),
       };
     }
 
@@ -435,7 +360,7 @@ export async function runAddCommand(args: {
 
     if (!dryRun) {
       await mkdir(destinationDirectory, { recursive: true });
-      for (const file of plan.files) {
+      for (const file of installPlan.files) {
         const content =
           file.kind === 'daemon'
             ? entry.daemon.content
@@ -443,7 +368,7 @@ export async function runAddCommand(args: {
         await writeTextFileEnsuringDirectory({
           path: file.destinationPath,
           content,
-          executable: file.kind === 'script' && content.startsWith('#!'),
+          mode: file.mode,
         });
         filesWritten.push(toDisplayPath(installRoot, file.destinationPath));
       }
@@ -457,14 +382,14 @@ export async function runAddCommand(args: {
       force,
       overwritten: collisions.length > 0,
       mode: 'remote',
-      fileCount: plan.files.length,
+      fileCount: installPlan.files.length,
       sourceRepo: SOURCE_REPO,
       sourceRef: ref,
       status: entry.status,
       readiness: entry.readiness,
       adaptationsRequired: adaptationsFor(entry),
       activationRequired: ACTIVATION_CAVEAT,
-      filesPlanned: plan.files.map((file) => ({ ...file, destinationPath: toDisplayPath(installRoot, file.destinationPath) })),
+      filesPlanned: installPlan.files.map((file) => ({ ...file, destinationPath: toDisplayPath(installRoot, file.destinationPath) })),
       filesWritten,
       collisions,
       deprecatedBlocked: false,

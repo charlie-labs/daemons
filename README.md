@@ -46,6 +46,19 @@ Use [DAEMON.md reference](https://docs.charlielabs.ai/daemons/daemon-md-referenc
 
 The root `examples.json` file is generated from each `daemons/<id>/example.yml`, `DAEMON.md`, and supported files under `scripts/**` and `references/**`.
 
+## Node examples API
+
+Node consumers can import the packaged catalog API without shelling out to the CLI:
+
+```ts
+import { getDaemonExample, listDaemonExamples, loadDaemonExamplesCatalog } from "@charlie-labs/daemons";
+
+const catalog = await loadDaemonExamplesCatalog();
+const examples = await listDaemonExamples();
+const example = await getDaemonExample("js-ts-dependency-upgrades");
+```
+
+The API reads the package-root `examples.json`, so it works from the built npm package and keeps dashboard or other Node consumers on the same generated catalog contract as the CLI.
 
 ## Daemon catalog CLI
 
@@ -70,6 +83,7 @@ Key safety defaults:
 - catalog reads default to `master` and support `--ref <sha|branch|tag>`;
 - install copies only catalog-listed `DAEMON.md`, `scripts[]`, and `references[]` files from the same ref;
 - install never copies `example.yml` or crawls upstream directories;
+- install plans include destination paths and file modes (`100644`/`100755`);
 - existing destination directories/files require `--force`;
 - deprecated examples require `--allow-deprecated`;
 - add/install/show always surface `adaptationsRequired[]` in JSON;

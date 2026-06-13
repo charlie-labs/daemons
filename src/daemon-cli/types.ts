@@ -54,10 +54,13 @@ export type ShowData = CatalogListItem & {
   activationRequired: string;
 };
 
+export type InstallFileMode = '100644' | '100755';
+
 export type InstallFilePlan = {
   sourcePath: string;
   destinationPath: string;
   kind: 'daemon' | 'script' | 'reference';
+  mode: InstallFileMode;
 };
 
 export type AddData = {

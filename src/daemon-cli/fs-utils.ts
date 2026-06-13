@@ -41,11 +41,14 @@ export async function findInstallRoot(cwd: string): Promise<string> {
 export async function writeTextFileEnsuringDirectory(args: {
   path: string;
   content: string;
-  executable?: boolean;
+  mode?: '100644' | '100755' | undefined;
+  executable?: boolean | undefined;
 }): Promise<void> {
   await mkdir(path.dirname(args.path), { recursive: true });
   await writeFile(args.path, args.content, 'utf8');
-  if (args.executable) {
+  if (args.mode) {
+    await chmod(args.path, args.mode === '100755' ? 0o755 : 0o644);
+  } else if (args.executable) {
     await chmod(args.path, 0o755);
   }
 }
