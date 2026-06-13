@@ -103,6 +103,7 @@ Install behavior is intentionally narrow:
 - fetches support files from the same catalog ref as `examples.json`
 - never copies `example.yml`
 - never crawls upstream daemon directories
+- plans destination paths and file modes before writing (`100644` for `DAEMON.md`/references, `100755` for scripts)
 - refuses to use an existing destination directory or overwrite existing destination files unless `--force` is provided
 - blocks deprecated examples unless `--allow-deprecated` is provided
 - supports `--dry-run` for read-only planning
@@ -123,7 +124,7 @@ JSON data includes:
 
 - `adaptationsRequired[]`
 - `activationRequired`
-- `filesPlanned[]`
+- `filesPlanned[]`, where each item includes `sourcePath`, `destinationPath`, `kind`, and `mode` (`100644` or `100755`)
 - `filesWritten[]`
 - `collisions[]`
 - `deprecatedBlocked`

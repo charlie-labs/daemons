@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 type CommandResult = {
   exitCode: number;
@@ -61,6 +61,34 @@ function parseJsonObject(text: string, description: string): Record<string, unkn
   const parsed: unknown = JSON.parse(text);
   assert(isRecord(parsed), `${description} did not produce a JSON object.`);
   return parsed;
+}
+
+
+function assertExportEntry(
+  packageExports: unknown,
+  subpath: string,
+  expectedImport: string,
+  expectedTypes: string,
+  description: string
+): void {
+  assert(isRecord(packageExports), `${description} package.json#exports must be an object.`);
+  const entry = packageExports[subpath];
+  assert(isRecord(entry), `${description} package.json#exports[${subpath}] must be an object.`);
+  assert(entry.types === expectedTypes, `${description} ${subpath} export must point types at ${expectedTypes}.`);
+  assert(entry.import === expectedImport, `${description} ${subpath} export must point import at ${expectedImport}.`);
+}
+
+function assertPackageEntrypoints(packageJson: Record<string, unknown>, description: string): void {
+  const bin = packageJson.bin;
+  const packageExports = packageJson.exports;
+  assert(isRecord(bin) && bin.daemon === './dist/bin.js', `${description} package is missing the daemon bin mapping.`);
+  assert(packageJson.main === './dist/index.js', `${description} package is missing the root main entry.`);
+  assert(packageJson.module === './dist/index.js', `${description} package is missing the root module entry.`);
+  assert(packageJson.types === './dist/index.d.ts', `${description} package is missing the root types entry.`);
+  assertExportEntry(packageExports, '.', './dist/index.js', './dist/index.d.ts', description);
+  assertExportEntry(packageExports, './examples', './dist/index.js', './dist/index.d.ts', description);
+  assert(isRecord(packageExports) && packageExports['./examples.json'] === './dist/examples.json', `${description} package is missing the ./examples.json export.`);
+  assert(isRecord(packageExports) && packageExports['./package.json'] === './package.json', `${description} package is missing the ./package.json export.`);
 }
 
 function baseEnv(): Record<string, string> {
@@ -130,19 +158,53 @@ async function main(): Promise<void> {
   const packageJsonPath = join(repoRoot, 'package.json');
   const packageJson = parseJsonObject(await readFile(packageJsonPath, 'utf8'), 'package.json');
   const version = packageJson.version;
-  const bin = packageJson.bin;
 
   assert(typeof version === 'string' && version.length > 0, 'package.json#version must be a non-empty string.');
-  assert(isRecord(bin) && bin.daemon === './dist/bin.js', 'package.json#bin.daemon must point at ./dist/bin.js.');
+  assertPackageEntrypoints(packageJson, 'Workspace');
 
   const distBinPath = join(repoRoot, 'dist', 'bin.js');
   const distBinStat = await stat(distBinPath).catch(() => null);
   assert(distBinStat !== null && distBinStat.isFile(), 'dist/bin.js is missing. Run `bun run build` before `bun run smoke:daemon`.');
   assert((distBinStat.mode & 0o111) !== 0, 'dist/bin.js is not executable.');
 
+  const env = baseEnv();
+  const localVersionResult = await run('node', [distBinPath, '--version'], {
+    cwd: repoRoot,
+    env,
+  });
+  assert(localVersionResult.stdout.trim() === version, `Expected node dist/bin.js --version to print ${version}, got ${localVersionResult.stdout.trim()}.`);
+  assert(localVersionResult.stderr.trim() === '', 'node dist/bin.js --version wrote to stderr.');
+
+  const distIndexUrl = pathToFileURL(join(repoRoot, 'dist', 'index.js')).href;
+  const localImportResult = await run('node', [
+    '--input-type=module',
+    '--eval',
+    `const mod = await import(${JSON.stringify(distIndexUrl)});
+const expected = [
+  'createDaemonInstallPlan',
+  'getDaemonExample',
+  'listDaemonExamples',
+  'loadDaemonExamplesCatalog',
+];
+for (const name of expected) {
+  if (typeof mod[name] !== 'function') throw new Error('missing function export ' + name);
+}
+const catalog = await mod.loadDaemonExamplesCatalog();
+if (catalog.schemaVersion !== 1 || catalog.examples.length === 0) throw new Error('dist catalog did not load');
+const examples = await mod.listDaemonExamples();
+const example = await mod.getDaemonExample(examples[0].id);
+if (!example || example.id !== examples[0].id) throw new Error('dist getDaemonExample did not return the first example');
+const planResult = mod.createDaemonInstallPlan({ entry: example, installRoot: process.cwd() });
+if (!planResult.ok) throw new Error('dist install planner rejected a packaged example');
+console.log('dist import smoke loaded ' + examples.length + ' examples');`,
+  ], {
+    cwd: repoRoot,
+    env,
+  });
+  assert(localImportResult.stdout.includes('dist import smoke loaded'), 'dist package import smoke did not print its success marker.');
+
   const tempRoot = await mkdtemp(join(tmpdir(), 'daemon-bin-smoke-'));
   try {
-    const env = baseEnv();
     const packDir = join(tempRoot, 'pack');
     const consumerDir = join(tempRoot, 'consumer');
     await mkdir(packDir, { recursive: true });
@@ -183,8 +245,7 @@ async function main(): Promise<void> {
       await readFile(join(consumerDir, 'node_modules', '@charlie-labs', 'daemons', 'package.json'), 'utf8'),
       'installed package.json'
     );
-    const installedBin = installedPackageJson.bin;
-    assert(isRecord(installedBin) && installedBin.daemon === './dist/bin.js', 'Installed package is missing the daemon bin mapping.');
+    assertPackageEntrypoints(installedPackageJson, 'Installed');
 
     const installedBinDir = join(consumerDir, 'node_modules', '.bin');
     const daemonCommand = process.platform === 'win32' ? 'daemon.cmd' : 'daemon';
@@ -192,14 +253,51 @@ async function main(): Promise<void> {
     const installedBinStat = await stat(installedBinPath).catch(() => null);
     assert(installedBinStat !== null, `Installed package did not create ${installedBinPath}.`);
 
-    const installedDistBinPath = join(consumerDir, 'node_modules', '@charlie-labs', 'daemons', 'dist', 'bin.js');
+    const installedPackageRoot = join(consumerDir, 'node_modules', '@charlie-labs', 'daemons');
+    const installedDistBinPath = join(installedPackageRoot, 'dist', 'bin.js');
     const installedDistBinStat = await stat(installedDistBinPath).catch(() => null);
     assert(installedDistBinStat !== null && installedDistBinStat.isFile(), 'Installed package is missing dist/bin.js.');
     if (process.platform !== 'win32') {
       assert((installedDistBinStat.mode & 0o111) !== 0, 'Installed dist/bin.js is not executable.');
     }
 
+    const installedDistIndexPath = join(installedPackageRoot, 'dist', 'index.js');
+    const installedDistTypesPath = join(installedPackageRoot, 'dist', 'index.d.ts');
+    const installedDistExamplesPath = join(installedPackageRoot, 'dist', 'examples.json');
+    const installedExamplesPath = join(installedPackageRoot, 'examples.json');
+    assert((await stat(installedDistIndexPath).catch(() => null))?.isFile() === true, 'Installed package is missing dist/index.js.');
+    assert((await stat(installedDistTypesPath).catch(() => null))?.isFile() === true, 'Installed package is missing dist/index.d.ts.');
+    assert((await stat(installedDistExamplesPath).catch(() => null))?.isFile() === true, 'Installed package is missing dist/examples.json.');
+    assert((await stat(installedExamplesPath).catch(() => null))?.isFile() === true, 'Installed package is missing examples.json.');
+
     const cliEnv = withPathPrefix(env, installedBinDir);
+
+    const importResult = await run('node', [
+      '--input-type=module',
+      '--eval',
+      `import {
+  createDaemonInstallPlan,
+  getDaemonExample,
+  listDaemonExamples,
+  loadDaemonExamplesCatalog,
+} from '@charlie-labs/daemons';
+const catalog = await loadDaemonExamplesCatalog();
+if (catalog.schemaVersion !== 1 || catalog.examples.length === 0) throw new Error('catalog did not load');
+const examples = await listDaemonExamples();
+const example = await getDaemonExample(examples[0].id);
+if (!example || example.id !== examples[0].id) throw new Error('getDaemonExample did not return the first example');
+const subpath = await import('@charlie-labs/daemons/examples');
+const subpathExamples = await subpath.listDaemonExamples();
+if (subpathExamples.length !== examples.length) throw new Error('./examples export returned a different catalog');
+const planResult = createDaemonInstallPlan({ entry: example, installRoot: process.cwd() });
+if (!planResult.ok) throw new Error('install planner rejected a packaged example');
+if (!planResult.plan.files.some((file) => file.mode === '100644')) throw new Error('install plan is missing 100644 modes');
+console.log('package import smoke loaded ' + examples.length + ' examples');`,
+    ], {
+      cwd: consumerDir,
+      env: cliEnv,
+    });
+    assert(importResult.stdout.includes('package import smoke loaded'), 'Package import smoke did not print its success marker.');
 
     const versionResult = await run(daemonCommand, ['--version'], {
       cwd: consumerDir,
@@ -249,7 +347,8 @@ async function main(): Promise<void> {
     console.log('daemon binary smoke tests passed');
     console.log('- packed package tarball and installed it into a temp consumer project');
     console.log('- invoked the CLI as `daemon` via node_modules/.bin');
-    console.log('- verified version, help, show help JSON, and validate JSON commands');
+    console.log('- verified direct node dist/bin.js execution plus installed version, help, show help JSON, and validate JSON commands');
+    console.log('- imported dist and packaged APIs, loaded examples.json, showed an example, and created an install plan');
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }

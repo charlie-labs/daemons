@@ -28,6 +28,23 @@ Consumers should not:
 - infer safety, readiness, or runtime behavior from publication flags alone;
 - parse catalog metadata out of `DAEMON.md` frontmatter or body.
 
+
+## Node package API
+
+Node consumers can use the package API instead of fetching and parsing `examples.json` manually:
+
+```ts
+import { getDaemonExample, listDaemonExamples, loadDaemonExamplesCatalog } from "@charlie-labs/daemons";
+
+const catalog = await loadDaemonExamplesCatalog();
+const examples = await listDaemonExamples();
+const example = await getDaemonExample("js-ts-dependency-upgrades");
+```
+
+`loadDaemonExamplesCatalog()` reads the package-root `examples.json` in Node, validates the catalog schema, and returns the same catalog shape documented below. `listDaemonExamples()` returns `catalog.examples`, and `getDaemonExample(id)` returns the matching catalog entry or `null`.
+
+For install flows, the package also exports `createDaemonInstallPlan({ entry, installRoot })`. The planner validates source/support paths, maps catalog files into `.agents/daemons/<id>/`, excludes `example.yml`, and includes Git tree-compatible file modes (`100644`/`100755`) before any writes.
+
 ## Catalog shape
 
 The committed catalog lives at the repository root:
@@ -129,8 +146,9 @@ Recommended flow:
 6. Write `entry.daemon.content` to `.agents/daemons/<id>/DAEMON.md`.
 7. Fetch each listed support file in `entry.scripts` and `entry.references` from the same ref.
 8. Write support files under `.agents/daemons/<id>/` using the same package-relative paths.
-9. Exclude `example.yml` and all unlisted upstream files.
-10. Run the consumer's preflight, collision, review, and rollout checks before enabling the daemon.
+9. Apply planned file modes when the write surface supports them (`100644` for `DAEMON.md`/references, `100755` for scripts).
+10. Exclude `example.yml` and all unlisted upstream files.
+11. Run the consumer's preflight, collision, review, and rollout checks before enabling the daemon.
 
 Path mapping example:
 
@@ -173,9 +191,9 @@ This is intentionally not a recursive copy. The catalog controls the install set
 
 ## Support-file caveats
 
-Catalog v1 lists support file paths, not file contents or mode metadata.
+Catalog v1 lists support file paths, not file contents or mode metadata. The package install planner derives write modes for consumers that need Git tree file modes: `100644` for `DAEMON.md` and references, `100755` for scripts.
 
-If a support script requires executable bits, consumers that write through GitHub APIs should either preserve or set `100755` through tree APIs, or invoke the script through an interpreter instead of relying on executable mode. For example, the current catalog includes:
+If a consumer works directly from raw catalog JSON without the planner, support scripts may still need explicit executable handling through tree APIs or invocation through an interpreter. For example, the current catalog includes:
 
 ```text
 daemons/js-ts-dependency-upgrades/references/package-manager-adaptation.md
