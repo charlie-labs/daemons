@@ -603,6 +603,20 @@ describe('daemon CLI catalog commands', () => {
     });
   });
 
+  test('pr open rejects --allow-deprecated as a non-public flag', async () => {
+    await withTempDir(async (directory) => {
+      const result = await runJson(['pr', 'open', 'ready-daemon', '--repo', 'acme/widgets', '--allow-deprecated'], directory);
+
+      expect(result.code).toBe(64);
+      expect(result.json).toMatchObject({
+        command: 'pr open',
+        ok: false,
+        exitCode: 64,
+      });
+      expect(result.json.summary).toContain("Unknown option '--allow-deprecated'");
+    });
+  });
+
   test('deprecated examples are blocked by default and allowed with explicit flag', async () => {
     await withTempDir(async (directory) => {
       const blocked = await runJson(['add', 'deprecated-daemon'], directory);
