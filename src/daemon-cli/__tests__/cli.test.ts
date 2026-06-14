@@ -362,6 +362,213 @@ describe('daemon CLI catalog commands', () => {
   });
 });
 
+const adaptiveDaemon = `---
+id: adaptive-daemon
+purpose: Keep {{adapt.repo}} tidy.
+watch:
+  - when a pull request changes files under src/
+routines:
+  - inspect the change on {{adapt.base_branch}} and report findings
+deny:
+  - do not merge pull requests
+---
+
+# Adaptive daemon
+
+Target repo {{adapt.repo}} on base branch {{adapt.base_branch}}.
+`;
+
+const adaptiveReference = '# Setup\n\nConfigure {{adapt.repo}} before enabling.\n';
+
+const undeclaredTokenDaemon = `---
+id: bad-token-daemon
+purpose: Watch {{adapt.ghost}}.
+watch:
+  - when something changes
+routines:
+  - do a bounded thing
+deny:
+  - do not mutate prod
+---
+
+# Bad token daemon
+
+Uses an undeclared {{adapt.ghost}} token.
+`;
+
+const adaptiveCatalog: ExamplesCatalog = {
+  schemaVersion: 1,
+  source: { repository: 'charlie-labs/daemons', baseDirectory: 'daemons' },
+  examples: [
+    {
+      id: 'adaptive-daemon',
+      title: 'Adaptive daemon',
+      status: 'ready',
+      summary: 'An adaptation fixture.',
+      readiness: 'adapt-before-use',
+      showOnWebsite: true,
+      showInDashboard: true,
+      fit: { jobsToBeDone: ['operate'], bestFor: ['tests'], notFor: ['prod'] },
+      requirements: { requiredIntegrations: ['github'], optionalIntegrations: [], other: [] },
+      adaptation: { mustCustomize: ['Set the repo.'] },
+      adaptations: [
+        { key: 'base_branch', label: 'Base branch', description: 'Default branch', required: false, default: 'main' },
+        { key: 'repo', label: 'Repository', description: 'Target repository', required: true },
+      ],
+      daemon: { path: 'DAEMON.md', content: adaptiveDaemon },
+      scripts: [],
+      references: ['references/setup.md'],
+      source: {
+        directory: 'daemons/adaptive-daemon',
+        url: 'https://github.com/charlie-labs/daemons/tree/master/daemons/adaptive-daemon',
+      },
+    },
+    {
+      id: 'bad-token-daemon',
+      title: 'Bad token daemon',
+      status: 'ready',
+      summary: 'A daemon with an undeclared token.',
+      readiness: 'adapt-before-use',
+      showOnWebsite: true,
+      showInDashboard: true,
+      fit: { jobsToBeDone: ['operate'], bestFor: ['tests'], notFor: ['prod'] },
+      requirements: { requiredIntegrations: ['github'], optionalIntegrations: [], other: [] },
+      adaptation: { mustCustomize: ['Fix the token.'] },
+      adaptations: [],
+      daemon: { path: 'DAEMON.md', content: undeclaredTokenDaemon },
+      scripts: [],
+      references: [],
+      source: {
+        directory: 'daemons/bad-token-daemon',
+        url: 'https://github.com/charlie-labs/daemons/tree/master/daemons/bad-token-daemon',
+      },
+    },
+  ],
+};
+
+function adaptiveCatalogClient(): CatalogClient {
+  const files = new Map<string, string>([
+    ['master:daemons/adaptive-daemon/references/setup.md', adaptiveReference],
+  ]);
+  return {
+    async loadCatalog(): Promise<ExamplesCatalog> {
+      return adaptiveCatalog;
+    },
+    async readTextFile(ref: string, filePath: string): Promise<string> {
+      const value = files.get(`${ref}:${filePath}`);
+      if (value === undefined) {
+        throw new Error(`missing mock file ${ref}:${filePath}`);
+      }
+      return value;
+    },
+  };
+}
+
+describe('daemon CLI adaptation rendering', () => {
+  test('install renders declared tokens in DAEMON.md and support files', async () => {
+    await withTempDir(async (directory) => {
+      const result = await runJson(
+        ['install', 'adaptive-daemon', '--adapt', 'repo=acme/web', '--adapt', 'base_branch=develop'],
+        directory,
+        adaptiveCatalogClient()
+      );
+
+      expect(result.code).toBe(0);
+      expect(result.json.data.adaptationsApplied).toEqual(['base_branch', 'repo']);
+
+      const daemon = await readFile(path.join(directory, '.agents/daemons/adaptive-daemon/DAEMON.md'), 'utf8');
+      expect(daemon).toContain('purpose: Keep acme/web tidy.');
+      expect(daemon).toContain('Target repo acme/web on base branch develop.');
+      expect(daemon).not.toContain('{{');
+
+      const reference = await readFile(path.join(directory, '.agents/daemons/adaptive-daemon/references/setup.md'), 'utf8');
+      expect(reference).toContain('Configure acme/web before enabling.');
+      expect(reference).not.toContain('{{');
+    });
+  });
+
+  test('optional adaptation falls back to its default when omitted', async () => {
+    await withTempDir(async (directory) => {
+      const result = await runJson(['install', 'adaptive-daemon', '--adapt', 'repo=acme/web'], directory, adaptiveCatalogClient());
+
+      expect(result.code).toBe(0);
+      const daemon = await readFile(path.join(directory, '.agents/daemons/adaptive-daemon/DAEMON.md'), 'utf8');
+      expect(daemon).toContain('on base branch main.');
+    });
+  });
+
+  test('--adapt flags override --adapt-file values', async () => {
+    await withTempDir(async (directory) => {
+      const adaptFile = path.join(directory, 'adapt.json');
+      await writeFile(adaptFile, JSON.stringify({ repo: 'acme/from-file', base_branch: 'from-file' }), 'utf8');
+
+      const result = await runJson(
+        ['install', 'adaptive-daemon', '--adapt-file', 'adapt.json', '--adapt', 'repo=acme/from-cli'],
+        directory,
+        adaptiveCatalogClient()
+      );
+
+      expect(result.code).toBe(0);
+      const daemon = await readFile(path.join(directory, '.agents/daemons/adaptive-daemon/DAEMON.md'), 'utf8');
+      expect(daemon).toContain('Keep acme/from-cli tidy.');
+      expect(daemon).toContain('on base branch from-file.');
+    });
+  });
+
+  test('dry-run resolves and validates without writing files', async () => {
+    await withTempDir(async (directory) => {
+      const result = await runJson(['add', 'adaptive-daemon', '--dry-run', '--adapt', 'repo=acme/web'], directory, adaptiveCatalogClient());
+
+      expect(result.code).toBe(0);
+      expect(result.json.data.adaptationsApplied).toEqual(['base_branch', 'repo']);
+      expect(result.json.data.filesWritten).toEqual([]);
+      await expect(readFile(path.join(directory, '.agents/daemons/adaptive-daemon/DAEMON.md'), 'utf8')).rejects.toThrow();
+    });
+  });
+
+  test('missing required adaptation fails closed without writing files', async () => {
+    await withTempDir(async (directory) => {
+      const result = await runJson(['add', 'adaptive-daemon'], directory, adaptiveCatalogClient());
+
+      expect(result.code).toBe(65);
+      expect(result.json.errors.map((error: { code: string }) => error.code)).toContain('MISSING_REQUIRED_ADAPTATION');
+      await expect(readFile(path.join(directory, '.agents/daemons/adaptive-daemon/DAEMON.md'), 'utf8')).rejects.toThrow();
+    });
+  });
+
+  test('unknown input keys are rejected', async () => {
+    await withTempDir(async (directory) => {
+      const result = await runJson(
+        ['add', 'adaptive-daemon', '--adapt', 'repo=acme/web', '--adapt', 'mystery=value'],
+        directory,
+        adaptiveCatalogClient()
+      );
+
+      expect(result.code).toBe(65);
+      expect(result.json.errors.map((error: { code: string }) => error.code)).toContain('UNKNOWN_ADAPTATION_INPUT_KEY');
+    });
+  });
+
+  test('malformed --adapt flags are a usage error', async () => {
+    await withTempDir(async (directory) => {
+      const result = await runJson(['add', 'adaptive-daemon', '--adapt', 'oops'], directory, adaptiveCatalogClient());
+
+      expect(result.code).toBe(64);
+      expect(result.json.errors[0].code).toBe('ADAPT_FLAG_INVALID');
+    });
+  });
+
+  test('undeclared tokens in catalog content fail at render time', async () => {
+    await withTempDir(async (directory) => {
+      const result = await runJson(['add', 'bad-token-daemon'], directory, adaptiveCatalogClient());
+
+      expect(result.code).toBe(65);
+      expect(result.json.errors.map((error: { code: string }) => error.code)).toContain('UNKNOWN_ADAPTATION_TOKEN');
+      await expect(readFile(path.join(directory, '.agents/daemons/bad-token-daemon/DAEMON.md'), 'utf8')).rejects.toThrow();
+    });
+  });
+});
+
 describe('daemon CLI validation', () => {
   test('validate reports cron, unknown key, body, and slug errors with exit 65', async () => {
     await withTempDir(async (directory) => {

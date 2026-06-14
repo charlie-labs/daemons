@@ -1,4 +1,4 @@
-import type { CatalogExample, ExamplesCatalog } from '../examples/types';
+import type { CatalogExample, ExampleAdaptation, ExamplesCatalog } from '../examples/types';
 
 export type CliIssue = {
   code: string;
@@ -51,6 +51,7 @@ export type ShowData = CatalogListItem & {
   sourceDirectory: string;
   sourceUrl: string;
   adaptationsRequired: string[];
+  adaptations: ExampleAdaptation[];
   activationRequired: string;
 };
 
@@ -77,6 +78,7 @@ export type AddData = {
   status: CatalogExample['status'];
   readiness: CatalogExample['readiness'];
   adaptationsRequired: string[];
+  adaptationsApplied: string[];
   activationRequired: string;
   filesPlanned: InstallFilePlan[];
   filesWritten: string[];

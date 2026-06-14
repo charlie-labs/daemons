@@ -87,6 +87,7 @@ Key safety defaults:
 - existing destination directories/files require `--force`;
 - deprecated examples require `--allow-deprecated`;
 - add/install/show always surface `adaptationsRequired[]` in JSON;
+- add/install render documented `{{adapt.key}}` tokens from `--adapt key=value` and `--adapt-file` inputs (defaults < file < flags), validating `DAEMON.md` before any writes;
 - scaffolding does not activate a daemon until the change is merged and ingested by Charlie.
 
 See [Daemon catalog CLI](docs/daemon-cli.md) for command details, JSON envelope, validation semantics, and exit codes.

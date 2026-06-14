@@ -39,6 +39,53 @@ const jobToBeDoneSchema = z.enum([
 
 const integrationSchema = z.enum(['github', 'linear', 'slack', 'sentry']);
 
+export const ADAPTATION_KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
+
+const adaptationKeySchema = z.string().refine((value) => ADAPTATION_KEY_PATTERN.test(value), {
+  message: 'Expected an adaptation key matching ^[a-z][a-z0-9_]*$.',
+});
+
+const adaptationSchema = z
+  .object({
+    key: adaptationKeySchema,
+    label: nonEmptyStringSchema,
+    description: nonEmptyStringSchema,
+    required: z.boolean(),
+    default: nonEmptyStringSchema.optional(),
+    suggestions: z.array(nonEmptyStringSchema).min(1).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.required && value.default !== undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['default'],
+        message: 'Required adaptations must not declare a default.',
+      });
+    }
+    if (!value.required && value.default === undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['default'],
+        message: 'Optional adaptations must declare a default.',
+      });
+    }
+  });
+
+const adaptationsSchema = z.array(adaptationSchema).superRefine((value, context) => {
+  const seen = new Set<string>();
+  for (const [index, adaptation] of value.entries()) {
+    if (seen.has(adaptation.key)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [index, 'key'],
+        message: `Duplicate adaptation key ${adaptation.key}.`,
+      });
+    }
+    seen.add(adaptation.key);
+  }
+});
+
 const exampleMetadataSchema = z
   .object({
     id: slugSchema,
@@ -67,6 +114,7 @@ const exampleMetadataSchema = z
         mustCustomize: stringListSchema,
       })
       .strict(),
+    adaptations: adaptationsSchema.optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -145,6 +193,7 @@ const catalogExampleSchema: z.ZodType<CatalogExample> = z
         mustCustomize: stringListSchema,
       })
       .strict(),
+    adaptations: adaptationsSchema.optional(),
     daemon: z
       .object({
         path: z.literal('DAEMON.md'),

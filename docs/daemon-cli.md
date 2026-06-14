@@ -73,6 +73,7 @@ Shows catalog details for one example:
 - required and optional integrations
 - support files from `scripts[]` and `references[]`
 - required adaptation notes from `adaptation.mustCustomize`
+- structured adaptation inputs from `adaptations[]` (key, label, required/optional, default, suggestions)
 - the activation caveat
 
 ```bash
@@ -81,7 +82,7 @@ daemon show pr-metadata
 daemon show pr-metadata --json
 ```
 
-`show` always returns `data.adaptationsRequired[]` in JSON, including for `adapt-before-use` examples. No explicit acknowledgement flag is required; the adaptation list is prominent in both human and JSON output.
+`show` always returns `data.adaptationsRequired[]` in JSON, including for `adapt-before-use` examples. No explicit acknowledgement flag is required; the adaptation list is prominent in both human and JSON output. When an example declares structured `adaptations[]`, `show` also returns `data.adaptations[]` describing each token key the CLI can render.
 
 ### `daemon add <example-id>` / `daemon install <example-id>`
 
@@ -123,12 +124,49 @@ daemon add js-ts-dependency-upgrades --force
 JSON data includes:
 
 - `adaptationsRequired[]`
+- `adaptationsApplied[]` — the adaptation keys whose values were rendered into the scaffolded files
 - `activationRequired`
 - `filesPlanned[]`, where each item includes `sourcePath`, `destinationPath`, `kind`, and `mode` (`100644` or `100755`)
 - `filesWritten[]`
 - `collisions[]`
 - `deprecatedBlocked`
 - `sourceRef`
+
+### Adaptation rendering
+
+Examples that declare structured `adaptations[]` embed `{{adapt.key}}` tokens in `DAEMON.md` and support files. `add`/`install` resolve values for those keys, render the tokens, and validate the rendered `DAEMON.md` before writing anything.
+
+Provide values two ways. Both are optional and can be combined:
+
+```bash
+# Repeated flags
+daemon add some-example --adapt repo=acme/web --adapt base_branch=main
+
+# A JSON object of string values
+daemon add some-example --adapt-file ./adaptations.json
+```
+
+`--adapt-file` must point at a JSON object whose values are all strings, for example:
+
+```json
+{ "repo": "acme/web", "base_branch": "main" }
+```
+
+Values are merged deterministically, lowest to highest precedence:
+
+1. optional adaptation defaults declared in the catalog
+2. `--adapt-file` values
+3. repeated `--adapt key=value` flags (later flags override earlier ones for the same key)
+
+`add`/`install` fail closed (exit code `65`, or `64` for malformed flags) without writing files when:
+
+- a required adaptation has no provided value
+- an input key (flag or file) is not declared by the example
+- a flag is not `key=value`, a key does not match `^[a-z][a-z0-9_]*$`, or a file value is not a string
+- a file or `DAEMON.md` contains a malformed `{{adapt.…}}` token, an undeclared token key, or a token left without a value
+- the rendered `DAEMON.md` fails runtime validation
+
+`--dry-run` performs the same resolution, rendering, and validation so failures surface before a real install.
 
 Scaffolding does **not** activate a daemon. The daemon becomes eligible only after the change is merged to the target repository default branch and Charlie ingests that merged version.
 
