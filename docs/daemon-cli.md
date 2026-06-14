@@ -131,7 +131,7 @@ Structured adaptation inputs:
 - use `--adapt-file adaptations.json` for a JSON object of string values;
 - optional defaults from the catalog are applied first, then file values, then CLI flag values;
 - empty string values are accepted when explicitly provided, but rendered `DAEMON.md` must still pass runtime validation;
-- unknown keys, non-string file values, missing required values, unknown `{{adapt.*}}` tokens, and unresolved adaptation tokens fail before any files are written.
+- unknown keys, non-string file values, missing required values, malformed or unknown `{{adapt.*}}` tokens, and unresolved adaptation tokens fail before any files are written.
 
 `adaptations.json` example:
 

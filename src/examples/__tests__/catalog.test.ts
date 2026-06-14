@@ -281,6 +281,52 @@ adaptations:
     });
   });
 
+  test('reports malformed adaptation tokens in daemon and support files', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/DAEMON.md'),
+        `${validDaemonMarkdown('no-support')}\nUse {{ adapt.slack-channel }} for notifications.\n`,
+        'utf8'
+      );
+      await mkdir(join(repoRoot, 'daemons/no-support/scripts'), { recursive: true });
+      await mkdir(join(repoRoot, 'daemons/no-support/references'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/scripts/render.ts'),
+        'console.log("{{ adapt .slack_channel }}");\n',
+        'utf8'
+      );
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/references/routing.md'),
+        'Send updates to {{ adapt. }}.\n',
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new TypeError('Expected fixture to be invalid.');
+      }
+
+      expect(result.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'malformed_adaptation_token',
+            path: 'daemons/no-support/DAEMON.md',
+          }),
+          expect.objectContaining({
+            code: 'malformed_adaptation_token',
+            path: 'daemons/no-support/scripts/render.ts',
+          }),
+          expect.objectContaining({
+            code: 'malformed_adaptation_token',
+            path: 'daemons/no-support/references/routing.md',
+          }),
+        ])
+      );
+    });
+  });
+
   test('allows declared adaptation tokens in daemon and support files', async () => {
     await withFixture('valid-no-support', async (repoRoot) => {
       await writeFile(

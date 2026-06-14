@@ -3,7 +3,10 @@ import type { CliIssue } from './types';
 import type { CatalogExample, ExampleAdaptation } from '../examples/types';
 
 export const ADAPTATION_KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
-const ADAPTATION_TOKEN_PATTERN = /{{\s*adapt\.([^{}\s]+)\s*}}/g;
+const MUSTACHE_TOKEN_PATTERN = /{{\s*([^{}]*?)\s*}}/g;
+const ADAPTATION_EXPRESSION_PREFIX_PATTERN = /^adapt(?:$|[.\s])/;
+const ADAPTATION_TOKEN_EXPRESSION_PATTERN = /^adapt\.([a-z][a-z0-9_]*)$/;
+const ADAPTATION_TOKEN_PATTERN = /{{\s*adapt\.([a-z][a-z0-9_]*)\s*}}/g;
 const UNRESOLVED_ADAPTATION_TOKEN_PATTERN = /{{\s*adapt\.[^}]*}}/;
 
 export type AdaptationValues = Map<string, string>;
@@ -267,10 +270,34 @@ export function renderAdaptationTokens(args: {
   path: string;
 }): { ok: true; content: string } | { ok: false; errors: CliIssue[] } {
   const errors: CliIssue[] = [];
-  const tokens = [...args.content.matchAll(ADAPTATION_TOKEN_PATTERN)];
+  const reportedMalformedTokens = new Set<string>();
 
-  for (const token of tokens) {
-    const key = token[1] ?? '';
+  for (const token of args.content.matchAll(MUSTACHE_TOKEN_PATTERN)) {
+    const rawExpression = token[1] ?? '';
+    const expression = rawExpression.trim();
+    if (!ADAPTATION_EXPRESSION_PREFIX_PATTERN.test(expression)) {
+      continue;
+    }
+
+    const expressionMatch = ADAPTATION_TOKEN_EXPRESSION_PATTERN.exec(expression);
+    if (!expressionMatch) {
+      const renderedToken = token[0] ?? `{{${rawExpression}}}`;
+      if (reportedMalformedTokens.has(renderedToken)) {
+        continue;
+      }
+
+      reportedMalformedTokens.add(renderedToken);
+      errors.push(
+        issue({
+          code: 'MALFORMED_ADAPTATION_TOKEN',
+          message: `Malformed adaptation token '${renderedToken}'. Use '{{adapt.key}}' with a key matching ^[a-z][a-z0-9_]*$.`,
+          path: args.path,
+        })
+      );
+      continue;
+    }
+
+    const key = expressionMatch[1] ?? '';
     if (!args.knownKeys.has(key)) {
       errors.push(
         issue({

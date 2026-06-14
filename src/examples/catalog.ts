@@ -20,7 +20,9 @@ const SOURCE_BASE_DIRECTORY = 'daemons';
 const DEFAULT_PUBLICATION_REF = 'master';
 const ROOT_CATALOG_PATH = 'examples.json';
 const ALLOWED_DAEMON_PACKAGE_ENTRIES = new Set(['DAEMON.md', 'example.yml', 'scripts', 'references']);
-const ADAPTATION_TOKEN_PATTERN = /{{\s*adapt\.([^{}\s]+)\s*}}/g;
+const MUSTACHE_TOKEN_PATTERN = /{{\s*([^{}]*?)\s*}}/g;
+const ADAPTATION_EXPRESSION_PREFIX_PATTERN = /^adapt(?:$|[.\s])/;
+const ADAPTATION_TOKEN_EXPRESSION_PATTERN = /^adapt\.([a-z][a-z0-9_]*)$/;
 
 export async function generateCatalogFromRepository(
   repoRoot: string,
@@ -523,7 +525,7 @@ async function validateDeclaredAdaptationTokens(args: {
   exampleMetadata: ExampleMetadata;
 }): Promise<ValidationError[]> {
   const declaredKeys = new Set(args.exampleMetadata.adaptations.map((adaptation) => adaptation.key));
-  const errors = findUnknownAdaptationTokenErrors({
+  const errors = findAdaptationTokenErrors({
     content: args.daemonContent,
     path: args.daemonPackage.daemonPath,
     declaredKeys,
@@ -545,22 +547,47 @@ async function validateDeclaredAdaptationTokens(args: {
       continue;
     }
 
-    errors.push(...findUnknownAdaptationTokenErrors({ content, path, declaredKeys }));
+    errors.push(...findAdaptationTokenErrors({ content, path, declaredKeys }));
   }
 
   return errors;
 }
 
-function findUnknownAdaptationTokenErrors(args: {
+function findAdaptationTokenErrors(args: {
   content: string;
   path: string;
   declaredKeys: ReadonlySet<string>;
 }): ValidationError[] {
   const errors: ValidationError[] = [];
   const reportedKeys = new Set<string>();
+  const reportedMalformedTokens = new Set<string>();
 
-  for (const token of args.content.matchAll(ADAPTATION_TOKEN_PATTERN)) {
-    const key = token[1] ?? '';
+  for (const token of args.content.matchAll(MUSTACHE_TOKEN_PATTERN)) {
+    const rawExpression = token[1] ?? '';
+    const expression = rawExpression.trim();
+    if (!ADAPTATION_EXPRESSION_PREFIX_PATTERN.test(expression)) {
+      continue;
+    }
+
+    const expressionMatch = ADAPTATION_TOKEN_EXPRESSION_PATTERN.exec(expression);
+    if (!expressionMatch) {
+      const renderedToken = token[0] ?? `{{${rawExpression}}}`;
+      if (reportedMalformedTokens.has(renderedToken)) {
+        continue;
+      }
+
+      reportedMalformedTokens.add(renderedToken);
+      errors.push(
+        machineError({
+          code: 'malformed_adaptation_token',
+          path: args.path,
+          message: `Malformed adaptation token '${renderedToken}' is used in ${args.path}. Use '{{adapt.key}}' with a key matching ^[a-z][a-z0-9_]*$ and declare it in example.yml adaptations[].`,
+        })
+      );
+      continue;
+    }
+
+    const key = expressionMatch[1] ?? '';
     if (args.declaredKeys.has(key) || reportedKeys.has(key)) {
       continue;
     }

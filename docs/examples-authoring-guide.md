@@ -390,6 +390,7 @@ Use this checklist before approving example changes.
 - `requirements.other` names daemon-specific non-integration prerequisites.
 - `readiness` matches whether `adaptations[]` contains required inputs.
 - `adaptations[]` keys are unique, token-safe, string-only, and have correct required/default behavior.
+- Every `{{adapt.key}}` token in `DAEMON.md`, `scripts/**`, and `references/**` uses exact token syntax and references a declared `adaptations[]` key.
 - `specializationIdeas[]` contains only optional tuning ideas and does not describe required install work.
 - Surface flags are intentional.
 
@@ -431,6 +432,7 @@ Use this checklist before approving example changes.
 | Public-safety failure | Replace private or credential-like content with public-safe placeholders. |
 | Catalog drift | Run `bun run generate:examples` and commit `examples.json`. |
 | Adaptation metadata error | Use unique `^[a-z][a-z0-9_]*$` keys, string-only fields/suggestions, no default on required items, and a default on optional items. |
+| Adaptation token error | Use exact `{{adapt.key}}` token syntax in `DAEMON.md` and support files, and declare each referenced key in `adaptations[]`. |
 
 ## Quality bar
 

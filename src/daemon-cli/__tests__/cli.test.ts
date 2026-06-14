@@ -422,6 +422,21 @@ describe('daemon CLI catalog commands', () => {
       expect(unknown.code).toBe(65);
       expect(unknown.json.errors).toContainEqual(expect.objectContaining({ code: 'UNKNOWN_ADAPTATION_TOKEN', field: 'unknown_key' }));
 
+      const withMalformedSupportToken = memoryCatalogClient({
+        'test-ref:daemons/templated-daemon/references/render.md': 'Malformed {{ adapt .required_value }}\n',
+      });
+      const malformed = await runJson([
+        'add',
+        'templated-daemon',
+        '--ref',
+        'test-ref',
+        '--dry-run',
+        '--adapt',
+        'required_value=ok',
+      ], directory, withMalformedSupportToken);
+      expect(malformed.code).toBe(65);
+      expect(malformed.json.errors).toContainEqual(expect.objectContaining({ code: 'MALFORMED_ADAPTATION_TOKEN' }));
+
       const unresolved = await runJson([
         'add',
         'templated-daemon',

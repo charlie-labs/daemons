@@ -94,16 +94,16 @@ Use one source ref for the catalog and all support-file fetches in a single cons
 | Intentionally latest internal surface | `master`. |
 | Website or docs deployment | A deployment-pinned ref chosen by that deployment. |
 
-Catalog v2 intentionally omits nondeterministic fields such as `generatedAt` and `sourceCommit`. If a consumer needs auditability, record the selected source ref in the consuming system, install metadata, PR body, or deployment logs.
+Catalog v2 intentionally omits nondeterministic fields such as `generatedAt` and `sourceCommit`. If a consumer needs auditability, record the selected source ref in the consuming system, install metadata, PR body, or deployment logs. Store the schema version read from the catalog at that same ref.
 
 Example install metadata:
 
 ```json
 {
   "catalogRepository": "charlie-labs/daemons",
-  "catalogRef": "11da8066b1e0cf968d07ce512f65a9a817f9bc10",
+  "catalogRef": "<catalog-commit-sha>",
   "catalogSchemaVersion": 2,
-  "exampleId": "dependency-upgrades"
+  "exampleId": "js-ts-dependency-upgrades"
 }
 ```
 
@@ -143,7 +143,7 @@ Each entry has:
 - `default`: required for optional inputs and forbidden for required inputs;
 - `suggestions`: optional string examples.
 
-Install consumers should merge values deterministically in this order: optional defaults, then adaptation-file values, then explicit CLI/UI values. Values are strings only. Reject unknown input keys, missing required keys, non-string values, unknown `{{adapt.*}}` tokens, and rendered files that still contain `{{adapt.*}}` tokens. Do not echo raw caller-provided adaptation values in logs or JSON output; reporting applied keys is sufficient.
+Install consumers should merge values deterministically in this order: optional defaults, then adaptation-file values, then explicit CLI/UI values. Values are strings only. Reject unknown input keys, missing required keys, non-string values, malformed or unknown `{{adapt.*}}` tokens, and rendered files that still contain `{{adapt.*}}` tokens. Do not echo raw caller-provided adaptation values in logs or JSON output; reporting applied keys is sufficient.
 
 ## Specialization ideas
 

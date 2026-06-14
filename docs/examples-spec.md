@@ -235,7 +235,7 @@ Each item is a strict object with:
 
 Structured values are string-only. Objects, arrays, numbers, booleans, and `null` are invalid. The generated catalog sorts `adaptations[]` by `key` for deterministic output.
 
-Use the exact token syntax `{{adapt.key}}` in `DAEMON.md`, `scripts/**`, or `references/**` when a value should be rendered during install. Consumers must reject unknown input keys, unknown adaptation tokens, missing required values, non-string file values, and unresolved `{{adapt.*}}` tokens after rendering.
+Use the exact token syntax `{{adapt.key}}` in `DAEMON.md`, `scripts/**`, or `references/**` when a value should be rendered during install. Example validation rejects malformed adaptation tokens and tokens whose keys are not declared in `adaptations[]` before catalog generation succeeds. Consumers must still reject unknown input keys, malformed or unknown adaptation tokens, missing required values, non-string file values, and unresolved `{{adapt.*}}` tokens after rendering.
 
 
 ### `specializationIdeas`
@@ -398,6 +398,8 @@ Common validation error categories include:
 | `per_example_readme` | A package contains an unsupported `README.md`. |
 | `unsupported_support_path` | A package contains unsupported top-level entries or invalid support paths. |
 | `script_not_executable` | A shebang script is not executable. |
+| `unknown_adaptation_token` | `DAEMON.md` or a support file uses `{{adapt.key}}` for a key missing from `adaptations[]`. |
+| `malformed_adaptation_token` | `DAEMON.md` or a support file contains an adaptation token that does not use `{{adapt.key}}` with a token-safe key. |
 | `public_safety` | Public-safety scanning found private or credential-like content. |
 | `catalog_drift` | Committed `examples.json` differs from generated output. |
 
