@@ -1,4 +1,4 @@
-export const DAEMON_CLI_VERSION = '0.0.1';
+export const DAEMON_CLI_VERSION = '2.0.0';
 
 export const EXIT_CODE_SUCCESS = 0;
 export const EXIT_CODE_USAGE = 64;
@@ -10,7 +10,7 @@ export const SOURCE_REPO_OWNER = 'charlie-labs';
 export const SOURCE_REPO_NAME = 'daemons';
 export const DEFAULT_CATALOG_REF = 'master';
 export const CATALOG_PATH = 'examples.json';
-export const SUPPORTED_CATALOG_SCHEMA_VERSION = 1;
+export const SUPPORTED_CATALOG_SCHEMA_VERSION = 2;
 export const CATALOG_SOURCE_BASE_DIRECTORY = 'daemons';
 
 export const DEFAULT_DAEMON_ROOT = '.agents/daemons';

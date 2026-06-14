@@ -61,7 +61,7 @@ Optional: {{ adapt.optional_value }}
 `;
 
 const catalog: ExamplesCatalog = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   source: {
     repository: 'charlie-labs/daemons',
     baseDirectory: 'daemons',

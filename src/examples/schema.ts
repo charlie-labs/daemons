@@ -256,7 +256,7 @@ const catalogExampleSchema = z
 
 const examplesCatalogSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(2),
     source: z
       .object({
         repository: z.literal('charlie-labs/daemons'),
@@ -311,7 +311,7 @@ export function parseExamplesCatalogValue(args: {
   value: unknown;
   path: string;
 }): ValidationResult<ExamplesCatalog> {
-  if (!isRecord(args.value) || args.value.schemaVersion !== 1) {
+  if (!isRecord(args.value) || args.value.schemaVersion !== 2) {
     const actual = isRecord(args.value) ? String(args.value.schemaVersion) : typeof args.value;
     return {
       ok: false,
@@ -320,7 +320,7 @@ export function parseExamplesCatalogValue(args: {
           code: 'unsupported_catalog_schema_version',
           path: args.path,
           fieldPath: 'schemaVersion',
-          message: `Unsupported examples.json schemaVersion ${actual}; supported schemaVersion is 1.`,
+          message: `Unsupported examples.json schemaVersion ${actual}; supported schemaVersion is 2.`,
         }),
       ],
     };

@@ -7,7 +7,7 @@ describe('daemon examples package API', () => {
     const examples = await listDaemonExamples();
     const firstExample = examples[0];
 
-    expect(catalog.schemaVersion).toBe(1);
+    expect(catalog.schemaVersion).toBe(2);
     expect(catalog.source.repository).toBe('charlie-labs/daemons');
     expect(examples.length).toBeGreaterThan(0);
     expect(examples.map((example) => example.id)).toEqual(catalog.examples.map((example) => example.id));

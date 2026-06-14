@@ -49,7 +49,7 @@ export async function generateCatalogFromRepository(
   return {
     ok: true,
     value: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       source: {
         repository: SOURCE_REPOSITORY,
         baseDirectory: SOURCE_BASE_DIRECTORY,

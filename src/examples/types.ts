@@ -75,7 +75,7 @@ export type CatalogExample = ExampleMetadata & {
 };
 
 export type ExamplesCatalog = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   source: {
     repository: 'charlie-labs/daemons';
     baseDirectory: 'daemons';

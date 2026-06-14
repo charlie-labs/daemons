@@ -307,7 +307,7 @@ Root shape:
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "source": {
     "repository": "charlie-labs/daemons",
     "baseDirectory": "daemons"
@@ -334,7 +334,7 @@ Generation rules:
 - `source.url` is a human GitHub tree URL using the publication ref;
 - the default publication ref for source URLs is `master`;
 - machine consumers should use the same source ref for `examples.json`, `DAEMON.md`, and support-file fetches;
-- v1 intentionally omits nondeterministic fields such as `generatedAt` or `sourceCommit`;
+- v2 intentionally omits nondeterministic fields such as `generatedAt` or `sourceCommit`;
 - serialization is `JSON.stringify(catalog, null, 2)` followed by a trailing newline;
 - `examples.json` must match generated output exactly.
 

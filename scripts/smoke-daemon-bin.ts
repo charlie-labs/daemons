@@ -190,7 +190,7 @@ for (const name of expected) {
   if (typeof mod[name] !== 'function') throw new Error('missing function export ' + name);
 }
 const catalog = await mod.loadDaemonExamplesCatalog();
-if (catalog.schemaVersion !== 1 || catalog.examples.length === 0) throw new Error('dist catalog did not load');
+if (catalog.schemaVersion !== 2 || catalog.examples.length === 0) throw new Error('dist catalog did not load');
 const examples = await mod.listDaemonExamples();
 const example = await mod.getDaemonExample(examples[0].id);
 if (!example || example.id !== examples[0].id) throw new Error('dist getDaemonExample did not return the first example');
@@ -282,7 +282,7 @@ console.log('dist import smoke loaded ' + examples.length + ' examples');`,
   loadDaemonExamplesCatalog,
 } from '@charlie-labs/daemons';
 const catalog = await loadDaemonExamplesCatalog();
-if (catalog.schemaVersion !== 1 || catalog.examples.length === 0) throw new Error('catalog did not load');
+if (catalog.schemaVersion !== 2 || catalog.examples.length === 0) throw new Error('catalog did not load');
 const examples = await listDaemonExamples();
 const example = await getDaemonExample(examples[0].id);
 if (!example || example.id !== examples[0].id) throw new Error('getDaemonExample did not return the first example');

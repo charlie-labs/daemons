@@ -4,7 +4,7 @@ This guide is for product surfaces, docs sites, installers, and internal tools t
 
 Use [Examples v2 package and catalog spec](./examples-spec.md) as the normative schema contract. Use [Examples authoring guide](./examples-authoring-guide.md) for how examples are authored and reviewed. The public daemon docs remain the source of truth for what `DAEMON.md` means at runtime.
 
-The package and catalog effort is called Examples v2. The current generated catalog still uses `schemaVersion: 1`. Consumers should validate the numeric catalog schema version, not the project nickname.
+The package and catalog effort is called Examples v2. The generated catalog now uses `schemaVersion: 2`. Consumers should validate the numeric catalog schema version, not the project nickname.
 
 ## Consumer responsibilities
 
@@ -12,7 +12,7 @@ Consumers should:
 
 - fetch repository-root `examples.json` instead of crawling `daemons/`;
 - select one source ref for the catalog and any support files;
-- validate `schemaVersion === 1` and fail closed on unsupported versions;
+- validate `schemaVersion === 2` and fail closed on unsupported versions;
 - use catalog metadata for discovery, filtering, cards, and install decisions;
 - use `entry.daemon.content` as the `DAEMON.md` source for install or rendering;
 - fetch only the support paths listed in `entry.scripts` and `entry.references`;
@@ -57,7 +57,7 @@ Root shape:
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "source": {
     "repository": "charlie-labs/daemons",
     "baseDirectory": "daemons"
@@ -82,7 +82,7 @@ Each `examples[]` entry includes the validated `example.yml` metadata plus gener
 | `source.directory` | Package directory, such as `daemons/pr-metadata`. |
 | `source.url` | Human GitHub tree URL for the package. Do not use it as the machine fetch contract. |
 
-Support file contents are not embedded in v1. Fetch each listed support file from `entry.source.directory` at the same source ref used for the catalog.
+Support file contents are not embedded in v2. Fetch each listed support file from `entry.source.directory` at the same source ref used for the catalog.
 
 ## Source refs
 
@@ -94,7 +94,7 @@ Use one source ref for the catalog and all support-file fetches in a single cons
 | Intentionally latest internal surface | `master`. |
 | Website or docs deployment | A deployment-pinned ref chosen by that deployment. |
 
-Catalog v1 intentionally omits nondeterministic fields such as `generatedAt` and `sourceCommit`. If a consumer needs auditability, record the selected source ref in the consuming system, install metadata, PR body, or deployment logs.
+Catalog v2 intentionally omits nondeterministic fields such as `generatedAt` and `sourceCommit`. If a consumer needs auditability, record the selected source ref in the consuming system, install metadata, PR body, or deployment logs.
 
 Example install metadata:
 
@@ -102,7 +102,7 @@ Example install metadata:
 {
   "catalogRepository": "charlie-labs/daemons",
   "catalogRef": "11da8066b1e0cf968d07ce512f65a9a817f9bc10",
-  "catalogSchemaVersion": 1,
+  "catalogSchemaVersion": 2,
   "exampleId": "dependency-upgrades"
 }
 ```
@@ -161,7 +161,7 @@ Recommended flow:
 
 1. Choose a source ref.
 2. Fetch `examples.json` from repository root at that ref.
-3. Validate `catalog.schemaVersion === 1`.
+3. Validate `catalog.schemaVersion === 2`.
 4. Select an entry from `catalog.examples`.
 5. Require `entry.daemon.content` to be present.
 6. Render `entry.daemon.content`, validate the rendered runtime daemon, then write it to `.agents/daemons/<id>/DAEMON.md`.
@@ -183,7 +183,7 @@ TypeScript-shaped pseudocode:
 ```ts
 const catalog = await fetchJson("charlie-labs/daemons", ref, "examples.json");
 
-if (catalog.schemaVersion !== 1) {
+if (catalog.schemaVersion !== 2) {
   throw new Error(`Unsupported examples catalog schema: ${catalog.schemaVersion}`);
 }
 
@@ -216,7 +216,7 @@ This is intentionally not a recursive copy. The catalog controls the install set
 
 ## Support-file caveats
 
-Catalog v1 lists support file paths, not file contents or mode metadata. The package install planner derives write modes for consumers that need Git tree file modes: `100644` for `DAEMON.md` and references, `100755` for scripts.
+Catalog v2 lists support file paths, not file contents or mode metadata. The package install planner derives write modes for consumers that need Git tree file modes: `100644` for `DAEMON.md` and references, `100755` for scripts.
 
 If a consumer works directly from raw catalog JSON without the planner, support scripts may still need explicit executable handling through tree APIs or invocation through an interpreter. For example, the current catalog includes:
 
@@ -224,7 +224,7 @@ If a consumer works directly from raw catalog JSON without the planner, support 
 daemons/github-activity-digest/references/digest-template.md
 ```
 
-That support file is listed in the catalog, but v1 does not include support file contents in `examples.json`.
+That support file is listed in the catalog, but v2 does not include support file contents in `examples.json`.
 
 Consumers should treat any support-file fetch failure as a blocking install failure. A partial daemon copy can be misleading if `DAEMON.md` references scripts or reference material that were not installed.
 
@@ -240,7 +240,7 @@ Consumers should not depend on catalog metadata appearing in `DAEMON.md`, and au
 
 Consumers should fail closed when:
 
-- `schemaVersion` is not `1`;
+- `schemaVersion` is not `2`;
 - the selected entry is missing;
 - `entry.daemon.content` is missing or empty;
 - a listed support path cannot be fetched from the selected ref;
@@ -255,7 +255,7 @@ Consumers may still display a non-installable entry for browsing if the surface 
 Before shipping a catalog integration, verify that it:
 
 - fetches `examples.json` instead of crawling `daemons/`;
-- validates `schemaVersion === 1`;
+- validates `schemaVersion === 2`;
 - uses one selected source ref for catalog and support files;
 - records that ref externally when auditability matters;
 - uses the correct surface filter;
