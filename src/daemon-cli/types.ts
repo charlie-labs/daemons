@@ -1,4 +1,5 @@
 import type { CatalogExample, ExamplesCatalog } from '../examples/types';
+import type { DaemonInstallPullRequestListing, DaemonInstallPullRequestOpenResult } from '../daemon-install-pr';
 
 export type CliIssue = {
   code: string;
@@ -83,6 +84,16 @@ export type AddData = {
   filesWritten: string[];
   collisions: string[];
   deprecatedBlocked: boolean;
+};
+
+
+export type PrOpenData = Omit<DaemonInstallPullRequestOpenResult, 'markerText'>;
+
+export type PrListData = {
+  repository: string;
+  branchPrefix: string;
+  count: number;
+  installPullRequests: DaemonInstallPullRequestListing[];
 };
 
 export type RuntimeDaemon = {
