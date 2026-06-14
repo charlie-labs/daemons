@@ -49,7 +49,7 @@ daemon add dependency-upgrades --ref 11da8066b1e0cf968d07ce512f65a9a817f9bc10
 
 A single command uses the same ref for `examples.json` and every support-file fetch.
 
-Unsupported catalog schema versions fail closed.
+The v2 catalog uses `schemaVersion: 2`, and the CLI fails closed on unsupported catalog schema versions. When v2 reaches `master`, old `@charlie-labs/daemons@0.0.1` clients that read the default `master` catalog will stop working until they upgrade to `@charlie-labs/daemons@2.0.0` or pin an older compatible ref.
 
 ## Commands
 

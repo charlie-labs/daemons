@@ -24,6 +24,17 @@ Every release PR must keep these inputs in sync:
 
 Use valid semver. Stable versions look like `0.0.1`; prereleases look like `0.0.2-beta.1`.
 
+## Schema-breaking catalog releases
+
+Catalog schema-breaking PRs need release coordination before merging to `master` because the default catalog ref is consumed by published CLIs. In addition to the normal release inputs, schema-breaking PRs must include:
+
+- the intended `package.json#version` bump;
+- the matching `DAEMON_CLI_VERSION` in `src/daemon-cli/constants.ts`;
+- `CHANGELOG.md` notes that call out the breaking catalog schema and required client upgrade;
+- regenerated and validated `examples.json` from `bun run generate:examples` and `bun run validate:examples`.
+
+Do not merge a `schemaVersion` bump with an unchanged package version unless the compatibility impact and release workflow behavior have been intentionally handled.
+
 ## Validation checklist
 
 Run the local checklist before opening the version PR:
