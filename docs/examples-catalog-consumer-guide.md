@@ -16,6 +16,7 @@ Consumers should:
 - use catalog metadata for discovery, filtering, cards, and install decisions;
 - use `entry.daemon.content` as the `DAEMON.md` source for install or rendering;
 - fetch only the support paths listed in `entry.scripts` and `entry.references`;
+- render and validate the full planned install set before writing any files;
 - preserve package-relative support paths under `.agents/daemons/<id>/` when installing;
 - treat missing daemon content or failed support-file fetches as blocking install failures.
 
@@ -143,7 +144,7 @@ Each entry has:
 - `default`: required for optional inputs and forbidden for required inputs;
 - `suggestions`: optional string examples.
 
-Install consumers should merge values deterministically in this order: optional defaults, then adaptation-file values, then explicit CLI/UI values. Values are strings only. Reject unknown input keys, missing required keys, non-string values, malformed or unknown `{{adapt.*}}` tokens, and rendered files that still contain `{{adapt.*}}` tokens. Do not echo raw caller-provided adaptation values in logs or JSON output; reporting applied keys is sufficient.
+Install consumers should merge values deterministically in this order: optional defaults, then adaptation-file values, then explicit CLI/UI values. Values are strings only. Reject unknown input keys, missing required keys, non-string values, malformed or unknown `{{adapt.*}}` tokens, and rendered files that still contain `{{adapt.*}}` tokens across every planned file before writing anything. Do not echo raw caller-provided adaptation values in logs or JSON output; reporting applied keys is sufficient.
 
 ## Specialization ideas
 
@@ -164,12 +165,16 @@ Recommended flow:
 3. Validate `catalog.schemaVersion === 2`.
 4. Select an entry from `catalog.examples`.
 5. Require `entry.daemon.content` to be present.
-6. Render `entry.daemon.content`, validate the rendered runtime daemon, then write it to `.agents/daemons/<id>/DAEMON.md`.
-7. Fetch each listed support file in `entry.scripts` and `entry.references` from the same ref.
-8. Render support files and write them under `.agents/daemons/<id>/` using the same package-relative paths.
-9. Apply planned file modes when the write surface supports them (`100644` for `DAEMON.md`/references, `100755` for scripts).
-10. Exclude `example.yml` and all unlisted upstream files.
-11. Run the consumer's preflight, collision, review, and rollout checks before enabling the daemon.
+6. Collect and validate structured adaptation values for the entry.
+7. Build the full install plan: `DAEMON.md` from `entry.daemon.content`, every listed `entry.scripts` file, and every listed `entry.references` file.
+8. Fetch every listed support file from `entry.source.directory` at the same ref.
+9. Render `entry.daemon.content` and all fetched support files with the collected adaptation values.
+10. Validate the rendered runtime daemon.
+11. Reject malformed, unknown, missing, or still-unresolved `{{adapt.*}}` tokens across all planned files.
+12. Only after all fetch, render, and validation work succeeds, write all rendered planned files under `.agents/daemons/<id>/` using the same package-relative paths.
+13. Apply planned file modes when the write surface supports them (`100644` for `DAEMON.md`/references, `100755` for scripts).
+14. Exclude `example.yml` and all unlisted upstream files.
+15. Run the consumer's preflight, collision, review, and rollout checks before enabling the daemon.
 
 Path mapping example:
 
@@ -192,23 +197,37 @@ if (!entry?.daemon?.content) {
   throw new Error(`Catalog entry ${exampleId} is missing daemon.content`);
 }
 
-const renderedDaemon = renderAdaptationTokens(entry.daemon.content, values);
-await validateRuntimeDaemonMarkdown(renderedDaemon);
-
-await writeFile(
-  `.agents/daemons/${entry.id}/DAEMON.md`,
-  renderedDaemon,
-);
+const plannedFiles = [
+  {
+    sourcePath: `${entry.source.directory}/DAEMON.md`,
+    destinationPath: `.agents/daemons/${entry.id}/DAEMON.md`,
+    mode: "100644",
+    content: entry.daemon.content,
+  },
+];
 
 for (const supportPath of [...entry.scripts, ...entry.references]) {
   const sourcePath = `${entry.source.directory}/${supportPath}`;
-  const content = await fetchText("charlie-labs/daemons", ref, sourcePath);
-  const renderedContent = renderAdaptationTokens(content, values);
+  plannedFiles.push({
+    sourcePath,
+    destinationPath: `.agents/daemons/${entry.id}/${supportPath}`,
+    mode: supportPath.startsWith("scripts/") ? "100755" : "100644",
+    content: await fetchText("charlie-labs/daemons", ref, sourcePath),
+  });
+}
 
-  await writeFile(
-    `.agents/daemons/${entry.id}/${supportPath}`,
-    renderedContent,
-  );
+const renderedFiles = plannedFiles.map((file) => ({
+  ...file,
+  content: renderAdaptationTokens(file.content, values),
+}));
+
+await rejectAdaptationErrors(renderedFiles);
+await validateRuntimeDaemonMarkdown(
+  renderedFiles.find((file) => file.destinationPath.endsWith("/DAEMON.md"))!.content,
+);
+
+for (const file of renderedFiles) {
+  await writePlannedFile(file.destinationPath, file.content, file.mode);
 }
 ```
 
@@ -226,7 +245,7 @@ daemons/github-activity-digest/references/digest-template.md
 
 That support file is listed in the catalog, but v2 does not include support file contents in `examples.json`.
 
-Consumers should treat any support-file fetch failure as a blocking install failure. A partial daemon copy can be misleading if `DAEMON.md` references scripts or reference material that were not installed.
+Consumers should treat any support-file fetch failure as a blocking install failure before writing files. A partial daemon copy can be misleading if `DAEMON.md` references scripts or reference material that were not installed.
 
 ## `DAEMON.md` and catalog metadata
 
@@ -246,7 +265,8 @@ Consumers should fail closed when:
 - a listed support path cannot be fetched from the selected ref;
 - install preflight detects collisions or unsafe local conditions;
 - required structured adaptation values are missing or not strings;
-- rendered content still contains `{{adapt.*}}` tokens.
+- any planned file contains malformed or unknown `{{adapt.*}}` tokens;
+- rendered content still contains unresolved `{{adapt.*}}` tokens.
 
 Consumers may still display a non-installable entry for browsing if the surface clearly separates browsing from installation. Do not convert browsing eligibility into install eligibility.
 
@@ -260,11 +280,13 @@ Before shipping a catalog integration, verify that it:
 - records that ref externally when auditability matters;
 - uses the correct surface filter;
 - treats surface flags as publication controls only;
-- renders `entry.daemon.content` before installing `DAEMON.md`;
-- fetches only listed `scripts` and `references` support paths;
-- renders `{{adapt.key}}` tokens in `DAEMON.md`, scripts, and references;
+- collects and validates structured adaptation values before rendering;
+- builds a full install plan before writing files;
+- fetches only listed `scripts` and `references` support paths from the selected ref;
+- renders `{{adapt.key}}` tokens in `DAEMON.md`, scripts, and references before writing any file;
+- rejects malformed, unknown, missing, or unresolved adaptation tokens across all planned files;
 - validates rendered `DAEMON.md` before writing files;
-- preserves package-relative paths under `.agents/daemons/<id>/`;
+- writes rendered planned files under `.agents/daemons/<id>/` while preserving package-relative paths;
 - excludes `example.yml` and unlisted files;
 - handles support script executable mode intentionally;
 - preserves existing collision, preflight, and human-review gates;

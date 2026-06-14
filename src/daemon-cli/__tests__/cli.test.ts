@@ -451,6 +451,29 @@ describe('daemon CLI catalog commands', () => {
     });
   });
 
+  test('add aborts non-dry-run before any writes when support-file rendering fails', async () => {
+    await withTempDir(async (directory) => {
+      const withUnknownSupportToken = memoryCatalogClient({
+        'test-ref:daemons/templated-daemon/references/render.md': 'Unknown {{adapt.unknown_key}}\n',
+      });
+
+      const result = await runJson([
+        'add',
+        'templated-daemon',
+        '--ref',
+        'test-ref',
+        '--adapt',
+        'required_value=ok',
+      ], directory, withUnknownSupportToken);
+
+      expect(result.code).toBe(65);
+      expect(result.json.errors).toContainEqual(expect.objectContaining({ code: 'UNKNOWN_ADAPTATION_TOKEN', field: 'unknown_key' }));
+      await expect(readFile(path.join(directory, '.agents/daemons/templated-daemon/DAEMON.md'), 'utf8')).rejects.toThrow();
+      await expect(readFile(path.join(directory, '.agents/daemons/templated-daemon/scripts/render.sh'), 'utf8')).rejects.toThrow();
+      await expect(readFile(path.join(directory, '.agents/daemons/templated-daemon/references/render.md'), 'utf8')).rejects.toThrow();
+    });
+  });
+
   test('add validates rendered DAEMON.md before writing any files', async () => {
     await withTempDir(async (directory) => {
       const invalidRenderedCatalog: ExamplesCatalog = {

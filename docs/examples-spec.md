@@ -285,7 +285,7 @@ Customer copies exclude:
 
 `example.yml` is public catalog metadata for discovery, recommendation, docs, dashboard, and adaptation flows. It is not part of the daemon runtime contract and must not be copied into customer repositories.
 
-Catalog-based consumers must not recursively copy the whole upstream `daemons/<id>/` directory. They should install from one `examples.json` entry by rendering `daemon.content` to `.agents/daemons/<id>/DAEMON.md`, then fetching and rendering only the listed `scripts[]` and `references[]` support files from the same source ref used to fetch the catalog.
+Catalog-based consumers must not recursively copy the whole upstream `daemons/<id>/` directory. They should install from one `examples.json` entry by collecting and validating structured adaptation values, building a full install plan, fetching every listed `scripts[]` and `references[]` support file from the same source ref used to fetch the catalog, rendering `daemon.content` and all fetched support files, validating the rendered `DAEMON.md`, rejecting adaptation errors across all planned files, and only then writing rendered files under `.agents/daemons/<id>/`.
 
 Before enabling a copied example in a customer repo:
 
@@ -358,10 +358,14 @@ Install consumers should:
 
 1. Fetch `examples.json` from one source ref.
 2. Select an entry from the catalog instead of crawling the repo tree.
-3. Write `DAEMON.md` from `entry.daemon.content`.
-4. Fetch each `scripts[]` and `references[]` path from `entry.source.directory` at the same source ref.
-5. Preserve support-file relative paths under `.agents/daemons/<id>/`.
-6. Exclude `example.yml`.
+3. Collect and validate structured adaptation values.
+4. Build the full planned file set: `entry.daemon.content` as `DAEMON.md`, every listed `scripts[]` file, and every listed `references[]` file.
+5. Fetch every listed support file from `entry.source.directory` at the same source ref.
+6. Render `daemon.content` and all fetched support files.
+7. Validate rendered `DAEMON.md`.
+8. Reject malformed, unknown, missing, or unresolved `{{adapt.*}}` tokens across all planned files before writing any files.
+9. Write all rendered planned files under `.agents/daemons/<id>/`, preserving support-file relative paths and modes.
+10. Exclude `example.yml` and all unlisted files.
 
 ## Validation expectations
 
