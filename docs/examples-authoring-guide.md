@@ -47,7 +47,7 @@ Do not add an example for:
 
 ## Adaptation, risk, and platform boundaries
 
-Public examples look copyable, but target repos vary by integrations, conventions, permissions, commands, source-of-truth systems, output preferences, existing automation, scale, and tolerance for noise. Make those assumptions visible in `requirements`, `adaptation.mustCustomize`, support files, or `DAEMON.md` runtime policy.
+Public examples look copyable, but target repos vary by integrations, conventions, permissions, commands, source-of-truth systems, output preferences, existing automation, scale, and tolerance for noise. Make those assumptions visible in `requirements`, `adaptations[]`, `specializationIdeas[]`, support files, or `DAEMON.md` runtime policy.
 
 Keep the boundary clear: `DAEMON.md` is runtime policy for Charlie after the daemon is installed and adapted. Instructions about how to use, configure, or modify an example belong in `example.yml`, not in the daemon body where Charlie may treat them as active policy. Support references can provide reusable detail when `example.yml` points readers there.
 
@@ -165,9 +165,14 @@ requirements:
   optionalIntegrations: []
   other:
     - A repo-local command or policy this daemon relies on.
-adaptation:
-  mustCustomize:
-    - Replace placeholder paths, scopes, thresholds, and output destinations.
+adaptations:
+  - key: target_branch
+    label: Target branch
+    description: Branch name the installed daemon should use for generated work.
+    required: false
+    default: daemon/example
+specializationIdeas:
+  - Narrow this daemon to one repository area if the default scope is too broad.
 ```
 
 #### Summary
@@ -244,7 +249,7 @@ Do not use `requirements.other` as a generic repo-health checklist. Broad expect
 
 Most examples should use `adapt-before-use` because customer repos differ.
 
-Use `adapt-before-use` when a customer must change any of the following before use:
+Use `adapt-before-use` when a customer must provide a required structured adaptation value before install, such as:
 
 - path globs;
 - issue/team/project scope;
@@ -254,9 +259,7 @@ Use `adapt-before-use` when a customer must change any of the following before u
 - thresholds, schedules, or quiet-hours policies;
 - support script assumptions.
 
-Use `direct-copy` only when no required customization is declared. Even then, reviewers should verify that the daemon is safe, useful, and accurate for the target repo before use.
-
-Use `adaptation.mustCustomize` for concrete changes a customer must make to the example or daemon before using it, such as replacing placeholder scopes, commands, destinations, thresholds, or policy choices. Do not use it for generic warnings, rollout steps, validation checklists, repo setup work, or process advice such as "verify that it works" or "watch the first few activations." Those belong in general daemon rollout docs, not package metadata.
+Use `direct-copy` only when no required structured adaptation is declared. Even then, reviewers should verify that the daemon is safe, useful, and accurate for the target repo before use.
 
 #### Configurable examples
 
@@ -265,9 +268,18 @@ Some examples intentionally require local values, such as package-manager comman
 For configurable examples:
 
 - keep runtime placeholder values in one obvious configuration block or support reference when possible;
+- use `adaptations[]` for structured string values that `daemon add` or another installer can render;
+- use token-safe keys matching `^[a-z][a-z0-9_]*$` and exact render tokens like `{{adapt.target_branch}}`;
+- declare required inputs with `required: true` and no `default`; declare optional inputs with `required: false` and a string `default`;
+- keep `suggestions[]` string-only, public-safe, and useful as examples rather than hidden configuration;
 - refer to configured values from the rest of the daemon instead of repeating placeholders throughout the body;
-- declare the required replacement or review in `adaptation.mustCustomize`;
 - avoid putting "change this before enabling" prose inside runtime daemon policy.
+
+#### Specialization ideas
+
+Use `specializationIdeas` for optional ways a team could tune the daemon after install, such as narrowing scope, changing conservative defaults, adding an evidence source, or adopting a team-specific output format.
+
+Do not use `specializationIdeas` for required install inputs, placeholder replacement, rollout advice, or safety warnings. If a value must be supplied for deterministic install, use `adaptations[]`. If a condition determines whether the example is appropriate, use `fit.bestFor`, `fit.notFor`, or `requirements.other`.
 
 ### 5. Add support files only when they help
 
@@ -278,7 +290,7 @@ Use `references/**` for reusable public-safe material, such as:
 - templates;
 - rubrics;
 - taxonomies;
-- adaptation notes;
+- configuration notes;
 - example output formats.
 
 Support files should be small, clearly named, and reusable outside the original authoring context.
@@ -312,11 +324,11 @@ When editing an example, first decide what kind of change it is.
 
 | Change type | Guidance |
 | --- | --- |
-| Copy improvement | Keep the ID. Tighten `summary`, `bestFor`, `notFor`, or `mustCustomize`. |
-| DAEMON.md behavior refinement | Keep the ID if the core pattern is the same. Update fit/adaptation if expectations changed. |
+| Copy improvement | Keep the ID. Tighten `summary`, `bestFor`, `notFor`, `adaptations[]`, or `specializationIdeas[]`. |
+| DAEMON.md behavior refinement | Keep the ID if the core pattern is the same. Update fit, requirements, adaptations, or specialization ideas if expectations changed. |
 | Support file update | Keep the ID. Re-run generation and validation. |
 | Surface change | Update `showOnWebsite` or `showInDashboard`; do not imply this changes safety. |
-| Deprecated pattern | Set `status: deprecated`, usually hide public surfaces, and explain replacement guidance in fit/adaptation when useful. |
+| Deprecated pattern | Set `status: deprecated`, usually hide public surfaces, and explain replacement guidance in fit or requirements when useful. |
 | New pattern using similar ingredients | Prefer a new package ID instead of changing the old example's identity. |
 
 Avoid broad rewrites when a targeted edit would fix the issue. The public writing guide's edit-mode advice applies here too: diagnose the failure mode, then adjust the smallest useful part.
@@ -330,7 +342,7 @@ Avoid these common failures:
 - `DAEMON.md` contains setup, tutorial, rollout, checklist, or catalog metadata.
 - `DAEMON.md` explains how to modify the example instead of describing runtime behavior.
 - `requirements.other` lists broad repo hygiene instead of daemon-specific prerequisites.
-- `mustCustomize` contains rollout, verification, or repo setup instructions instead of daemon customization.
+- Required customization is described only in prose instead of structured `adaptations[]`.
 - Optional integrations are used to encode required alternatives.
 - The daemon assumes event wakes outside supported routed GitHub, Linear, Slack, or scheduled activation paths.
 - The daemon requires production secrets or mutating infra commands to be useful.
@@ -376,8 +388,10 @@ Use this checklist before approving example changes.
 - `notFor` lists real exclusions, not scenarios that repo policy can support.
 - Required and optional integrations are accurate.
 - `requirements.other` names daemon-specific non-integration prerequisites.
-- `readiness` matches `adaptation.mustCustomize`.
-- `adaptation.mustCustomize` names required daemon/example changes, not generic rollout or repo setup work.
+- `readiness` matches whether `adaptations[]` contains required inputs.
+- `adaptations[]` keys are unique, token-safe, string-only, and have correct required/default behavior.
+- Every `{{adapt.key}}` token in `DAEMON.md`, `scripts/**`, and `references/**` uses exact token syntax and references a declared `adaptations[]` key.
+- `specializationIdeas[]` contains only optional tuning ideas and does not describe required install work.
 - Surface flags are intentional.
 
 ### Support files
@@ -411,12 +425,14 @@ Use this checklist before approving example changes.
 | Stale metadata field | Move catalog metadata from `DAEMON.md` to `example.yml`. |
 | Missing activation path | Add `watch`, `schedule`, or both. |
 | Invalid schedule | Use a five-field UTC cron expression. |
-| Direct-copy adaptation error | Empty `adaptation.mustCustomize` or change readiness to `adapt-before-use`. |
-| Adapt-before-use adaptation error | Add at least one concrete customization. |
+| Direct-copy adaptation error | Remove required adaptations or change readiness to `adapt-before-use`. |
+| Adapt-before-use adaptation error | Add at least one required structured adaptation. |
 | Unsupported support path | Move the file under `scripts/**` or `references/**`, or remove it. |
 | Shebang script failure | Make the script executable or remove the shebang. |
 | Public-safety failure | Replace private or credential-like content with public-safe placeholders. |
 | Catalog drift | Run `bun run generate:examples` and commit `examples.json`. |
+| Adaptation metadata error | Use unique `^[a-z][a-z0-9_]*$` keys, string-only fields/suggestions, no default on required items, and a default on optional items. |
+| Adaptation token error | Use exact `{{adapt.key}}` token syntax in `DAEMON.md` and support files, and declare each referenced key in `adaptations[]`. |
 
 ## Quality bar
 

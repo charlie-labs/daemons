@@ -2,7 +2,7 @@ id: pr-metadata
 title: PR Metadata Manager
 status: ready
 summary: Keeps pull request titles and bodies complete, current, and linked to the right issues.
-readiness: adapt-before-use
+readiness: direct-copy
 showOnWebsite: true
 showInDashboard: true
 fit:
@@ -21,11 +21,9 @@ requirements:
   optionalIntegrations:
     - linear
   other:
-    - A documented PR metadata contract for title suffixes, body sections, and issue references.
-    - A selected issue tracker or linked-issue source of truth.
-    - A clear issue ID pattern for the selected issue source.
-adaptation:
-  mustCustomize:
-    - Specify the issue tracker or linked-issue source of truth and the team's issue ID pattern.
-    - Confirm the exact required PR body sections and explicit issue-reference line.
-    - Confirm how linked issue IDs should be inferred for the team's workflow.
+    - Pull request titles and bodies are editable by Charlie.
+    - Issue identifiers are available from linked issue metadata or clear repository conventions.
+specializationIdeas:
+  - Customize required pull request body sections to match the team's template.
+  - Specialize issue-reference keywords such as Refs, Resolves, or tracker-specific syntax.
+  - Add rules for preserving generated pull request body sections from other automation.

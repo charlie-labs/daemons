@@ -107,9 +107,20 @@ requirements:
   optionalIntegrations: []
   other:
     - Daemon-specific local policy or command prerequisite.
-adaptation:
-  mustCustomize:
-    - Replace placeholder repository paths and output destinations.
+adaptations:
+  - key: target_branch
+    label: Target branch
+    description: Branch name the installed daemon should use for generated work.
+    required: false
+    default: daemon/example
+  - key: destination_channel
+    label: Destination channel
+    description: Slack channel or other destination for daemon output.
+    required: true
+    suggestions:
+      - '#team-alerts'
+specializationIdeas:
+  - Narrow this daemon to a specific path area, label, channel, or review policy.
 ```
 
 ### Required top-level fields
@@ -125,7 +136,8 @@ adaptation:
 | `showInDashboard` | boolean | Required surface-control flag. |
 | `fit` | object | Required strict object describing where this example fits. |
 | `requirements` | object | Required strict object describing prerequisites. |
-| `adaptation` | object | Required strict object describing required customization. |
+| `adaptations` | array of objects | Optional structured render inputs. Defaults to `[]`; generated `examples.json` always includes it. |
+| `specializationIdeas` | array of strings | Optional non-required ideas for future behavior changes or team-specific variants. Defaults to `[]`; generated `examples.json` always includes it. |
 
 Unknown top-level keys are rejected.
 
@@ -143,13 +155,13 @@ Allowed values:
 
 Allowed values:
 
-- `adapt-before-use`: the example is a reference pattern and has declared required customization.
-- `direct-copy`: the example declares no required customization.
+- `adapt-before-use`: the example declares at least one required structured adaptation input.
+- `direct-copy`: the example declares no required structured adaptation inputs.
 
 Readiness invariants:
 
-- `adapt-before-use` requires `adaptation.mustCustomize` to contain at least one item.
-- `direct-copy` requires `adaptation.mustCustomize` to be empty.
+- `adapt-before-use` requires `adaptations[]` to contain at least one item with `required: true`.
+- `direct-copy` must not declare required adaptations. Optional adaptations with defaults remain allowed.
 - `direct-copy` does not mean "safe without review." Customers must still verify the daemon against their repo, integrations, and rollout policy before using it.
 
 ### Surface flags
@@ -206,15 +218,34 @@ Allowed integration values:
 
 List an integration as required only when the daemon cannot perform its core job without it. Put daemon-specific non-integration prerequisites, such as a label taxonomy, branch convention, destination convention, or configured command that the daemon directly invokes, in `requirements.other`.
 
-### `adaptation`
+### `adaptations`
 
-`adaptation` is a strict object with:
+`adaptations` is optional structured metadata for values that can be rendered by install consumers such as `daemon add`.
+
+Each item is a strict object with:
 
 | Field | Type | Rules |
 | --- | --- | --- |
-| `mustCustomize` | array of strings | Required. Empty only for `direct-copy`; non-empty for `adapt-before-use`. |
+| `key` | string | Required. Must match `^[a-z][a-z0-9_]*$`; duplicate keys are rejected. |
+| `label` | string | Required non-empty display label. |
+| `description` | string | Required non-empty description for authors and consumers. |
+| `required` | boolean | Required. `true` means the install flow must receive a value. |
+| `default` | string | Required for optional adaptations; forbidden for required adaptations. |
+| `suggestions` | array of strings | Optional. Every value must be a string. |
 
-Use `mustCustomize` for concrete changes a customer must make to the example or daemon before using the pattern, such as replacing path globs, destination channels, issue-state names, label taxonomies, configured commands, thresholds, or ownership boundaries. Do not use it for generic rollout instructions, repo setup work, or broad verification reminders.
+Structured values are string-only. Objects, arrays, numbers, booleans, and `null` are invalid. The generated catalog sorts `adaptations[]` by `key` for deterministic output.
+
+Use the exact token syntax `{{adapt.key}}` in `DAEMON.md`, `scripts/**`, or `references/**` when a value should be rendered during install. Example validation rejects malformed adaptation tokens and tokens whose keys are not declared in `adaptations[]` before catalog generation succeeds. Consumers must still reject unknown input keys, malformed or unknown adaptation tokens, missing required values, non-string file values, and unresolved `{{adapt.*}}` tokens after rendering.
+
+
+### `specializationIdeas`
+
+`specializationIdeas` is optional catalog metadata for non-required ways a team might further tune an example after deterministic install. It is a list of non-empty strings.
+
+Use it for suggestions such as narrowing scope, adding team-specific output formats, changing conservative policies, or integrating additional evidence sources. Do not use it for required install inputs, placeholders that must be rendered, generic rollout advice, or warnings that belong in `fit.notFor`, `requirements.other`, or runtime deny rules.
+
+Install consumers must not treat `specializationIdeas[]` as required work. It is display guidance only and is not rendered into installed files.
+
 
 ## Support files
 
@@ -243,9 +274,9 @@ Examples are reference patterns, not automatically installed daemons. Catalog co
 
 Customer copies include:
 
-- `DAEMON.md`;
-- files listed in catalog `scripts[]`;
-- files listed in catalog `references[]`.
+- rendered `DAEMON.md`;
+- rendered files listed in catalog `scripts[]`;
+- rendered files listed in catalog `references[]`.
 
 Customer copies exclude:
 
@@ -254,13 +285,13 @@ Customer copies exclude:
 
 `example.yml` is public catalog metadata for discovery, recommendation, docs, dashboard, and adaptation flows. It is not part of the daemon runtime contract and must not be copied into customer repositories.
 
-Catalog-based consumers must not recursively copy the whole upstream `daemons/<id>/` directory. They should install from one `examples.json` entry by writing `daemon.content` to `.agents/daemons/<id>/DAEMON.md`, then fetching only the listed `scripts[]` and `references[]` support files from the same source ref used to fetch the catalog.
+Catalog-based consumers must not recursively copy the whole upstream `daemons/<id>/` directory. They should install from one `examples.json` entry by collecting and validating structured adaptation values, building a full install plan, fetching every listed `scripts[]` and `references[]` support file from the same source ref used to fetch the catalog, rendering `daemon.content` and all fetched support files, validating the rendered `DAEMON.md`, rejecting adaptation errors across all planned files, and only then writing rendered files under `.agents/daemons/<id>/`.
 
 Before enabling a copied example in a customer repo:
 
 - Treat `DAEMON.md` as a starting point that must be checked against the customer's desired behavior.
 - Review `example.yml` fit and requirements before using the pattern.
-- Follow `adaptation.mustCustomize` for `adapt-before-use` examples.
+- Provide required structured adaptation values for `adapt-before-use` examples.
 - Verify all watch conditions, schedules, routines, deny rules, output destinations, integration assumptions, and support files locally.
 - Keep public docs as the source of truth for `DAEMON.md` semantics and rollout guidance.
 
@@ -276,7 +307,7 @@ Root shape:
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "source": {
     "repository": "charlie-labs/daemons",
     "baseDirectory": "daemons"
@@ -303,7 +334,7 @@ Generation rules:
 - `source.url` is a human GitHub tree URL using the publication ref;
 - the default publication ref for source URLs is `master`;
 - machine consumers should use the same source ref for `examples.json`, `DAEMON.md`, and support-file fetches;
-- v1 intentionally omits nondeterministic fields such as `generatedAt` or `sourceCommit`;
+- v2 intentionally omits nondeterministic fields such as `generatedAt` or `sourceCommit`;
 - serialization is `JSON.stringify(catalog, null, 2)` followed by a trailing newline;
 - `examples.json` must match generated output exactly.
 
@@ -327,10 +358,14 @@ Install consumers should:
 
 1. Fetch `examples.json` from one source ref.
 2. Select an entry from the catalog instead of crawling the repo tree.
-3. Write `DAEMON.md` from `entry.daemon.content`.
-4. Fetch each `scripts[]` and `references[]` path from `entry.source.directory` at the same source ref.
-5. Preserve support-file relative paths under `.agents/daemons/<id>/`.
-6. Exclude `example.yml`.
+3. Collect and validate structured adaptation values.
+4. Build the full planned file set: `entry.daemon.content` as `DAEMON.md`, every listed `scripts[]` file, and every listed `references[]` file.
+5. Fetch every listed support file from `entry.source.directory` at the same source ref.
+6. Render `daemon.content` and all fetched support files.
+7. Validate rendered `DAEMON.md`.
+8. Reject malformed, unknown, missing, or unresolved `{{adapt.*}}` tokens across all planned files before writing any files.
+9. Write all rendered planned files under `.agents/daemons/<id>/`, preserving support-file relative paths and modes.
+10. Exclude `example.yml` and all unlisted files.
 
 ## Validation expectations
 
@@ -359,7 +394,7 @@ Common validation error categories include:
 | `invalid_example_yml` | `example.yml` YAML parsing failed. |
 | `missing_required_field` | A required schema field is missing. |
 | `invalid_enum_value` | A field uses a value outside the allowed enum. |
-| `invalid_field_value` | A custom invariant failed, such as readiness/adaptation mismatch. |
+| `invalid_field_value` | A custom invariant failed, such as readiness/required-adaptation mismatch. |
 | `unknown_key` | A strict schema object contains an unsupported key. |
 | `stale_metadata_field` | Deprecated catalog metadata was placed where it no longer belongs. |
 | `id_mismatch` | Directory, `example.yml`, and `DAEMON.md` IDs do not all match. |
@@ -367,6 +402,8 @@ Common validation error categories include:
 | `per_example_readme` | A package contains an unsupported `README.md`. |
 | `unsupported_support_path` | A package contains unsupported top-level entries or invalid support paths. |
 | `script_not_executable` | A shebang script is not executable. |
+| `unknown_adaptation_token` | `DAEMON.md` or a support file uses `{{adapt.key}}` for a key missing from `adaptations[]`. |
+| `malformed_adaptation_token` | `DAEMON.md` or a support file contains an adaptation token that does not use `{{adapt.key}}` with a token-safe key. |
 | `public_safety` | Public-safety scanning found private or credential-like content. |
 | `catalog_drift` | Committed `examples.json` differs from generated output. |
 

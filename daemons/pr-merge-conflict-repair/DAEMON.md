@@ -2,9 +2,9 @@
 id: pr-merge-conflict-repair
 purpose: Resolve merge conflicts on non-draft pull requests found after repository branch changes.
 watch:
-  - A GitHub push updates `refs/heads/main`.
+  - A GitHub push updates the repository default branch.
 routines:
-  - Run `bun .agents/daemons/pr-merge-conflict-repair/scripts/find-conflicted-pulls.ts --repo <owner/repo>` to find open non-draft PRs with mergeability state `CONFLICTING`.
+  - Run `bun .agents/daemons/pr-merge-conflict-repair/scripts/find-conflicted-pulls.ts` to find open non-draft PRs with mergeability state `CONFLICTING`.
   - Re-fetch the current remote PR head and the PR's current base branch before editing each conflicted PR.
   - Resolve the conflict and push to the existing PR branch when repo context, tests, and PR intent make the resolution clear.
   - Run focused verification after conflict resolution when feasible.
@@ -17,7 +17,7 @@ deny:
   - Do not continue on a PR if its remote head changes during the run.
   - Do not open new pull requests or new issues.
   - Do not submit PR reviews, approve, or request changes on pull requests.
-  - Do not force-push unless repo policy explicitly permits rebase-based repair; use `--force-with-lease` only after fresh remote verification.
+  - Do not force-push.
 ---
 
 # PR Merge Conflict Repair
@@ -36,7 +36,7 @@ Fix and push when the PR is still conflicting, the remote head has not changed, 
 
 Stop/no-op and comment with the blocking reason when the conflict requires human judgment, unclear product intent, dependency substitution, external configuration, production data/backfill decisions, or unavailable permissions/tooling.
 
-Use the repo/platform's default branch-update mechanism when available. If it is unavailable or cannot resolve the conflict, choose merge or rebase case by case based on repo conventions and the safest path for the PR branch.
+Use the repo/platform's default branch-update mechanism when available. If it is unavailable or cannot resolve the conflict, choose merge-based repair when repo context makes it safe. Do not rebase or force-push.
 
 If the base branch moves during the run, re-fetch and re-evaluate against the new base. Continue only if the resolution is still clear.
 

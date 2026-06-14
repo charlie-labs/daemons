@@ -1,4 +1,5 @@
 import type { CatalogExample, ExamplesCatalog } from '../examples/types';
+import type { DaemonInstallPullRequestListing, DaemonInstallPullRequestOpenResult } from '../daemon-install-pr';
 
 export type CliIssue = {
   code: string;
@@ -50,7 +51,8 @@ export type ShowData = CatalogListItem & {
   daemonPath: string;
   sourceDirectory: string;
   sourceUrl: string;
-  adaptationsRequired: string[];
+  adaptations: CatalogExample['adaptations'];
+  specializationIdeas: string[];
   activationRequired: string;
 };
 
@@ -76,12 +78,22 @@ export type AddData = {
   sourceRef: string;
   status: CatalogExample['status'];
   readiness: CatalogExample['readiness'];
-  adaptationsRequired: string[];
+  adaptationsApplied: string[];
   activationRequired: string;
   filesPlanned: InstallFilePlan[];
   filesWritten: string[];
   collisions: string[];
   deprecatedBlocked: boolean;
+};
+
+
+export type PrOpenData = Omit<DaemonInstallPullRequestOpenResult, 'markerText'>;
+
+export type PrListData = {
+  repository: string;
+  branchPrefix: string;
+  count: number;
+  installPullRequests: DaemonInstallPullRequestListing[];
 };
 
 export type RuntimeDaemon = {

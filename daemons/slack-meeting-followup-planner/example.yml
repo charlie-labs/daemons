@@ -24,6 +24,14 @@ requirements:
   other:
     - Slack workspaces are mapped to the repositories discussed in meeting notes.
     - Transcript text, transcript links, or uploaded note files are accessible to Charlie under the workspace policy.
-adaptation:
-  mustCustomize:
-    - Replace `#team-meeting-notes` in the watch conditions with the Slack channel where your team shares meeting notes or transcripts.
+adaptations:
+  - key: slack_channel
+    label: Slack meeting notes channel
+    description: Slack channel where Charlie should watch for meeting notes or transcript messages.
+    required: true
+    suggestions:
+      - '#team-meeting-notes'
+specializationIdeas:
+  - Specialize transcript detection for a team's preferred recorder such as Granola, Fathom, Zoom, or Meet.
+  - Tune the follow-up format for planning meetings, incident reviews, or customer calls.
+  - Allow issue-creation suggestions to include a preferred Linear project or GitHub issue template.

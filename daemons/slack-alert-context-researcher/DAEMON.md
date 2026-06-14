@@ -2,7 +2,7 @@
 id: slack-alert-context-researcher
 purpose: Add compact operational context to Slack alert threads without acknowledging or mutating the incident.
 watch:
-  - "A Slack app or bot posts an alert-like monitoring, incident, error, or paging message in `#alerts`."
+  - "A Slack app or bot posts an alert-like monitoring, incident, error, or paging message in `{{adapt.slack_channel}}`."
 routines:
   - Decide whether the Slack message is an alert-style monitoring or incident notification.
   - Research likely affected service context using the alert text, mapped repository, GitHub activity, and optional Linear or Sentry evidence.

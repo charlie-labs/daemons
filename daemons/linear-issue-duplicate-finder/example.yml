@@ -23,5 +23,7 @@ requirements:
   other:
     - Linear issue teams are mapped to the repositories that own their work.
     - Completed and canceled Linear workflow states are identifiable through Linear state metadata.
-adaptation:
-  mustCustomize: []
+specializationIdeas:
+  - Broaden or narrow duplicate search across Linear teams mapped to the same repository.
+  - Adjust the completed or canceled issue lookback window.
+  - Tune confidence thresholds before Charlie comments with possible matches.

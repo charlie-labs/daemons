@@ -25,6 +25,14 @@ requirements:
   other:
     - Slack workspaces are mapped to the repositories that own the alerted services.
     - Monitoring or incident notifications arrive as Slack app or bot messages with enough text or metadata to infer the affected service.
-adaptation:
-  mustCustomize:
-    - Replace `#alerts` in the watch condition with the Slack channel where your team receives monitoring or incident alerts.
+adaptations:
+  - key: slack_channel
+    label: Slack alert channel
+    description: Slack channel where Charlie should watch for monitoring or incident alert messages.
+    required: true
+    suggestions:
+      - '#alerts'
+specializationIdeas:
+  - Prioritize Sentry, PagerDuty, Datadog, or another alert source when alert messages consistently include those links.
+  - Restrict replies to production or customer-impacting alerts only.
+  - Add a team-specific triage checklist for common service ownership or escalation conventions.

@@ -4,8 +4,10 @@ export function getRootHelpText(): string {
 Usage:
   daemon list [--ref <sha|branch|tag>] [--json]
   daemon show <example-id> [--ref <sha|branch|tag>] [--json]
-  daemon add <example-id> [--ref <sha|branch|tag>] [--dry-run] [--force] [--allow-deprecated] [--json]
+  daemon add <example-id> [--ref <sha|branch|tag>] [--adapt key=value] [--adapt-file adaptations.json] [--dry-run] [--force] [--allow-deprecated] [--json]
   daemon install <example-id> [same flags as add]
+  daemon pr open <example-id> --repo owner/repo [--ref <sha|branch|tag>] [--base <branch>] [--adapt key=value] [--adapt-file adaptations.json] [--force] [--json]
+  daemon pr list --repo owner/repo [--json]
   daemon validate <path> [--dry-run] [--json]
   daemon validate --all [--dry-run] [--json]
 
@@ -22,11 +24,23 @@ export function getCommandHelpText(command: string): string {
   }
 
   if (command === 'show') {
-    return 'Usage: daemon show <example-id> [--ref <sha|branch|tag>] [--json]\n\nShows catalog metadata, support files, integrations, and required adaptations.';
+    return 'Usage: daemon show <example-id> [--ref <sha|branch|tag>] [--json]\n\nShows catalog metadata, support files, integrations, structured adaptation inputs, and optional specialization ideas.';
   }
 
   if (command === 'add') {
-    return 'Usage: daemon add <example-id> [--ref <sha|branch|tag>] [--dry-run] [--force] [--allow-deprecated] [--json]\n\nScaffolds catalog-listed files into .agents/daemons/<id>/ without activating the daemon.';
+    return 'Usage: daemon add <example-id> [--ref <sha|branch|tag>] [--adapt key=value] [--adapt-file adaptations.json] [--dry-run] [--force] [--allow-deprecated] [--json]\n\nScaffolds catalog-listed files into .agents/daemons/<id>/ without activating the daemon. Adaptation values render documented {{adapt.key}} tokens before validation and writes.';
+  }
+
+  if (command === 'pr') {
+    return 'Usage: daemon pr <open|list> [--json]\n\nOpens and lists daemon install pull requests in a target GitHub repository.';
+  }
+
+  if (command === 'pr open') {
+    return 'Usage: daemon pr open <example-id> --repo owner/repo [--ref <sha|branch|tag>] [--base <branch>] [--adapt key=value] [--adapt-file adaptations.json] [--force] [--json]\n\nRenders a catalog example and opens an idempotent GitHub pull request from a deterministic charlie/daemon-installs/<example-id> branch. Raw adaptation values are not included in output or PR markers.';
+  }
+
+  if (command === 'pr list') {
+    return 'Usage: daemon pr list --repo owner/repo [--json]\n\nLists daemon install pull requests by hidden marker and reconciles deterministic charlie/daemon-installs/* branches.';
   }
 
   if (command === 'validate') {

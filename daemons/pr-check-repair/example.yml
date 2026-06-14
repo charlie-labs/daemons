@@ -2,7 +2,7 @@ id: pr-check-repair
 title: PR Check Repair
 status: ready
 summary: Repairs failing GitHub-visible PR checks with focused evidence-grounded commits, flaky reruns, or low-noise blocked comments.
-readiness: adapt-before-use
+readiness: direct-copy
 showOnWebsite: true
 showInDashboard: true
 fit:
@@ -23,6 +23,7 @@ requirements:
   other:
     - Access to check logs or provider data.
     - Repository-local verification commands.
-adaptation:
-  mustCustomize:
-    - Confirm the check repair categories are aligned with the team's expectations.
+specializationIdeas:
+  - Restrict repair to selected check names, path areas, or pull request authors.
+  - Add repository-specific verification commands for common failure classes.
+  - Tune flaky-check rerun behavior for known flaky providers.

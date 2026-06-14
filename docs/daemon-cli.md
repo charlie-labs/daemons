@@ -49,7 +49,7 @@ daemon add dependency-upgrades --ref 11da8066b1e0cf968d07ce512f65a9a817f9bc10
 
 A single command uses the same ref for `examples.json` and every support-file fetch.
 
-Unsupported catalog schema versions fail closed.
+The v2 catalog uses `schemaVersion: 2`, and the CLI fails closed on unsupported catalog schema versions. When v2 reaches `master`, old `@charlie-labs/daemons@0.0.1` clients that read the default `master` catalog will stop working until they upgrade to `@charlie-labs/daemons@2.0.0` or pin an older compatible ref.
 
 ## Commands
 
@@ -72,7 +72,8 @@ Shows catalog details for one example:
 - status and readiness
 - required and optional integrations
 - support files from `scripts[]` and `references[]`
-- required adaptation notes from `adaptation.mustCustomize`
+- structured adaptation inputs from `adaptations[]`
+- optional specialization ideas from `specializationIdeas[]`
 - the activation caveat
 
 ```bash
@@ -81,7 +82,7 @@ daemon show pr-metadata
 daemon show pr-metadata --json
 ```
 
-`show` always returns `data.adaptationsRequired[]` in JSON, including for `adapt-before-use` examples. No explicit acknowledgement flag is required; the adaptation list is prominent in both human and JSON output.
+`show` returns `data.adaptations[]` for structured render inputs and `data.specializationIdeas[]` for optional follow-up tuning ideas. No explicit acknowledgement flag is required; the adaptation inputs are prominent in both human and JSON output.
 
 ### `daemon add <example-id>` / `daemon install <example-id>`
 
@@ -98,7 +99,7 @@ If the current working directory is inside a git repository, the destination roo
 
 Install behavior is intentionally narrow:
 
-- writes `DAEMON.md` from `entry.daemon.content`
+- writes rendered `DAEMON.md` from `entry.daemon.content`
 - fetches only paths listed in `entry.scripts[]` and `entry.references[]`
 - fetches support files from the same catalog ref as `examples.json`
 - never copies `example.yml`
@@ -107,22 +108,42 @@ Install behavior is intentionally narrow:
 - refuses to use an existing destination directory or overwrite existing destination files unless `--force` is provided
 - blocks deprecated examples unless `--allow-deprecated` is provided
 - supports `--dry-run` for read-only planning
+- renders `{{adapt.key}}` tokens in `DAEMON.md`, scripts, and references before validating and writing
 
 Examples:
 
 ```bash
-daemon add js-ts-dependency-upgrades --dry-run
+daemon add js-ts-dependency-upgrades --dry-run \
+  --adapt package_manager=pnpm
 
 daemon install docs-drift-maintainer --ref master
 
 daemon add pr-merge-conflict-repair --allow-deprecated --dry-run
 
-daemon add js-ts-dependency-upgrades --force
+daemon add js-ts-dependency-upgrades --force \
+  --adapt package_manager=pnpm
+```
+
+
+Structured adaptation inputs:
+
+- repeat `--adapt key=value` for explicit values;
+- use `--adapt-file adaptations.json` for a JSON object of string values;
+- optional defaults from the catalog are applied first, then file values, then CLI flag values;
+- empty string values are accepted when explicitly provided, but rendered `DAEMON.md` must still pass runtime validation;
+- unknown keys, non-string file values, missing required values, malformed or unknown `{{adapt.*}}` tokens, and unresolved adaptation tokens fail before any files are written.
+
+`adaptations.json` example:
+
+```json
+{
+  "package_manager": "pnpm"
+}
 ```
 
 JSON data includes:
 
-- `adaptationsRequired[]`
+- `adaptationsApplied[]` (keys only, not raw values)
 - `activationRequired`
 - `filesPlanned[]`, where each item includes `sourcePath`, `destinationPath`, `kind`, and `mode` (`100644` or `100755`)
 - `filesWritten[]`
@@ -131,6 +152,78 @@ JSON data includes:
 - `sourceRef`
 
 Scaffolding does **not** activate a daemon. The daemon becomes eligible only after the change is merged to the target repository default branch and Charlie ingests that merged version.
+
+
+
+### `daemon pr open <example-id>`
+
+Renders a catalog example the same way as `daemon add`, but writes the install as a GitHub pull request in a target repository instead of writing to the local filesystem:
+
+```bash
+daemon pr open js-ts-dependency-upgrades \
+  --repo owner/repo \
+  --base main \
+  --adapt package_manager=pnpm
+```
+
+Options:
+
+- `--repo owner/repo` is required and selects the target GitHub repository.
+- `--ref <sha|branch|tag>` pins the daemon catalog source ref. It defaults to `master`.
+- `--base <branch>` selects the target PR base branch. If omitted, the GitHub repository default branch is used.
+- `--adapt key=value` and `--adapt-file adaptations.json` use the same structured adaptation rules and precedence as `daemon add`.
+- `--force` allows the PR commit to write catalog-managed install paths even when the target base already contains `.agents/daemons/<example-id>/`. Without `--force`, existing target files or directories are reported as collisions and no branch is created.
+
+The command uses `GITHUB_TOKEN` or `GH_TOKEN` for GitHub API authentication. Node callers can pass an explicit token or injected GitHub client to `createDaemonInstallPullRequest()`.
+
+PR creation is idempotent for a given target repo and example ID:
+
+- the install branch is deterministic: `charlie/daemon-installs/<example-id>`;
+- if an exact-head open PR already exists for that branch and base, the command returns it instead of opening another PR;
+- if the branch exists without a PR and its files match the rendered install, the command opens a PR from that existing branch;
+- if the branch exists but does not match the rendered install, the command fails closed with a branch-collision error;
+- if another caller creates the branch or PR concurrently, the command re-reads the branch/PR and returns the existing open PR when possible.
+
+The implementation writes via GitHub's tree, commit, ref, and pull-request REST APIs. The PR body includes a hidden marker in this format:
+
+```html
+<!-- charlie-daemon-install-v1 {"adaptationKeys":["package_manager"],"...":"..."} -->
+```
+
+The marker is used for reconciliation and intentionally stores only adaptation keys, never raw adaptation values. JSON output likewise reports `adaptationsApplied[]` keys only.
+
+JSON data includes:
+
+- `repository`, `daemonId`, `sourceRepo`, `sourceRef`, and `catalogSchemaVersion`;
+- `baseBranch`, deterministic `headBranch`, and `headSha`;
+- `pullRequest` number, URL, state, head/base refs, and merge metadata;
+- `filesPlanned[]` / `filesWritten[]` with destination paths and Git file modes;
+- `adaptationsApplied[]` key names;
+- parsed marker metadata.
+
+### `daemon pr list`
+
+Lists daemon install PRs and deterministic install branches in a target repository:
+
+```bash
+daemon pr list --repo owner/repo
+
+daemon pr list --repo owner/repo --json
+```
+
+The listing reconciles two sources:
+
+1. GitHub issue search for PR bodies containing the hidden `charlie-daemon-install-v1` marker.
+2. Git refs under `heads/charlie/daemon-installs/`.
+
+Each item is classified as:
+
+- `open` — an open install PR;
+- `merged` — a closed PR with `merged_at` set;
+- `closed_unmerged` — a closed PR that was not merged;
+- `branchWithoutPullRequest` — a deterministic install branch with no associated PR.
+
+If a PR body was edited and the hidden marker was removed, `daemon pr list` still reports the PR while the deterministic branch exists, with a warning that marker metadata is missing. If GitHub search is temporarily stale or unavailable, the command falls back to branch reconciliation and returns a warning.
 
 ## Runtime validation
 
@@ -159,7 +252,7 @@ Validation enforces the canonical runtime `DAEMON.md` contract:
 - Allowed frontmatter keys are exactly `id`, `purpose`, `watch`, `routines`, `deny`, and `schedule`.
 - Unknown keys are rejected.
 - Legacy keys such as `name`, `description`, `triggers`, `actions`, and `disallowed` are rejected with replacement guidance.
-- Catalog/example metadata keys such as `status`, `readiness`, `requirements`, and `adaptation` are rejected in runtime frontmatter.
+- Catalog/example metadata keys such as `status`, `readiness`, and `requirements` are rejected in runtime frontmatter.
 - `id`, `purpose`, and non-empty `routines[]` are required.
 - At least one activation path is required: non-empty `watch[]` or a valid `schedule`.
 - `schedule`, when present and non-blank, must be a standard five-field cron expression.
@@ -178,7 +271,7 @@ Validation enforces the canonical runtime `DAEMON.md` contract:
 
 ## Examples are patterns
 
-The catalog examples are reference patterns to adapt before production use. Treat `adaptationsRequired[]` as required local work before enabling or relying on a scaffolded daemon.
+The catalog examples are reference patterns to adapt before production use. Treat required `adaptations[]` entries as required local inputs before enabling or relying on a scaffolded daemon.
 
 Use the public daemon docs for the runtime contract:
 

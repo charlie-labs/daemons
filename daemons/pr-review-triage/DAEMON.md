@@ -6,7 +6,7 @@ watch:
   - A top-level GitHub PR comment is created on an open non-draft pull request.
   - A GitHub pull request head commit changes on an open non-draft pull request.
 routines:
-  - Bootstrap PR review, issue-comment, thread, and pagination context via `bun .agents/daemons/pr-review-triage/scripts/bootstrap-data.ts --repo <owner/repo> --pr <number>` before any triage action.
+  - Bootstrap PR review, issue-comment, thread, and pagination context via `bun .agents/daemons/pr-review-triage/scripts/bootstrap-data.ts --pr <number>` before any triage action.
   - Treat each review thread or top-level PR issue comment as one triage item.
   - "Assign each actionable item one disposition: `valid`, `invalid`, `duplicate`, `fixed`, or `uncertain`."
   - Apply the author-specific action policy for the item disposition.
@@ -34,7 +34,7 @@ deny:
 Before evaluating feedback, run:
 
 ```bash
-bun .agents/daemons/pr-review-triage/scripts/bootstrap-data.ts --repo <owner/repo> --pr <number>
+bun .agents/daemons/pr-review-triage/scripts/bootstrap-data.ts --pr <number>
 ```
 
 The script emits raw GraphQL JSON. Parse the response, confirm the PR is open and non-draft, and inspect every relevant `pageInfo`. If relevant reviews, review threads, thread comments, or top-level PR comments are paginated beyond the returned data, stop/no-op rather than acting from incomplete context.

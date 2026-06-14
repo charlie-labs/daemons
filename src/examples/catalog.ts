@@ -7,6 +7,7 @@ import { parseDaemonMarkdown, parseExampleYaml } from './schema';
 import type {
   CatalogExample,
   DaemonPackage,
+  ExampleAdaptation,
   ExampleMetadata,
   ExamplesCatalog,
   ValidationError,
@@ -19,6 +20,9 @@ const SOURCE_BASE_DIRECTORY = 'daemons';
 const DEFAULT_PUBLICATION_REF = 'master';
 const ROOT_CATALOG_PATH = 'examples.json';
 const ALLOWED_DAEMON_PACKAGE_ENTRIES = new Set(['DAEMON.md', 'example.yml', 'scripts', 'references']);
+const MUSTACHE_TOKEN_PATTERN = /{{\s*([^{}]*?)\s*}}/g;
+const ADAPTATION_EXPRESSION_PREFIX_PATTERN = /^adapt(?:$|[.\s])/;
+const ADAPTATION_TOKEN_EXPRESSION_PATTERN = /^adapt\.([a-z][a-z0-9_]*)$/;
 
 export async function generateCatalogFromRepository(
   repoRoot: string,
@@ -47,7 +51,7 @@ export async function generateCatalogFromRepository(
   return {
     ok: true,
     value: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       source: {
         repository: SOURCE_REPOSITORY,
         baseDirectory: SOURCE_BASE_DIRECTORY,
@@ -110,6 +114,20 @@ export async function validateCatalogFile(repoRoot: string): Promise<ValidationR
 
 export function serializeCatalog(catalog: ExamplesCatalog): string {
   return `${JSON.stringify(catalog, null, 2)}\n`;
+}
+
+
+function catalogAdaptations(adaptations: readonly ExampleAdaptation[]): ExampleAdaptation[] {
+  return [...adaptations]
+    .sort((left, right) => left.key.localeCompare(right.key))
+    .map((adaptation) => ({
+      key: adaptation.key,
+      label: adaptation.label,
+      description: adaptation.description,
+      required: adaptation.required,
+      ...(adaptation.default !== undefined ? { default: adaptation.default } : {}),
+      ...(adaptation.suggestions !== undefined ? { suggestions: [...adaptation.suggestions] } : {}),
+    }));
 }
 
 type LoadedPackageResult = {
@@ -273,6 +291,18 @@ async function loadCatalogExample(
   const supportPaths = await discoverSupportPaths(repoRoot, daemonPackage.directoryPath);
   errors.push(...supportPaths.errors);
 
+  if (exampleMetadata && daemonContent.ok) {
+    errors.push(
+      ...(await validateDeclaredAdaptationTokens({
+        repoRoot,
+        daemonPackage,
+        daemonContent: daemonContent.value,
+        supportPaths: [...supportPaths.scripts, ...supportPaths.references],
+        exampleMetadata,
+      }))
+    );
+  }
+
   if (!exampleMetadata || !daemonContent.ok || errors.length > 0) {
     return {
       directoryName: daemonPackage.directoryName,
@@ -307,9 +337,8 @@ async function loadCatalogExample(
         optionalIntegrations: exampleMetadata.requirements.optionalIntegrations,
         other: exampleMetadata.requirements.other,
       },
-      adaptation: {
-        mustCustomize: exampleMetadata.adaptation.mustCustomize,
-      },
+      adaptations: catalogAdaptations(exampleMetadata.adaptations),
+      specializationIdeas: [...exampleMetadata.specializationIdeas],
       daemon: {
         path: 'DAEMON.md',
         content: daemonContent.value,
@@ -486,6 +515,94 @@ async function walkSupportDirectory(
   }
 
   return { paths, errors };
+}
+
+async function validateDeclaredAdaptationTokens(args: {
+  repoRoot: string;
+  daemonPackage: DaemonPackage;
+  daemonContent: string;
+  supportPaths: readonly string[];
+  exampleMetadata: ExampleMetadata;
+}): Promise<ValidationError[]> {
+  const declaredKeys = new Set(args.exampleMetadata.adaptations.map((adaptation) => adaptation.key));
+  const errors = findAdaptationTokenErrors({
+    content: args.daemonContent,
+    path: args.daemonPackage.daemonPath,
+    declaredKeys,
+  });
+
+  for (const supportPath of args.supportPaths) {
+    const path = `${args.daemonPackage.directoryPath}/${supportPath}`;
+    let content: string;
+    try {
+      content = await readFile(join(args.repoRoot, path), 'utf8');
+    } catch (error) {
+      errors.push(
+        machineError({
+          code: 'unsupported_support_path',
+          path,
+          message: `Unable to read support file: ${normalizeThrownMessage(error)}`,
+        })
+      );
+      continue;
+    }
+
+    errors.push(...findAdaptationTokenErrors({ content, path, declaredKeys }));
+  }
+
+  return errors;
+}
+
+function findAdaptationTokenErrors(args: {
+  content: string;
+  path: string;
+  declaredKeys: ReadonlySet<string>;
+}): ValidationError[] {
+  const errors: ValidationError[] = [];
+  const reportedKeys = new Set<string>();
+  const reportedMalformedTokens = new Set<string>();
+
+  for (const token of args.content.matchAll(MUSTACHE_TOKEN_PATTERN)) {
+    const rawExpression = token[1] ?? '';
+    const expression = rawExpression.trim();
+    if (!ADAPTATION_EXPRESSION_PREFIX_PATTERN.test(expression)) {
+      continue;
+    }
+
+    const expressionMatch = ADAPTATION_TOKEN_EXPRESSION_PATTERN.exec(expression);
+    if (!expressionMatch) {
+      const renderedToken = token[0] ?? `{{${rawExpression}}}`;
+      if (reportedMalformedTokens.has(renderedToken)) {
+        continue;
+      }
+
+      reportedMalformedTokens.add(renderedToken);
+      errors.push(
+        machineError({
+          code: 'malformed_adaptation_token',
+          path: args.path,
+          message: `Malformed adaptation token '${renderedToken}' is used in ${args.path}. Use '{{adapt.key}}' with a key matching ^[a-z][a-z0-9_]*$ and declare it in example.yml adaptations[].`,
+        })
+      );
+      continue;
+    }
+
+    const key = expressionMatch[1] ?? '';
+    if (args.declaredKeys.has(key) || reportedKeys.has(key)) {
+      continue;
+    }
+
+    reportedKeys.add(key);
+    errors.push(
+      machineError({
+        code: 'unknown_adaptation_token',
+        path: args.path,
+        message: `Adaptation token '{{adapt.${key}}}' is used in ${args.path}, but example.yml does not declare adaptations[].key '${key}'. Add the adaptation metadata or fix the token spelling.`,
+      })
+    );
+  }
+
+  return errors;
 }
 
 function findDuplicateIdErrors(results: readonly LoadedPackageResult[]): ValidationError[] {

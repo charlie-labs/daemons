@@ -1,14 +1,14 @@
 import { spawnSync } from "node:child_process";
 
 const USAGE =
-  "Usage: bun .agents/daemons/pr-merge-conflict-repair/scripts/find-conflicted-pulls.ts --repo <owner/repo> [--unknown-retries N] [--unknown-retry-delay-ms N] [--max-pages N]";
+  "Usage: bun .agents/daemons/pr-merge-conflict-repair/scripts/find-conflicted-pulls.ts [--repo <owner/repo>] [--unknown-retries N] [--unknown-retry-delay-ms N] [--max-pages N]";
 
 const HELP_TEXT = `Find open non-draft pull requests with merge conflicts.
 
 ${USAGE}
 
 Options:
-  --repo <owner/repo>              Required repository identity.
+  --repo <owner/repo>              Optional repository identity. Defaults to the current GitHub repository.
   --unknown-retries N             Optional retries when mergeability is UNKNOWN (default: 2).
   --unknown-retry-delay-ms N       Optional delay between UNKNOWN retries (default: 1500).
   --max-pages N                   Optional open-PR page cap, 100 PRs per page (default: 25).
@@ -149,7 +149,7 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
   }
 
   if (!repoRaw) {
-    throw new TypeError(`--repo is required.\n${USAGE}`);
+    repoRaw = inferCurrentRepository();
   }
 
   const [owner, repo, extra] = repoRaw.split("/");
@@ -166,6 +166,40 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
     unknownRetryDelayMs,
     maxPages,
   };
+}
+
+function inferCurrentRepository(): string {
+  const result = spawnSync(
+    "gh",
+    ["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"],
+    {
+      encoding: "utf8",
+      maxBuffer: 1024 * 1024,
+    },
+  );
+
+  if (result.error) {
+    throw new TypeError(
+      `Failed to infer repository with gh repo view: ${result.error.message}`,
+    );
+  }
+
+  if (result.status !== 0) {
+    const stderr = result.stderr.trim();
+    throw new TypeError(
+      stderr.length > 0
+        ? `Failed to infer repository with gh repo view: ${stderr}`
+        : `Failed to infer repository with gh repo view; pass --repo <owner/repo>.`,
+    );
+  }
+
+  const repo = result.stdout.trim();
+  if (!repo) {
+    throw new TypeError(
+      `Failed to infer repository with gh repo view; pass --repo <owner/repo>.`,
+    );
+  }
+  return repo;
 }
 
 function parseIntegerString(value: string, flag: string): number {

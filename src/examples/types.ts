@@ -30,6 +30,15 @@ export type JobToBeDone =
   | 'daemon-operations';
 export type IntegrationSlug = 'github' | 'linear' | 'slack' | 'sentry';
 
+export type ExampleAdaptation = {
+  key: string;
+  label: string;
+  description: string;
+  required: boolean;
+  default?: string | undefined;
+  suggestions?: string[] | undefined;
+};
+
 export type ExampleMetadata = {
   id: string;
   title: string;
@@ -48,9 +57,8 @@ export type ExampleMetadata = {
     optionalIntegrations: IntegrationSlug[];
     other: string[];
   };
-  adaptation: {
-    mustCustomize: string[];
-  };
+  adaptations: ExampleAdaptation[];
+  specializationIdeas: string[];
 };
 
 export type CatalogExample = ExampleMetadata & {
@@ -67,7 +75,7 @@ export type CatalogExample = ExampleMetadata & {
 };
 
 export type ExamplesCatalog = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   source: {
     repository: 'charlie-labs/daemons';
     baseDirectory: 'daemons';

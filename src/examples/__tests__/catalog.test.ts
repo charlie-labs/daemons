@@ -34,6 +34,7 @@ describe('examples catalog generator and validator', () => {
       expect(result.value.examples).toHaveLength(1);
       expect(result.value.examples[0]?.scripts).toEqual([]);
       expect(result.value.examples[0]?.references).toEqual([]);
+      expect(result.value.examples[0]?.specializationIdeas).toEqual([]);
     });
   });
 
@@ -133,6 +134,462 @@ describe('examples catalog generator and validator', () => {
 
       expect(result.errors.map((error) => error.code)).toEqual(
         expect.arrayContaining(['invalid_enum_value', 'unknown_key'])
+      );
+    });
+  });
+
+  test('emits structured adaptations in deterministic key order', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/example.yml'),
+        `id: no-support
+title: no support fixture
+status: ready
+summary: Demonstrates structured adaptation metadata for catalog validation.
+readiness: adapt-before-use
+showOnWebsite: true
+showInDashboard: false
+fit:
+  jobsToBeDone:
+    - daemon-operations
+  bestFor:
+    - Teams validating the examples catalog generator.
+  notFor:
+    - Production daemon deployments without local review.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other: []
+adaptations:
+  - key: target_repo
+    label: Target repository
+    description: Repository slug to mention in rendered daemon files.
+    required: true
+    suggestions:
+      - owner/repo
+  - key: branch_prefix
+    label: Branch prefix
+    description: Branch prefix for generated work.
+    required: false
+    default: daemon/example
+`,
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        throw new TypeError('Expected fixture to be valid.');
+      }
+
+      expect(result.value.examples[0]?.adaptations).toEqual([
+        {
+          key: 'branch_prefix',
+          label: 'Branch prefix',
+          description: 'Branch prefix for generated work.',
+          required: false,
+          default: 'daemon/example',
+        },
+        {
+          key: 'target_repo',
+          label: 'Target repository',
+          description: 'Repository slug to mention in rendered daemon files.',
+          required: true,
+          suggestions: ['owner/repo'],
+        },
+      ]);
+    });
+  });
+
+
+  test('reports undeclared adaptation tokens in DAEMON.md', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/DAEMON.md'),
+        `${validDaemonMarkdown('no-support')}\nUse {{adapt.slack_chanel}} for notifications.\n`,
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new TypeError('Expected fixture to be invalid.');
+      }
+
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({
+          code: 'unknown_adaptation_token',
+          path: 'daemons/no-support/DAEMON.md',
+        })
+      );
+      expect(result.errors.find((error) => error.code === 'unknown_adaptation_token')?.message).toContain(
+        "adaptations[].key 'slack_chanel'"
+      );
+    });
+  });
+
+  test('reports undeclared adaptation tokens in script support files', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await mkdir(join(repoRoot, 'daemons/no-support/scripts'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/scripts/render.ts'),
+        'console.log("{{ adapt.slack_chanel }}");\n',
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new TypeError('Expected fixture to be invalid.');
+      }
+
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({
+          code: 'unknown_adaptation_token',
+          path: 'daemons/no-support/scripts/render.ts',
+        })
+      );
+    });
+  });
+
+  test('reports undeclared adaptation tokens in reference support files', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await mkdir(join(repoRoot, 'daemons/no-support/references'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/references/routing.md'),
+        'Send updates to {{adapt.slack_chanel}}.\n',
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new TypeError('Expected fixture to be invalid.');
+      }
+
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({
+          code: 'unknown_adaptation_token',
+          path: 'daemons/no-support/references/routing.md',
+        })
+      );
+    });
+  });
+
+  test('reports malformed adaptation tokens in daemon and support files', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/DAEMON.md'),
+        `${validDaemonMarkdown('no-support')}\nUse {{ adapt.slack-channel }} for notifications.\n`,
+        'utf8'
+      );
+      await mkdir(join(repoRoot, 'daemons/no-support/scripts'), { recursive: true });
+      await mkdir(join(repoRoot, 'daemons/no-support/references'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/scripts/render.ts'),
+        'console.log("{{ adapt .slack_channel }}");\n',
+        'utf8'
+      );
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/references/routing.md'),
+        'Send updates to {{ adapt. }}.\n',
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new TypeError('Expected fixture to be invalid.');
+      }
+
+      expect(result.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'malformed_adaptation_token',
+            path: 'daemons/no-support/DAEMON.md',
+          }),
+          expect.objectContaining({
+            code: 'malformed_adaptation_token',
+            path: 'daemons/no-support/scripts/render.ts',
+          }),
+          expect.objectContaining({
+            code: 'malformed_adaptation_token',
+            path: 'daemons/no-support/references/routing.md',
+          }),
+        ])
+      );
+    });
+  });
+
+  test('allows declared adaptation tokens in daemon and support files', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/example.yml'),
+        `id: no-support
+title: no support fixture
+status: ready
+summary: Demonstrates declared structured adaptation token usage.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: false
+fit:
+  jobsToBeDone:
+    - daemon-operations
+  bestFor:
+    - Teams validating the examples catalog generator.
+  notFor:
+    - Production daemon deployments without local review.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other: []
+adaptations:
+  - key: package_manager
+    label: Package manager
+    description: Package manager command used by this example.
+    required: false
+    default: bun
+`,
+        'utf8'
+      );
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/DAEMON.md'),
+        `${validDaemonMarkdown('no-support')}\nRun {{ adapt.package_manager }} install before checks.\n`,
+        'utf8'
+      );
+      await mkdir(join(repoRoot, 'daemons/no-support/scripts'), { recursive: true });
+      await mkdir(join(repoRoot, 'daemons/no-support/references'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/scripts/render.ts'),
+        'console.log("{{adapt.package_manager}}");\n',
+        'utf8'
+      );
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/references/routing.md'),
+        'Use {{ adapt.package_manager }} for package commands.\n',
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        throw new TypeError('Expected fixture to be valid.');
+      }
+
+      expect(result.value.examples[0]?.adaptations).toEqual([
+        {
+          key: 'package_manager',
+          label: 'Package manager',
+          description: 'Package manager command used by this example.',
+          required: false,
+          default: 'bun',
+        },
+      ]);
+    });
+  });
+
+  test('emits optional specialization ideas', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/example.yml'),
+        `id: no-support
+title: no support fixture
+status: ready
+summary: Demonstrates optional specialization ideas for catalog validation.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: false
+fit:
+  jobsToBeDone:
+    - daemon-operations
+  bestFor:
+    - Teams validating the examples catalog generator.
+  notFor:
+    - Production daemon deployments without local review.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other: []
+specializationIdeas:
+  - Restrict the daemon to a narrower repository area.
+  - Add a team-specific output format.
+`,
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        throw new TypeError('Expected fixture to be valid.');
+      }
+
+      expect(result.value.examples[0]?.specializationIdeas).toEqual([
+        'Restrict the daemon to a narrower repository area.',
+        'Add a team-specific output format.',
+      ]);
+    });
+  });
+
+  test('reports invalid specialization ideas', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/example.yml'),
+        `id: no-support
+title: no support fixture
+status: ready
+summary: Demonstrates invalid specialization ideas.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: false
+fit:
+  jobsToBeDone:
+    - daemon-operations
+  bestFor:
+    - Teams validating the examples catalog generator.
+  notFor:
+    - Production daemon deployments without local review.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other: []
+specializationIdeas:
+  - ''
+`,
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new TypeError('Expected fixture to be invalid.');
+      }
+
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({ code: 'invalid_schema', fieldPath: 'specializationIdeas[0]' })
+      );
+    });
+  });
+
+  test('reports duplicate structured adaptation keys', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/example.yml'),
+        `id: no-support
+title: no support fixture
+status: ready
+summary: Demonstrates duplicate structured adaptation keys.
+readiness: adapt-before-use
+showOnWebsite: true
+showInDashboard: false
+fit:
+  jobsToBeDone:
+    - daemon-operations
+  bestFor:
+    - Teams validating the examples catalog generator.
+  notFor:
+    - Production daemon deployments without local review.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other: []
+adaptations:
+  - key: duplicate_key
+    label: Duplicate key one
+    description: First duplicate.
+    required: true
+  - key: duplicate_key
+    label: Duplicate key two
+    description: Second duplicate.
+    required: true
+`,
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new TypeError('Expected fixture to be invalid.');
+      }
+
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({ code: 'invalid_field_value', fieldPath: 'adaptations[1].key' })
+      );
+    });
+  });
+
+  test('reports structured adaptation metadata validation failures', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/example.yml'),
+        `id: no-support
+title: no support fixture
+status: ready
+summary: Demonstrates invalid structured adaptation metadata.
+readiness: adapt-before-use
+showOnWebsite: true
+showInDashboard: false
+fit:
+  jobsToBeDone:
+    - daemon-operations
+  bestFor:
+    - Teams validating the examples catalog generator.
+  notFor:
+    - Production daemon deployments without local review.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other: []
+adaptations:
+  - key: 9bad
+    label: Bad key
+    description: This key is not token safe.
+    required: true
+    default: should-not-exist
+  - key: duplicate_key
+    label: Duplicate key one
+    description: First duplicate.
+    required: false
+  - key: duplicate_key
+    label: Duplicate key two
+    description: Second duplicate.
+    required: false
+    default: ok
+    suggestions:
+      - valid
+      - 123
+`,
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new TypeError('Expected fixture to be invalid.');
+      }
+
+      expect(result.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'invalid_schema', fieldPath: 'adaptations[0].key' }),
+          expect.objectContaining({ code: 'invalid_field_value', fieldPath: 'adaptations[0].default' }),
+          expect.objectContaining({ code: 'invalid_field_value', fieldPath: 'adaptations[1].default' }),
+          expect.objectContaining({ code: 'invalid_schema', fieldPath: 'adaptations[2].suggestions[1]' }),
+        ])
       );
     });
   });

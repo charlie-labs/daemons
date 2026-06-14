@@ -2,8 +2,9 @@ import { createGitHubCatalogClient } from './catalog-client';
 import { commandAliases, DAEMON_CLI_VERSION, EXIT_CODE_SUCCESS, EXIT_CODE_USAGE } from './constants';
 import { getCommandHelpText, getRootHelpText } from './help';
 import { issue } from './issues';
-import { runAddCommand, runListCommand, runShowCommand, runValidateCommand } from './commands';
+import { runAddCommand, runListCommand, runPrCommand, runShowCommand, runValidateCommand } from './commands';
 import type { CatalogClient, CliCommandResult, HelpData, VersionData } from './types';
+import type { DaemonInstallPrGitHubClient } from '../daemon-install-pr';
 
 export type CliOutput = {
   stdout: (text: string) => void;
@@ -36,12 +37,13 @@ function parseGlobalFlags(argv: readonly string[]): { flags: GlobalFlags; remain
   return { flags, remaining };
 }
 
-function resolveCommand(commandToken: string): 'list' | 'show' | 'add' | 'validate' | null {
+function resolveCommand(commandToken: string): 'list' | 'show' | 'add' | 'validate' | 'pr' | null {
   if (commandToken === 'list') return commandAliases.list;
   if (commandToken === 'show') return commandAliases.show;
   if (commandToken === 'add') return commandAliases.add;
   if (commandToken === 'install') return commandAliases.install;
   if (commandToken === 'validate') return commandAliases.validate;
+  if (commandToken === 'pr') return 'pr';
   return null;
 }
 
@@ -85,6 +87,7 @@ async function runCommand(args: {
   argv: readonly string[];
   cwd: string;
   catalogClient: CatalogClient;
+  githubClient?: DaemonInstallPrGitHubClient | undefined;
 }): Promise<{ flags: GlobalFlags; result: CliCommandResult }> {
   const parsed = parseGlobalFlags(args.argv);
 
@@ -100,6 +103,13 @@ async function runCommand(args: {
     const resolved = resolveCommand(commandToken);
     if (!resolved) {
       return { flags: parsed.flags, result: usageResult(`Unknown command '${commandToken}'.`) };
+    }
+    if (resolved === 'pr') {
+      const subcommand = parsed.remaining[1];
+      if (subcommand === 'open' || subcommand === 'list') {
+        return { flags: parsed.flags, result: helpResult(`pr ${subcommand}`) };
+      }
+      return { flags: parsed.flags, result: helpResult('pr') };
     }
     return { flags: parsed.flags, result: helpResult(commandToken === 'install' ? 'add' : resolved) };
   }
@@ -130,6 +140,10 @@ async function runCommand(args: {
         catalogClient: args.catalogClient,
       }),
     };
+  }
+
+  if (resolved === 'pr') {
+    return { flags: parsed.flags, result: await runPrCommand({ commandArgs, cwd: args.cwd, catalogClient: args.catalogClient, githubClient: args.githubClient }) };
   }
 
   return { flags: parsed.flags, result: await runValidateCommand({ commandArgs, cwd: args.cwd }) };
@@ -169,12 +183,20 @@ function formatHumanResult(result: CliCommandResult, verbose: boolean): string {
     lines.push(`Required integrations: ${Array.isArray(data.requiredIntegrations) && data.requiredIntegrations.length > 0 ? data.requiredIntegrations.join(', ') : 'none'}`);
     lines.push(`Optional integrations: ${Array.isArray(data.optionalIntegrations) && data.optionalIntegrations.length > 0 ? data.optionalIntegrations.join(', ') : 'none'}`);
     lines.push(`Support files: ${[...(Array.isArray(data.scripts) ? data.scripts : []), ...(Array.isArray(data.references) ? data.references : [])].length.toString()}`);
-    lines.push('Adaptations required:');
-    const adaptations = Array.isArray(data.adaptationsRequired) ? data.adaptationsRequired : [];
-    if (adaptations.length === 0) {
-      lines.push('- none declared');
-    } else {
-      for (const adaptation of adaptations) lines.push(`- ${String(adaptation)}`);
+    const structuredAdaptations = Array.isArray(data.adaptations) ? data.adaptations : [];
+    if (structuredAdaptations.length > 0) {
+      lines.push('Adaptation inputs:');
+      for (const adaptation of structuredAdaptations) {
+        if (typeof adaptation === 'object' && adaptation !== null && 'key' in adaptation) {
+          const record = adaptation as Record<string, unknown>;
+          lines.push(`- ${String(record.key)} (${record.required === true ? 'required' : 'optional'}): ${String(record.label)}`);
+        }
+      }
+    }
+    const specializationIdeas = Array.isArray(data.specializationIdeas) ? data.specializationIdeas : [];
+    if (specializationIdeas.length > 0) {
+      lines.push('Specialization ideas:');
+      for (const specializationIdea of specializationIdeas) lines.push(`- ${String(specializationIdea)}`);
     }
     lines.push(`Activation: ${String(data.activationRequired)}`);
   }
@@ -185,14 +207,39 @@ function formatHumanResult(result: CliCommandResult, verbose: boolean): string {
     lines.push(`Files planned: ${String(data.fileCount)}`);
     lines.push(`Dry run: ${data.dryRun === true ? 'yes' : 'no'}`);
     lines.push(`Overwritten: ${data.overwritten === true ? 'yes' : 'no'}`);
-    lines.push('Adaptations required:');
-    const adaptations = Array.isArray(data.adaptationsRequired) ? data.adaptationsRequired : [];
-    if (adaptations.length === 0) {
-      lines.push('- none declared');
+    const appliedKeys = Array.isArray(data.adaptationsApplied) ? data.adaptationsApplied : [];
+    lines.push('Adaptation keys applied:');
+    if (appliedKeys.length === 0) {
+      lines.push('- none');
     } else {
-      for (const adaptation of adaptations) lines.push(`- ${String(adaptation)}`);
+      for (const key of appliedKeys) lines.push(`- ${String(key)}`);
     }
     lines.push(`Activation: ${String(data.activationRequired)}`);
+  }
+
+  if (result.command === 'pr open' && data) {
+    lines.push(`Repository: ${String(data.repository)}`);
+    lines.push(`Base: ${String(data.baseBranch)}`);
+    lines.push(`Branch: ${String(data.headBranch)}`);
+    lines.push(`Head SHA: ${String(data.headSha)}`);
+    const pullRequest = data.pullRequest as Record<string, unknown> | undefined;
+    if (pullRequest) lines.push(`Pull request: #${String(pullRequest.number)} ${String(pullRequest.url)}`);
+    const appliedKeys = Array.isArray(data.adaptationsApplied) ? data.adaptationsApplied : [];
+    lines.push(`Adaptation keys applied: ${appliedKeys.length > 0 ? appliedKeys.map(String).join(', ') : 'none'}`);
+  }
+
+  if (result.command === 'pr list' && data) {
+    lines.push(`Repository: ${String(data.repository)}`);
+    lines.push(`Branch prefix: ${String(data.branchPrefix)}`);
+    const listings = Array.isArray(data.installPullRequests) ? data.installPullRequests : [];
+    for (const listing of listings) {
+      if (typeof listing === 'object' && listing !== null) {
+        const record = listing as Record<string, unknown>;
+        const pullRequest = record.pullRequest as Record<string, unknown> | null;
+        const label = pullRequest ? `#${String(pullRequest.number)}` : String(record.headBranch);
+        lines.push(`- ${label}: ${String(record.status)}`);
+      }
+    }
   }
 
   if (result.command === 'validate' && data) {
@@ -248,13 +295,14 @@ export async function executeCli(args: {
   argv: readonly string[];
   output?: CliOutput;
   catalogClient?: CatalogClient;
+  githubClient?: DaemonInstallPrGitHubClient | undefined;
 }): Promise<number> {
   const stdout = args.output?.stdout ?? ((text: string) => process.stdout.write(`${text}\n`));
   const stderr = args.output?.stderr ?? ((text: string) => process.stderr.write(`${text}\n`));
   const cwd = args.output?.cwd ?? process.cwd();
   const catalogClient = args.catalogClient ?? createGitHubCatalogClient();
 
-  const run = await runCommand({ argv: args.argv, cwd, catalogClient });
+  const run = await runCommand({ argv: args.argv, cwd, catalogClient, githubClient: args.githubClient });
   const rendered = run.flags.json ? formatJsonResult(run.result) : formatHumanResult(run.result, false);
 
   if (run.flags.json || run.result.ok) {

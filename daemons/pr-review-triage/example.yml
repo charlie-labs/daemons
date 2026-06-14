@@ -2,7 +2,7 @@ id: pr-review-triage
 title: PR review triage
 status: ready
 summary: Triages PR review threads and top-level PR comments for merge-readiness, duplicate feedback, fixed items, and safe low-noise follow-up.
-readiness: adapt-before-use
+readiness: direct-copy
 showOnWebsite: true
 showInDashboard: false
 fit:
@@ -19,7 +19,7 @@ requirements:
   optionalIntegrations: []
   other:
     - GitHub pull request review threads and top-level PR comments are the source of truth for feedback state.
-    - A repo-local policy for when duplicate or addressed feedback may be hidden or resolved.
-adaptation:
-  mustCustomize:
-    - Review the action policy and ensure it is aligned with the team's expectations.
+specializationIdeas:
+  - Tune action policy for specific bot reviewers or code-review tools.
+  - Restrict hiding or minimizing behavior to non-human comments only from known automation.
+  - Add repository-specific rules for when fixed human-authored threads may be resolved.

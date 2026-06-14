@@ -3,7 +3,15 @@ import { z, type ZodIssue } from 'zod';
 import { validateCronExpression } from '../daemon-cli/validation/cron';
 import { findPublicSafetyErrors } from './public-safety';
 import { isKebabCaseSlug, isSupportPath } from './paths';
-import type { CatalogExample, DaemonFrontmatter, ExampleMetadata, ExamplesCatalog, ValidationError, ValidationResult } from './types';
+import type {
+  CatalogExample,
+  DaemonFrontmatter,
+  ExampleAdaptation,
+  ExampleMetadata,
+  ExamplesCatalog,
+  ValidationError,
+  ValidationResult,
+} from './types';
 import { formatFieldPath, machineError } from './validation';
 
 const STALE_METADATA_FIELDS = new Set([
@@ -24,6 +32,62 @@ const slugSchema = z.string().min(1).refine(isKebabCaseSlug, {
 
 const nonEmptyStringSchema = z.string().trim().min(1);
 const stringListSchema = z.array(nonEmptyStringSchema);
+const ADAPTATION_KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
+
+const adaptationKeySchema = z.string().regex(ADAPTATION_KEY_PATTERN, {
+  message: 'Expected a token-safe adaptation key matching ^[a-z][a-z0-9_]*$.',
+});
+
+const exampleAdaptationSchema: z.ZodType<ExampleAdaptation> = z
+  .object({
+    key: adaptationKeySchema,
+    label: nonEmptyStringSchema,
+    description: nonEmptyStringSchema,
+    required: z.boolean(),
+    default: z.string().optional(),
+    suggestions: z.array(z.string()).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.required && value.default !== undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['default'],
+        message: 'Required adaptations must not declare a default value.',
+      });
+    }
+
+    if (!value.required && value.default === undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['default'],
+        message: 'Optional adaptations must declare a default value.',
+      });
+    }
+  });
+
+const adaptationsSchema = z
+  .array(exampleAdaptationSchema)
+  .default([])
+  .superRefine((value, context) => {
+    const seen = new Map<string, number>();
+    for (const [index, adaptation] of value.entries()) {
+      const firstIndex = seen.get(adaptation.key);
+      if (firstIndex !== undefined) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, 'key'],
+          message: `Duplicate adaptation key '${adaptation.key}' also appears at adaptations[${firstIndex.toString()}].`,
+        });
+      } else {
+        seen.set(adaptation.key, index);
+      }
+    }
+  });
+
+function hasRequiredAdaptation(adaptations: readonly ExampleAdaptation[]): boolean {
+  return adaptations.some((adaptation) => adaptation.required);
+}
 
 const jobToBeDoneSchema = z.enum([
   'maintain-and-modernize',
@@ -62,27 +126,24 @@ const exampleMetadataSchema = z
         other: stringListSchema,
       })
       .strict(),
-    adaptation: z
-      .object({
-        mustCustomize: stringListSchema,
-      })
-      .strict(),
+    adaptations: adaptationsSchema,
+    specializationIdeas: stringListSchema.default([]),
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.readiness === 'adapt-before-use' && value.adaptation.mustCustomize.length === 0) {
+    if (value.readiness === 'adapt-before-use' && !hasRequiredAdaptation(value.adaptations)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['adaptation', 'mustCustomize'],
-        message: 'adapt-before-use examples must name at least one local customization.',
+        path: ['adaptations'],
+        message: 'adapt-before-use examples must declare at least one required structured adaptation.',
       });
     }
 
-    if (value.readiness === 'direct-copy' && value.adaptation.mustCustomize.length > 0) {
+    if (value.readiness === 'direct-copy' && hasRequiredAdaptation(value.adaptations)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['adaptation', 'mustCustomize'],
-        message: 'direct-copy examples must not require local customization.',
+        path: ['adaptations'],
+        message: 'direct-copy examples must not declare required structured adaptations.',
       });
     }
   });
@@ -117,7 +178,7 @@ const daemonFrontmatterSchema = z
     }
   });
 
-const catalogExampleSchema: z.ZodType<CatalogExample> = z
+const catalogExampleSchema = z
   .object({
     id: slugSchema,
     title: nonEmptyStringSchema,
@@ -140,11 +201,8 @@ const catalogExampleSchema: z.ZodType<CatalogExample> = z
         other: stringListSchema,
       })
       .strict(),
-    adaptation: z
-      .object({
-        mustCustomize: stringListSchema,
-      })
-      .strict(),
+    adaptations: adaptationsSchema,
+    specializationIdeas: stringListSchema.default([]),
     daemon: z
       .object({
         path: z.literal('DAEMON.md'),
@@ -170,19 +228,19 @@ const catalogExampleSchema: z.ZodType<CatalogExample> = z
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.readiness === 'adapt-before-use' && value.adaptation.mustCustomize.length === 0) {
+    if (value.readiness === 'adapt-before-use' && !hasRequiredAdaptation(value.adaptations)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['adaptation', 'mustCustomize'],
-        message: 'adapt-before-use examples must name at least one local customization.',
+        path: ['adaptations'],
+        message: 'adapt-before-use examples must declare at least one required structured adaptation.',
       });
     }
 
-    if (value.readiness === 'direct-copy' && value.adaptation.mustCustomize.length > 0) {
+    if (value.readiness === 'direct-copy' && hasRequiredAdaptation(value.adaptations)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['adaptation', 'mustCustomize'],
-        message: 'direct-copy examples must not require local customization.',
+        path: ['adaptations'],
+        message: 'direct-copy examples must not declare required structured adaptations.',
       });
     }
 
@@ -196,9 +254,9 @@ const catalogExampleSchema: z.ZodType<CatalogExample> = z
     }
   });
 
-const examplesCatalogSchema: z.ZodType<ExamplesCatalog> = z
+const examplesCatalogSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(2),
     source: z
       .object({
         repository: z.literal('charlie-labs/daemons'),
@@ -253,7 +311,7 @@ export function parseExamplesCatalogValue(args: {
   value: unknown;
   path: string;
 }): ValidationResult<ExamplesCatalog> {
-  if (!isRecord(args.value) || args.value.schemaVersion !== 1) {
+  if (!isRecord(args.value) || args.value.schemaVersion !== 2) {
     const actual = isRecord(args.value) ? String(args.value.schemaVersion) : typeof args.value;
     return {
       ok: false,
@@ -262,7 +320,7 @@ export function parseExamplesCatalogValue(args: {
           code: 'unsupported_catalog_schema_version',
           path: args.path,
           fieldPath: 'schemaVersion',
-          message: `Unsupported examples.json schemaVersion ${actual}; supported schemaVersion is 1.`,
+          message: `Unsupported examples.json schemaVersion ${actual}; supported schemaVersion is 2.`,
         }),
       ],
     };
