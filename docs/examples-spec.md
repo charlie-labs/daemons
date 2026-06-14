@@ -340,6 +340,20 @@ Generation rules:
 
 Run `bun run generate:examples` after changing any example package. Commit `examples.json` if it changes.
 
+
+## Schema tracking tags
+
+The repository maintains moving schema tracking tags named `examples-schema-v${schemaVersion}`. Each tag points to the latest validated `master` commit whose committed root `examples.json` declares that `schemaVersion`.
+
+These tags are machine refs for consumers that want the latest catalog for a specific schema without following every future catalog schema change. They are separate from npm release tags:
+
+- package release tags remain annotated `v${package.json#version}` tags;
+- schema tracking tags are moving `examples-schema-v1`, `examples-schema-v2`, and so on;
+- a consume/install operation must use the same selected ref for `examples.json` and every listed support file.
+
+The `daemon` CLI chooses its default catalog ref from the installed package major: `0.x.x` maps to `examples-schema-v1`, `1.x.x` intentionally has no default and requires `--ref <sha|branch|tag>`, and `2.x.x+` maps to the matching `examples-schema-vN` tag. Prerelease and build metadata do not change the major mapping.
+
+
 ## Consumer behavior
 
 Website/docs consumers should show catalog entries where:

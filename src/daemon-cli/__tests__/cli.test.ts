@@ -4,6 +4,7 @@ import path from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { parseExamplesCatalogValue } from '../../examples/schema';
 import type { ExamplesCatalog } from '../../examples/types';
+import { catalogRefForSchemaVersion, resolveDefaultCatalogRefForPackageVersion } from '../catalog-ref';
 import { executeCli } from '../cli';
 import { createDaemonInstallPlan } from '../install-plan';
 import type { CatalogClient } from '../types';
@@ -186,10 +187,16 @@ function memoryCatalogClient(
   const files = new Map<string, string>([
     ['test-ref:daemons/ready-daemon/scripts/run.sh', '#!/usr/bin/env bash\necho ready\n'],
     ['test-ref:daemons/ready-daemon/references/guide.md', '# Guide\n\nAdapt me.\n'],
+    ['examples-schema-v2:daemons/ready-daemon/scripts/run.sh', '#!/usr/bin/env bash\necho schema-v2-ready\n'],
+    ['examples-schema-v2:daemons/ready-daemon/references/guide.md', '# Schema v2 guide\n\nAdapt me.\n'],
+    ['examples-schema-v1:daemons/ready-daemon/scripts/run.sh', '#!/usr/bin/env bash\necho schema-v1-ready\n'],
+    ['examples-schema-v1:daemons/ready-daemon/references/guide.md', '# Schema v1 guide\n\nAdapt me.\n'],
     ['master:daemons/ready-daemon/scripts/run.sh', '#!/usr/bin/env bash\necho ready\n'],
     ['master:daemons/ready-daemon/references/guide.md', '# Guide\n\nAdapt me.\n'],
     ['test-ref:daemons/templated-daemon/scripts/render.sh', '#!/usr/bin/env bash\necho {{adapt.required_value}} {{adapt.optional_value}}\n'],
     ['test-ref:daemons/templated-daemon/references/render.md', '# Rendered\n\nTarget: {{ adapt.required_value }}\nOptional: {{adapt.optional_value}}\n'],
+    ['examples-schema-v2:daemons/templated-daemon/scripts/render.sh', '#!/usr/bin/env bash\necho {{adapt.required_value}} {{adapt.optional_value}}\n'],
+    ['examples-schema-v2:daemons/templated-daemon/references/render.md', '# Rendered v2\n\nTarget: {{ adapt.required_value }}\nOptional: {{adapt.optional_value}}\n'],
     ['master:daemons/templated-daemon/scripts/render.sh', '#!/usr/bin/env bash\necho {{adapt.required_value}} {{adapt.optional_value}}\n'],
     ['master:daemons/templated-daemon/references/render.md', '# Rendered\n\nTarget: {{ adapt.required_value }}\nOptional: {{adapt.optional_value}}\n'],
   ]);
@@ -200,7 +207,7 @@ function memoryCatalogClient(
   }
 
   return {
-    async loadCatalog(): Promise<ExamplesCatalog> {
+    async loadCatalog(_ref: string): Promise<ExamplesCatalog> {
       return catalogValue;
     },
     async readTextFile(ref: string, filePath: string): Promise<string> {
@@ -223,12 +230,18 @@ async function withTempDir(run: (directory: string) => Promise<void>): Promise<v
   }
 }
 
-async function runJson(argv: string[], cwd: string, client: CatalogClient = memoryCatalogClient()): Promise<{ code: number; stdout: string; stderr: string; json: any }> {
+async function runJson(
+  argv: string[],
+  cwd: string,
+  client: CatalogClient = memoryCatalogClient(),
+  packageVersion?: string
+): Promise<{ code: number; stdout: string; stderr: string; json: any }> {
   let stdout = '';
   let stderr = '';
   const code = await executeCli({
     argv: [...argv, '--json'],
     catalogClient: client,
+    packageVersion,
     output: {
       cwd,
       stdout: (text) => {
@@ -258,6 +271,58 @@ describe('daemon CLI catalog commands', () => {
           exampleIds: ['ready-daemon', 'deprecated-daemon', 'templated-daemon'],
         },
       });
+    });
+  });
+
+  test('uses package-major schema tracking tag as default ref', async () => {
+    await withTempDir(async (directory) => {
+      const result = await runJson(['list'], directory);
+
+      expect(result.code).toBe(0);
+      expect(result.json.data.sourceRef).toBe('examples-schema-v2');
+    });
+  });
+
+  test('default add uses the selected schema tag for support-file reads', async () => {
+    await withTempDir(async (directory) => {
+      const result = await runJson(['add', 'ready-daemon'], directory);
+
+      expect(result.code).toBe(0);
+      expect(result.json.data.sourceRef).toBe('examples-schema-v2');
+      await expect(readFile(path.join(directory, '.agents/daemons/ready-daemon/scripts/run.sh'), 'utf8')).resolves.toContain('echo schema-v2-ready');
+      await expect(readFile(path.join(directory, '.agents/daemons/ready-daemon/references/guide.md'), 'utf8')).resolves.toContain('Schema v2 guide');
+    });
+  });
+
+  test('explicit ref wins even when package major has no default mapping or invalid semver', async () => {
+    await withTempDir(async (directory) => {
+      const skippedMajor = await runJson(['list', '--ref', 'test-ref'], directory, memoryCatalogClient(), '1.2.3');
+      expect(skippedMajor.code).toBe(0);
+      expect(skippedMajor.json.data.sourceRef).toBe('test-ref');
+
+      const invalidVersion = await runJson(['show', 'ready-daemon', '--ref', 'test-ref'], directory, memoryCatalogClient(), 'not-semver');
+      expect(invalidVersion.code).toBe(0);
+      expect(invalidVersion.json.data.sourceRef).toBe('test-ref');
+    });
+  });
+
+  test('package major 1 has no default ref and asks for explicit --ref', async () => {
+    await withTempDir(async (directory) => {
+      const result = await runJson(['list'], directory, memoryCatalogClient(), '1.0.0-beta.1');
+
+      expect(result.code).toBe(64);
+      expect(result.json.errors).toContainEqual(expect.objectContaining({ code: 'DEFAULT_CATALOG_REF_UNAVAILABLE' }));
+      expect(result.json.summary).toContain('--ref <sha|branch|tag>');
+    });
+  });
+
+  test('invalid package version has no default ref and asks for explicit --ref', async () => {
+    await withTempDir(async (directory) => {
+      const result = await runJson(['list'], directory, memoryCatalogClient(), 'invalid-version');
+
+      expect(result.code).toBe(64);
+      expect(result.json.errors).toContainEqual(expect.objectContaining({ code: 'DEFAULT_CATALOG_REF_VERSION_INVALID' }));
+      expect(result.json.summary).toContain('--ref <sha|branch|tag>');
     });
   });
 
@@ -742,5 +807,37 @@ describe('daemon CLI catalog and cron helpers', () => {
       ok: false,
       reason: 'cron:minute value out of range',
     });
+  });
+});
+
+describe('daemon CLI default catalog ref helpers', () => {
+  test('maps package major versions to schema tracking tags', () => {
+    expect(resolveDefaultCatalogRefForPackageVersion('0.9.9')).toMatchObject({
+      ok: true,
+      ref: 'examples-schema-v1',
+      schemaVersion: 1,
+    });
+    expect(resolveDefaultCatalogRefForPackageVersion('2.0.0-beta.1+build.5')).toMatchObject({
+      ok: true,
+      ref: 'examples-schema-v2',
+      schemaVersion: 2,
+    });
+    expect(resolveDefaultCatalogRefForPackageVersion('7.1.0')).toMatchObject({
+      ok: true,
+      ref: 'examples-schema-v7',
+      schemaVersion: 7,
+    });
+  });
+
+  test('skips package major 1 and rejects invalid semver for defaults', () => {
+    expect(resolveDefaultCatalogRefForPackageVersion('1.0.0')).toMatchObject({
+      ok: false,
+      code: 'DEFAULT_CATALOG_REF_UNAVAILABLE',
+    });
+    expect(resolveDefaultCatalogRefForPackageVersion('not-semver')).toMatchObject({
+      ok: false,
+      code: 'DEFAULT_CATALOG_REF_VERSION_INVALID',
+    });
+    expect(catalogRefForSchemaVersion(2)).toBe('examples-schema-v2');
   });
 });

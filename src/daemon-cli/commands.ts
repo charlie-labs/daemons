@@ -3,8 +3,8 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import {
   ACTIVATION_CAVEAT,
+  DAEMON_CLI_VERSION,
   DAEMON_ID_PATTERN,
-  DEFAULT_CATALOG_REF,
   DEFAULT_DAEMON_ROOT,
   EXIT_CODE_DATA,
   EXIT_CODE_INTERNAL,
@@ -30,6 +30,7 @@ import {
   resolveAdaptations,
   type AdaptationResolution,
 } from './adaptations';
+import { resolveCatalogRef } from './catalog-ref';
 import { createDaemonInstallPlan } from './install-plan';
 import { issue, normalizeErrorMessage } from './issues';
 import type {
@@ -70,6 +71,24 @@ function usageIssuesResult(command: string, summary: string, errors: CliIssue[])
   };
 }
 
+function resolveCommandCatalogRef(
+  command: string,
+  explicitRef: string | undefined,
+  packageVersion: string
+): { ok: true; ref: string } | { ok: false; result: CliCommandResult } {
+  const resolved = resolveCatalogRef({ explicitRef, packageVersion });
+  if (resolved.ok) {
+    return { ok: true, ref: resolved.ref };
+  }
+
+  return {
+    ok: false,
+    result: usageIssuesResult(command, resolved.message, [
+      issue({ code: resolved.code, message: resolved.message }),
+    ]),
+  };
+}
+
 function internalResult(command: string, error: unknown): CliCommandResult {
   return {
     command,
@@ -96,7 +115,7 @@ function catalogErrorResult(command: string, error: unknown): CliCommandResult {
   };
 }
 
-function parseRefOnly(command: string, commandArgs: readonly string[]):
+function parseRefOnly(command: string, commandArgs: readonly string[], packageVersion: string):
   | { ok: true; ref: string }
   | { ok: false; result: CliCommandResult } {
   try {
@@ -108,7 +127,7 @@ function parseRefOnly(command: string, commandArgs: readonly string[]):
       allowPositionals: false,
       strict: true,
     });
-    return { ok: true, ref: parsed.values.ref ?? DEFAULT_CATALOG_REF };
+    return resolveCommandCatalogRef(command, parsed.values.ref, packageVersion);
   } catch (error) {
     return { ok: false, result: usageResult(command, normalizeErrorMessage(error)) };
   }
@@ -131,8 +150,9 @@ function listItem(entry: CatalogExample) {
 export async function runListCommand(args: {
   commandArgs: readonly string[];
   catalogClient: CatalogClient;
+  packageVersion?: string | undefined;
 }): Promise<CliCommandResult<ListData>> {
-  const parsed = parseRefOnly('list', args.commandArgs);
+  const parsed = parseRefOnly('list', args.commandArgs, args.packageVersion ?? DAEMON_CLI_VERSION);
   if (!parsed.ok) return parsed.result as CliCommandResult<ListData>;
 
   try {
@@ -162,6 +182,7 @@ export async function runListCommand(args: {
 export async function runShowCommand(args: {
   commandArgs: readonly string[];
   catalogClient: CatalogClient;
+  packageVersion?: string | undefined;
 }): Promise<CliCommandResult<ShowData>> {
   let parsed;
   try {
@@ -184,7 +205,9 @@ export async function runShowCommand(args: {
     return usageResult('show', `Invalid example id '${exampleId ?? ''}'. Expected kebab-case.`) as CliCommandResult<ShowData>;
   }
 
-  const ref = parsed.values.ref ?? DEFAULT_CATALOG_REF;
+  const resolvedRef = resolveCommandCatalogRef('show', parsed.values.ref, args.packageVersion ?? DAEMON_CLI_VERSION);
+  if (!resolvedRef.ok) return resolvedRef.result as CliCommandResult<ShowData>;
+  const ref = resolvedRef.ref;
   try {
     const catalog = await args.catalogClient.loadCatalog(ref);
     const entry = findCatalogEntry(catalog.examples, exampleId);
@@ -382,6 +405,7 @@ export async function runAddCommand(args: {
   commandArgs: readonly string[];
   cwd: string;
   catalogClient: CatalogClient;
+  packageVersion?: string | undefined;
 }): Promise<CliCommandResult<AddData>> {
   let parsed;
   try {
@@ -411,7 +435,9 @@ export async function runAddCommand(args: {
     return usageResult(args.commandName, `Invalid example id '${exampleId ?? ''}'. Expected kebab-case.`) as CliCommandResult<AddData>;
   }
 
-  const ref = parsed.values.ref ?? DEFAULT_CATALOG_REF;
+  const resolvedRef = resolveCommandCatalogRef(args.commandName, parsed.values.ref, args.packageVersion ?? DAEMON_CLI_VERSION);
+  if (!resolvedRef.ok) return resolvedRef.result as CliCommandResult<AddData>;
+  const ref = resolvedRef.ref;
   const force = parsed.values.force === true;
   const dryRun = parsed.values['dry-run'] === true;
   const allowDeprecated = parsed.values['allow-deprecated'] === true;
