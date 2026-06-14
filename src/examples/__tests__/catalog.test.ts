@@ -203,6 +203,153 @@ adaptations:
     });
   });
 
+
+  test('reports undeclared adaptation tokens in DAEMON.md', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/DAEMON.md'),
+        `${validDaemonMarkdown('no-support')}\nUse {{adapt.slack_chanel}} for notifications.\n`,
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new TypeError('Expected fixture to be invalid.');
+      }
+
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({
+          code: 'unknown_adaptation_token',
+          path: 'daemons/no-support/DAEMON.md',
+        })
+      );
+      expect(result.errors.find((error) => error.code === 'unknown_adaptation_token')?.message).toContain(
+        "adaptations[].key 'slack_chanel'"
+      );
+    });
+  });
+
+  test('reports undeclared adaptation tokens in script support files', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await mkdir(join(repoRoot, 'daemons/no-support/scripts'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/scripts/render.ts'),
+        'console.log("{{ adapt.slack_chanel }}");\n',
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new TypeError('Expected fixture to be invalid.');
+      }
+
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({
+          code: 'unknown_adaptation_token',
+          path: 'daemons/no-support/scripts/render.ts',
+        })
+      );
+    });
+  });
+
+  test('reports undeclared adaptation tokens in reference support files', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await mkdir(join(repoRoot, 'daemons/no-support/references'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/references/routing.md'),
+        'Send updates to {{adapt.slack_chanel}}.\n',
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new TypeError('Expected fixture to be invalid.');
+      }
+
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({
+          code: 'unknown_adaptation_token',
+          path: 'daemons/no-support/references/routing.md',
+        })
+      );
+    });
+  });
+
+  test('allows declared adaptation tokens in daemon and support files', async () => {
+    await withFixture('valid-no-support', async (repoRoot) => {
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/example.yml'),
+        `id: no-support
+title: no support fixture
+status: ready
+summary: Demonstrates declared structured adaptation token usage.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: false
+fit:
+  jobsToBeDone:
+    - daemon-operations
+  bestFor:
+    - Teams validating the examples catalog generator.
+  notFor:
+    - Production daemon deployments without local review.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other: []
+adaptations:
+  - key: package_manager
+    label: Package manager
+    description: Package manager command used by this example.
+    required: false
+    default: bun
+`,
+        'utf8'
+      );
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/DAEMON.md'),
+        `${validDaemonMarkdown('no-support')}\nRun {{ adapt.package_manager }} install before checks.\n`,
+        'utf8'
+      );
+      await mkdir(join(repoRoot, 'daemons/no-support/scripts'), { recursive: true });
+      await mkdir(join(repoRoot, 'daemons/no-support/references'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/scripts/render.ts'),
+        'console.log("{{adapt.package_manager}}");\n',
+        'utf8'
+      );
+      await writeFile(
+        join(repoRoot, 'daemons/no-support/references/routing.md'),
+        'Use {{ adapt.package_manager }} for package commands.\n',
+        'utf8'
+      );
+
+      const result = await generateCatalogFromRepository(repoRoot);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        throw new TypeError('Expected fixture to be valid.');
+      }
+
+      expect(result.value.examples[0]?.adaptations).toEqual([
+        {
+          key: 'package_manager',
+          label: 'Package manager',
+          description: 'Package manager command used by this example.',
+          required: false,
+          default: 'bun',
+        },
+      ]);
+    });
+  });
+
   test('emits optional specialization ideas', async () => {
     await withFixture('valid-no-support', async (repoRoot) => {
       await writeFile(

@@ -20,6 +20,7 @@ const SOURCE_BASE_DIRECTORY = 'daemons';
 const DEFAULT_PUBLICATION_REF = 'master';
 const ROOT_CATALOG_PATH = 'examples.json';
 const ALLOWED_DAEMON_PACKAGE_ENTRIES = new Set(['DAEMON.md', 'example.yml', 'scripts', 'references']);
+const ADAPTATION_TOKEN_PATTERN = /{{\s*adapt\.([^{}\s]+)\s*}}/g;
 
 export async function generateCatalogFromRepository(
   repoRoot: string,
@@ -288,6 +289,18 @@ async function loadCatalogExample(
   const supportPaths = await discoverSupportPaths(repoRoot, daemonPackage.directoryPath);
   errors.push(...supportPaths.errors);
 
+  if (exampleMetadata && daemonContent.ok) {
+    errors.push(
+      ...(await validateDeclaredAdaptationTokens({
+        repoRoot,
+        daemonPackage,
+        daemonContent: daemonContent.value,
+        supportPaths: [...supportPaths.scripts, ...supportPaths.references],
+        exampleMetadata,
+      }))
+    );
+  }
+
   if (!exampleMetadata || !daemonContent.ok || errors.length > 0) {
     return {
       directoryName: daemonPackage.directoryName,
@@ -500,6 +513,69 @@ async function walkSupportDirectory(
   }
 
   return { paths, errors };
+}
+
+async function validateDeclaredAdaptationTokens(args: {
+  repoRoot: string;
+  daemonPackage: DaemonPackage;
+  daemonContent: string;
+  supportPaths: readonly string[];
+  exampleMetadata: ExampleMetadata;
+}): Promise<ValidationError[]> {
+  const declaredKeys = new Set(args.exampleMetadata.adaptations.map((adaptation) => adaptation.key));
+  const errors = findUnknownAdaptationTokenErrors({
+    content: args.daemonContent,
+    path: args.daemonPackage.daemonPath,
+    declaredKeys,
+  });
+
+  for (const supportPath of args.supportPaths) {
+    const path = `${args.daemonPackage.directoryPath}/${supportPath}`;
+    let content: string;
+    try {
+      content = await readFile(join(args.repoRoot, path), 'utf8');
+    } catch (error) {
+      errors.push(
+        machineError({
+          code: 'unsupported_support_path',
+          path,
+          message: `Unable to read support file: ${normalizeThrownMessage(error)}`,
+        })
+      );
+      continue;
+    }
+
+    errors.push(...findUnknownAdaptationTokenErrors({ content, path, declaredKeys }));
+  }
+
+  return errors;
+}
+
+function findUnknownAdaptationTokenErrors(args: {
+  content: string;
+  path: string;
+  declaredKeys: ReadonlySet<string>;
+}): ValidationError[] {
+  const errors: ValidationError[] = [];
+  const reportedKeys = new Set<string>();
+
+  for (const token of args.content.matchAll(ADAPTATION_TOKEN_PATTERN)) {
+    const key = token[1] ?? '';
+    if (args.declaredKeys.has(key) || reportedKeys.has(key)) {
+      continue;
+    }
+
+    reportedKeys.add(key);
+    errors.push(
+      machineError({
+        code: 'unknown_adaptation_token',
+        path: args.path,
+        message: `Adaptation token '{{adapt.${key}}}' is used in ${args.path}, but example.yml does not declare adaptations[].key '${key}'. Add the adaptation metadata or fix the token spelling.`,
+      })
+    );
+  }
+
+  return errors;
 }
 
 function findDuplicateIdErrors(results: readonly LoadedPackageResult[]): ValidationError[] {
