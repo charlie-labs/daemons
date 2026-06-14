@@ -18,15 +18,15 @@ Exit codes:
 
 export function getCommandHelpText(command: string): string {
   if (command === 'list') {
-    return 'Usage: daemon list [--ref <sha|branch|tag>] [--json]\n\nReads root examples.json and lists catalog example IDs. Without --ref, the package major selects examples-schema-vN; package major 1 requires an explicit ref.';
+    return 'Usage: daemon list [--ref <sha|branch|tag>] [--json]\n\nReads root examples.json and lists catalog example IDs.';
   }
 
   if (command === 'show') {
-    return 'Usage: daemon show <example-id> [--ref <sha|branch|tag>] [--json]\n\nShows catalog metadata, support files, integrations, structured adaptation inputs, and optional specialization ideas. Without --ref, the package major selects examples-schema-vN; package major 1 requires an explicit ref.';
+    return 'Usage: daemon show <example-id> [--ref <sha|branch|tag>] [--json]\n\nShows catalog metadata, support files, integrations, structured adaptation inputs, and optional specialization ideas.';
   }
 
   if (command === 'add') {
-    return 'Usage: daemon add <example-id> [--ref <sha|branch|tag>] [--adapt key=value] [--adapt-file adaptations.json] [--dry-run] [--force] [--allow-deprecated] [--json]\n\nScaffolds catalog-listed files into .agents/daemons/<id>/ without activating the daemon. Without --ref, the package major selects examples-schema-vN; package major 1 requires an explicit ref. Adaptation values render documented {{adapt.key}} tokens before validation and writes.';
+    return 'Usage: daemon add <example-id> [--ref <sha|branch|tag>] [--adapt key=value] [--adapt-file adaptations.json] [--dry-run] [--force] [--allow-deprecated] [--json]\n\nScaffolds catalog-listed files into .agents/daemons/<id>/ without activating the daemon. Adaptation values render documented {{adapt.key}} tokens before validation and writes.';
   }
 
   if (command === 'validate') {

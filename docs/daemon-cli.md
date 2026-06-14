@@ -33,32 +33,21 @@ node dist/bin.js list --json
 
 ## Catalog source and pinned refs
 
-The root `examples.json` file is the source of truth. The CLI reads it from `charlie-labs/daemons`.
-
-When `--ref` is omitted, the CLI derives a schema tracking tag from the installed package version in `package.json`:
-
-| Installed package major | Default catalog ref |
-| --- | --- |
-| `0.x.x` | `examples-schema-v1` |
-| `1.x.x` | No default; pass `--ref <sha|branch|tag>` explicitly. |
-| `2.x.x` | `examples-schema-v2` |
-| `N.x.x`, where `N >= 2` | `examples-schema-vN` |
-
-Prerelease and build metadata keep the same major mapping, so `2.0.0-beta.1` uses `examples-schema-v2`. If the package version is invalid or the installed major is `1`, commands that need the catalog fail with a clear prompt to pass `--ref <sha|branch|tag>`.
+The root `examples.json` file is the source of truth. The CLI reads it from `charlie-labs/daemons` and defaults to `master`:
 
 ```bash
 daemon list
 ```
 
-Use `--ref <sha|branch|tag>` for reproducible reads and installs. An explicit `--ref` always wins over the package-major default:
+Use `--ref <sha|branch|tag>` for reproducible reads and installs:
 
 ```bash
 daemon show dependency-upgrades --ref 11da8066b1e0cf968d07ce512f65a9a817f9bc10
 
-daemon add dependency-upgrades --ref examples-schema-v2
+daemon add dependency-upgrades --ref 11da8066b1e0cf968d07ce512f65a9a817f9bc10
 ```
 
-A single command uses the selected ref for `examples.json` and every support-file fetch.
+A single command uses the same ref for `examples.json` and every support-file fetch.
 
 Unsupported catalog schema versions fail closed.
 
@@ -71,7 +60,7 @@ Reads root `examples.json` and prints stable example IDs.
 ```bash
 daemon list
 
-daemon list --ref examples-schema-v2 --json
+daemon list --ref master --json
 ```
 
 JSON data includes `exampleIds[]`, compact `examples[]`, `sourceRepo`, `sourceRef`, and `schemaVersion`.
@@ -127,7 +116,7 @@ Examples:
 daemon add js-ts-dependency-upgrades --dry-run \
   --adapt package_manager=pnpm
 
-daemon install docs-drift-maintainer --ref examples-schema-v2
+daemon install docs-drift-maintainer --ref master
 
 daemon add pr-merge-conflict-repair --allow-deprecated --dry-run
 

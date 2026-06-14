@@ -6,9 +6,6 @@ on:
     branches:
       - master
 
-permissions:
-  contents: read
-
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -25,42 +22,3 @@ jobs:
       - run: bun run generate:examples
       - run: bun run validate:examples
       - run: git diff --exit-code examples.json
-
-  update-schema-tracking-tag:
-    name: Update examples schema tracking tag
-    needs: validate
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Read committed examples schema version
-        id: schema
-        shell: bash
-        run: |
-          node <<'NODE' >> "$GITHUB_OUTPUT"
-          const fs = require('node:fs');
-          const catalog = JSON.parse(fs.readFileSync('examples.json', 'utf8'));
-          const schemaVersion = catalog.schemaVersion;
-          if (!Number.isInteger(schemaVersion) || schemaVersion < 1) {
-            throw new Error(`examples.json#schemaVersion must be a positive integer, got ${JSON.stringify(schemaVersion)}.`);
-          }
-          console.log(`schema_version=${schemaVersion}`);
-          console.log(`tag=examples-schema-v${schemaVersion}`);
-          NODE
-      - name: Force-update schema tracking tag
-        shell: bash
-        env:
-          TAG: ${{ steps.schema.outputs.tag }}
-        run: |
-          set -euo pipefail
-          current_sha="$(git rev-parse HEAD)"
-          if [[ "$current_sha" != "$GITHUB_SHA" ]]; then
-            echo "Checked-out commit $current_sha does not match push commit $GITHUB_SHA." >&2
-            exit 1
-          fi
-          git tag -f "$TAG" "$GITHUB_SHA"
-          git push --force origin "refs/tags/${TAG}"

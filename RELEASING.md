@@ -6,6 +6,7 @@ Releases are created from reviewed PRs. A human updates the package version and 
 
 1. Open a normal PR against `master` that includes:
    - the intended `package.json` version;
+   - the matching CLI-reported version in `src/daemon-cli/constants.ts`;
    - release notes in `CHANGELOG.md` for that exact version.
 2. Get the PR reviewed and wait for CI to pass.
 3. Merge the PR to `master`.
@@ -17,22 +18,11 @@ Do not publish manually as part of the normal flow, and do not add a long-lived 
 
 Every release PR must keep these inputs in sync:
 
-- `package.json#version` is the source for the npm package version, release tag, `daemon --version`, and default examples-catalog schema ref mapping.
-- The `smoke:daemon` check packs and installs the package, then verifies the installed binary prints the package version.
+- `package.json#version` is the source for the npm package version and release tag.
+- `src/daemon-cli/constants.ts` must report the same version through `daemon --version`. The `smoke:daemon` check packs and installs the package, then verifies the installed binary prints the package version.
 - `CHANGELOG.md` must include an entry for the exact version. The release workflow uses that entry for the GitHub Release notes when it is present.
 
 Use valid semver. Stable versions look like `0.0.1`; prereleases look like `0.0.2-beta.1`.
-
-The CLI default catalog ref is selected from the package major:
-
-| Package version | Default catalog ref |
-| --- | --- |
-| `0.x.x` | `examples-schema-v1` |
-| `1.x.x` | No default; users must pass `--ref <sha|branch|tag>`. |
-| `2.x.x` | `examples-schema-v2` |
-| `N.x.x`, where `N >= 2` | `examples-schema-vN` |
-
-Prerelease/build metadata does not change the major mapping. Keep the package major aligned with the catalog schema the CLI supports.
 
 ## Validation checklist
 
@@ -51,13 +41,6 @@ npm pack --dry-run
 ```
 
 The release workflow runs the same validation checklist before it creates release artifacts or publishes to npm.
-
-The CI workflow also updates the moving schema tracking tag after the `master` validation job passes. It reads committed `examples.json#schemaVersion` and force-updates `examples-schema-v${schemaVersion}` to the validated `master` commit. These schema tags are intentionally separate from release tags:
-
-- release tags are annotated `v${package.json#version}` tags and are not moved after publication;
-- schema tags are moving `examples-schema-v1`, `examples-schema-v2`, etc. tags for latest validated catalog refs.
-
-Do not manually create or move schema tracking tags during a release unless CI is unavailable and the release owner intentionally performs the same validated update.
 
 ## Stable and prerelease behavior
 

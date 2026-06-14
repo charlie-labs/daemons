@@ -1,26 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-function readPackageVersion(): string {
-  const moduleDirectory = dirname(fileURLToPath(import.meta.url));
-  const packageJsonPath = [
-    join(moduleDirectory, '..', '..', 'package.json'),
-    join(moduleDirectory, '..', '..', '..', 'package.json'),
-  ].find((candidate) => existsSync(candidate));
-
-  if (!packageJsonPath) {
-    throw new Error('Unable to locate package.json for daemon CLI version.');
-  }
-
-  const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as { version?: unknown };
-  if (typeof packageJson.version !== 'string' || packageJson.version.length === 0) {
-    throw new Error('package.json#version must be a non-empty string.');
-  }
-  return packageJson.version;
-}
-
-export const DAEMON_CLI_VERSION = readPackageVersion();
+export const DAEMON_CLI_VERSION = '2.0.0';
 
 export const EXIT_CODE_SUCCESS = 0;
 export const EXIT_CODE_USAGE = 64;
@@ -30,6 +8,7 @@ export const EXIT_CODE_INTERNAL = 70;
 export const SOURCE_REPO = 'charlie-labs/daemons';
 export const SOURCE_REPO_OWNER = 'charlie-labs';
 export const SOURCE_REPO_NAME = 'daemons';
+export const DEFAULT_CATALOG_REF = 'master';
 export const CATALOG_PATH = 'examples.json';
 export const SUPPORTED_CATALOG_SCHEMA_VERSION = 2;
 export const CATALOG_SOURCE_BASE_DIRECTORY = 'daemons';

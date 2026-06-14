@@ -92,13 +92,8 @@ Use one source ref for the catalog and all support-file fetches in a single cons
 | Consumer goal | Recommended ref |
 | --- | --- |
 | Reproducible install or audit trail | A commit SHA. |
-| Latest validated catalog for a specific schema | `examples-schema-v${schemaVersion}`, such as `examples-schema-v2`. |
-| Intentional branch tracking for internal development | `master`. |
+| Intentionally latest internal surface | `master`. |
 | Website or docs deployment | A deployment-pinned ref chosen by that deployment. |
-
-Schema tracking tags are moving tags. After validation on `master`, automation reads committed root `examples.json#schemaVersion` and force-updates `examples-schema-v${schemaVersion}` to that commit. These tags are separate from package release tags, which remain `v${package.json#version}`.
-
-The `daemon` CLI derives its default source ref from the installed package major: `0.x.x` uses `examples-schema-v1`, `1.x.x` has no default and requires explicit `--ref <sha|branch|tag>`, and `2.x.x+` uses `examples-schema-vN` for the matching major. Prerelease and build metadata keep the same major mapping. Explicit `--ref` always wins.
 
 Catalog v2 intentionally omits nondeterministic fields such as `generatedAt` and `sourceCommit`. If a consumer needs auditability, record the selected source ref in the consuming system, install metadata, PR body, or deployment logs. Store the schema version read from the catalog at that same ref.
 
@@ -165,7 +160,7 @@ Install consumers should copy from one catalog entry into:
 
 Recommended flow:
 
-1. Choose a source ref, preferably a commit SHA for reproducibility or `examples-schema-v${schemaVersion}` for the latest validated catalog with a known schema.
+1. Choose a source ref.
 2. Fetch `examples.json` from repository root at that ref.
 3. Validate `catalog.schemaVersion === 2`.
 4. Select an entry from `catalog.examples`.

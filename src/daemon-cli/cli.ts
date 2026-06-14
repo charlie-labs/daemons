@@ -57,15 +57,15 @@ function usageResult(summary: string): CliCommandResult<HelpData> {
   };
 }
 
-function versionResult(packageVersion: string): CliCommandResult<VersionData> {
+function versionResult(): CliCommandResult<VersionData> {
   return {
     command: 'version',
     ok: true,
     exitCode: EXIT_CODE_SUCCESS,
-    summary: `daemon version ${packageVersion}`,
+    summary: `daemon version ${DAEMON_CLI_VERSION}`,
     warnings: [],
     errors: [],
-    data: { version: packageVersion },
+    data: { version: DAEMON_CLI_VERSION },
   };
 }
 
@@ -85,12 +85,11 @@ async function runCommand(args: {
   argv: readonly string[];
   cwd: string;
   catalogClient: CatalogClient;
-  packageVersion: string;
 }): Promise<{ flags: GlobalFlags; result: CliCommandResult }> {
   const parsed = parseGlobalFlags(args.argv);
 
   if (parsed.flags.version) {
-    return { flags: parsed.flags, result: versionResult(args.packageVersion) };
+    return { flags: parsed.flags, result: versionResult() };
   }
 
   const commandToken = parsed.remaining[0];
@@ -116,10 +115,10 @@ async function runCommand(args: {
 
   const commandArgs = parsed.remaining.slice(1);
   if (resolved === 'list') {
-    return { flags: parsed.flags, result: await runListCommand({ commandArgs, catalogClient: args.catalogClient, packageVersion: args.packageVersion }) };
+    return { flags: parsed.flags, result: await runListCommand({ commandArgs, catalogClient: args.catalogClient }) };
   }
   if (resolved === 'show') {
-    return { flags: parsed.flags, result: await runShowCommand({ commandArgs, catalogClient: args.catalogClient, packageVersion: args.packageVersion }) };
+    return { flags: parsed.flags, result: await runShowCommand({ commandArgs, catalogClient: args.catalogClient }) };
   }
   if (resolved === 'add') {
     return {
@@ -129,7 +128,6 @@ async function runCommand(args: {
         commandArgs,
         cwd: args.cwd,
         catalogClient: args.catalogClient,
-        packageVersion: args.packageVersion,
       }),
     };
   }
@@ -258,15 +256,13 @@ export async function executeCli(args: {
   argv: readonly string[];
   output?: CliOutput;
   catalogClient?: CatalogClient;
-  packageVersion?: string | undefined;
 }): Promise<number> {
   const stdout = args.output?.stdout ?? ((text: string) => process.stdout.write(`${text}\n`));
   const stderr = args.output?.stderr ?? ((text: string) => process.stderr.write(`${text}\n`));
   const cwd = args.output?.cwd ?? process.cwd();
   const catalogClient = args.catalogClient ?? createGitHubCatalogClient();
-  const packageVersion = args.packageVersion ?? DAEMON_CLI_VERSION;
 
-  const run = await runCommand({ argv: args.argv, cwd, catalogClient, packageVersion });
+  const run = await runCommand({ argv: args.argv, cwd, catalogClient });
   const rendered = run.flags.json ? formatJsonResult(run.result) : formatHumanResult(run.result, false);
 
   if (run.flags.json || run.result.ok) {
