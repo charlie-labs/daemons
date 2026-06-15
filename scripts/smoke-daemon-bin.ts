@@ -182,8 +182,10 @@ async function main(): Promise<void> {
     `const mod = await import(${JSON.stringify(distIndexUrl)});
 const expected = [
   'createDaemonInstallPlan',
+  'createDaemonInstallPullRequest',
   'getDaemonExample',
   'listDaemonExamples',
+  'listDaemonInstallPullRequests',
   'loadDaemonExamplesCatalog',
 ];
 for (const name of expected) {
@@ -277,10 +279,22 @@ console.log('dist import smoke loaded ' + examples.length + ' examples');`,
       '--eval',
       `import {
   createDaemonInstallPlan,
+  createDaemonInstallPullRequest,
   getDaemonExample,
   listDaemonExamples,
+  listDaemonInstallPullRequests,
   loadDaemonExamplesCatalog,
 } from '@charlie-labs/daemons';
+const dashboardNeededExports = {
+  loadDaemonExamplesCatalog,
+  listDaemonExamples,
+  getDaemonExample,
+  createDaemonInstallPullRequest,
+  listDaemonInstallPullRequests,
+};
+for (const [name, value] of Object.entries(dashboardNeededExports)) {
+  if (typeof value !== 'function') throw new Error('missing dashboard export ' + name);
+}
 const catalog = await loadDaemonExamplesCatalog();
 if (catalog.schemaVersion !== 2 || catalog.examples.length === 0) throw new Error('catalog did not load');
 const examples = await listDaemonExamples();
