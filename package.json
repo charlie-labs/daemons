@@ -20,6 +20,7 @@
     "generate:examples": "bun scripts/generate-examples.ts",
     "validate:examples": "bun scripts/validate-examples.ts",
     "build": "bun run --bun zshy && chmod +x dist/bin.js",
+    "assert:package-contents": "bun scripts/assert-package-contents.ts",
     "smoke:daemon": "bun scripts/smoke-daemon-bin.ts",
     "prepack": "bun run build"
   },

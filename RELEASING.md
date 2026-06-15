@@ -33,14 +33,14 @@ bun install --frozen-lockfile --registry https://registry.npmjs.org/
 bun run typecheck
 bun run test
 bun run build
+bun run assert:package-contents
 bun run smoke:daemon
 bun run generate:examples
 bun run validate:examples
 git diff --exit-code examples.json
-npm pack --dry-run
 ```
 
-The release workflow runs the same validation checklist before it creates release artifacts or publishes to npm.
+The release workflow runs the same validation checklist before it creates release artifacts or publishes to npm. `bun run assert:package-contents` intentionally runs `npm pack --dry-run --ignore-scripts --json` after the build so missing `dist/` output fails loudly instead of being rebuilt by `prepack` or missed in manual dry-run inspection.
 
 ## Stable and prerelease behavior
 

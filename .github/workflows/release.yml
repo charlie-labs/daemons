@@ -216,8 +216,8 @@ jobs:
       - name: Ensure generated examples catalog is committed
         run: git diff --exit-code examples.json
 
-      - name: Dry-run npm package
-        run: npm pack --dry-run
+      - name: Assert npm package contents
+        run: bun run assert:package-contents
 
       - name: Prepare release notes
         id: release_notes
