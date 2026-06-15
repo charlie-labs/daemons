@@ -1,6 +1,12 @@
-This repo contains example daemon files for common daemon patterns.
+This repo publishes example daemon files for common daemon patterns.
 
 These examples are reference patterns for Charlie daemons. They are not the normative source of truth for the daemon format or for authoring rules.
+
+## Repo-local daemons for this repository
+
+This repository also uses Charlie daemons itself. Runtime daemon definitions for this repo live in `.agents/daemons/<id>/DAEMON.md`. Those files are functioning repo-local daemon policies for `charlie-labs/daemons`; they are not public example packages.
+
+Public example packages remain in `daemons/<id>/` and drive `examples.json`, the npm package, and CLI/catalog behavior.
 
 ## Start here
 
