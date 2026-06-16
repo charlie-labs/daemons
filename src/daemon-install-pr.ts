@@ -655,15 +655,16 @@ function createPullRequestBody(args: {
     );
   }
 
-  lines.push(
-    '',
-    '## Integrations and setup',
-    '',
-    'This daemon requires these integrations to work as intended:',
-    '',
-    ...markdownListLines(requiredIntegrations, { code: true }),
-    ''
-  );
+  lines.push('', '## Integrations and setup', '');
+
+  if (requiredIntegrations.length > 0) {
+    lines.push(
+      'This daemon requires these integrations to work as intended:',
+      '',
+      ...markdownListLines(requiredIntegrations, { code: true }),
+      ''
+    );
+  }
 
   if (optionalIntegrations.length > 0) {
     lines.push(
@@ -672,8 +673,10 @@ function createPullRequestBody(args: {
       ...markdownListLines(optionalIntegrations, { code: true }),
       ''
     );
-  } else {
-    lines.push(...markdownListLines(optionalIntegrations), '');
+  }
+
+  if (requiredIntegrations.length === 0 && optionalIntegrations.length === 0) {
+    lines.push(...markdownListLines([]), '');
   }
 
   lines.push(
