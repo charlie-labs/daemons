@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.1 - 2026-06-16
+
+- Release the daemon install PR body improvements from PR #26, replacing the generated install PR body with an educational template that explains what the daemon does and how it works.
+- Derive the PR body purpose, routines, watch conditions, and schedule from the rendered and validated `DAEMON.md` after adaptations are applied.
+- Include required and optional catalog integrations while preserving the hidden install marker without raw adaptation values.
+
 ## 2.0.0 - 2026-06-14
 
 - Bump the daemon examples catalog schema to `schemaVersion: 2` for structured adaptation inputs.
