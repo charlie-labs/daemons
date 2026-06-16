@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.2 - 2026-06-16
+
+- Release the daemon install PR body fix from PR #28 so empty optional integration lists render cleanly without a placeholder bullet.
+- Add regression coverage for install PR bodies when optional integrations are empty.
+
 ## 2.0.1 - 2026-06-16
 
 - Release the daemon install PR body improvements from PR #26, replacing the generated install PR body with an educational template that explains what the daemon does and how it works.
