@@ -101,11 +101,52 @@ const catalogClient: CatalogClient = {
   },
 };
 
+function catalogClientWithIntegrations(args: {
+  requiredIntegrations: ExamplesCatalog['examples'][number]['requirements']['requiredIntegrations'];
+  optionalIntegrations: ExamplesCatalog['examples'][number]['requirements']['optionalIntegrations'];
+}): CatalogClient {
+  const example = catalog.examples[0]!;
+  const testCatalog: ExamplesCatalog = {
+    ...catalog,
+    examples: [
+      {
+        ...example,
+        requirements: {
+          ...example.requirements,
+          requiredIntegrations: args.requiredIntegrations,
+          optionalIntegrations: args.optionalIntegrations,
+        },
+      },
+    ],
+  };
+
+  return {
+    ...catalogClient,
+    async loadCatalog(): Promise<ExamplesCatalog> {
+      return testCatalog;
+    },
+  };
+}
+
 type RecordedCall = {
   method: string;
   path: string;
   options: unknown;
 };
+
+function createdPullRequestBody(calls: RecordedCall[]): string {
+  const pullCall = calls.find((call) => call.method === 'POST' && call.path.endsWith('/pulls'));
+  expect(pullCall).toBeDefined();
+  return (pullCall!.options as { body: { body: string } }).body.body;
+}
+
+function integrationsSection(body: string): string {
+  const start = body.indexOf('## Integrations and setup');
+  const end = body.indexOf('## Review and iterate before merging');
+  expect(start).toBeGreaterThanOrEqual(0);
+  expect(end).toBeGreaterThan(start);
+  return body.slice(start, end);
+}
 
 function githubError(status: number, message: string): Error & { status: number; response: { status: number } } {
   const error = new Error(message) as Error & { status: number; response: { status: number } };
@@ -334,6 +375,63 @@ ${result.markerText}`);
     expect(result.markerText).not.toContain('secret-option');
     expect(pullBody.endsWith(result.markerText)).toBe(true);
     expect(parseDaemonInstallMarker(pullBody)).toMatchObject({ ok: true });
+  });
+
+  test('omits none-listed integration placeholder when required integrations exist and optional integrations are empty', async () => {
+    const githubClient = successGithubClient();
+
+    await createDaemonInstallPullRequest({
+      repo: 'acme/widgets',
+      exampleId: 'templated-daemon',
+      base: 'main',
+      sourceRef: 'test-ref',
+      adaptations: { required_value: 'secret-target' },
+      catalogClient: catalogClientWithIntegrations({ requiredIntegrations: ['github'], optionalIntegrations: [] }),
+      githubClient,
+    });
+
+    const section = integrationsSection(createdPullRequestBody(githubClient.calls));
+    expect(section).toContain('This daemon requires these integrations to work as intended:');
+    expect(section).toContain('- `github`');
+    expect(section).not.toContain('This daemon declares these optional integrations:');
+    expect(section).not.toContain('- None listed');
+  });
+
+  test('lists none when required and optional integrations are both empty', async () => {
+    const githubClient = successGithubClient();
+
+    await createDaemonInstallPullRequest({
+      repo: 'acme/widgets',
+      exampleId: 'templated-daemon',
+      base: 'main',
+      sourceRef: 'test-ref',
+      adaptations: { required_value: 'secret-target' },
+      catalogClient: catalogClientWithIntegrations({ requiredIntegrations: [], optionalIntegrations: [] }),
+      githubClient,
+    });
+
+    const section = integrationsSection(createdPullRequestBody(githubClient.calls));
+    expect(section).toBe(`## Integrations and setup\n\n- None listed\n\nSet up or configure integrations here:\n\nhttps://dash.charlielabs.ai/organizations/acme/integrations\n\n`);
+  });
+
+  test('renders optional-only integrations without the none-listed placeholder', async () => {
+    const githubClient = successGithubClient();
+
+    await createDaemonInstallPullRequest({
+      repo: 'acme/widgets',
+      exampleId: 'templated-daemon',
+      base: 'main',
+      sourceRef: 'test-ref',
+      adaptations: { required_value: 'secret-target' },
+      catalogClient: catalogClientWithIntegrations({ requiredIntegrations: [], optionalIntegrations: ['linear'] }),
+      githubClient,
+    });
+
+    const section = integrationsSection(createdPullRequestBody(githubClient.calls));
+    expect(section).not.toContain('This daemon requires these integrations to work as intended:');
+    expect(section).toContain('This daemon declares these optional integrations:');
+    expect(section).toContain('- `linear`');
+    expect(section).not.toContain('- None listed');
   });
 
   test('idempotently returns an exact-head open PR for an existing install branch', async () => {
