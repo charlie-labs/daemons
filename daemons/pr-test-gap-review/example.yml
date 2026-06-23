@@ -1,0 +1,26 @@
+id: pr-test-gap-review
+title: Targeted Test-Gap Review
+status: ready
+summary: Finds only concrete, diff-scoped gaps in pull request test evidence and suggests the narrowest useful verification.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: false
+fit:
+  jobsToBeDone:
+    - review-with-confidence
+  bestFor:
+    - Repositories where pull requests regularly change behavior and reviewers benefit from focused test-evidence checks.
+    - Teams that want conservative, non-blocking test-gap feedback without coverage quotas or automated code changes.
+  notFor:
+    - Teams looking for broad coverage enforcement or a general-purpose code reviewer.
+    - Repositories where another pull request review daemon already owns test-evidence feedback and cannot be configured to defer it.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other:
+    - GitHub pull request diffs, comments, review threads, and current check results are available to Charlie.
+specializationIdeas:
+  - Configure a broader pull request reviewer to omit test/proof findings while this daemon is enabled.
+  - Narrow review to selected branches, labels, or high-risk repository paths when lower activation volume is preferred.
+  - Add repository-specific guidance for accepted evals, fixtures, snapshots, generated artifacts, or manual verification.
