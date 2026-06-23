@@ -62,6 +62,6 @@ If the head changed after analysis, assess the current diff and evidence again r
 
 ## Coordination
 
-When the repository already runs a broader pull request review daemon, assign test-evidence findings to one owner. Prefer configuring the broader reviewer to omit its test/proof lane while this focused daemon is enabled. If that separation is not possible, use only one of the overlapping daemons.
+When another reviewer already owns equivalent test/proof feedback, treat that as existing equivalent coverage and no-op.
 
 Regardless of source, treat existing equivalent test-gap feedback as authoritative coordination evidence and do not repeat it.
