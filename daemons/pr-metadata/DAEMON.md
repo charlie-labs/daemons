@@ -2,7 +2,7 @@
 id: pr-metadata
 purpose: Keep open non-draft pull request titles and bodies accurate, reviewable, and linked to the right issues.
 watch:
-  - A GitHub pull request is opened, edited, reopened, or synchronized while open and non-draft.
+  - A GitHub pull request is opened, reopened, or synchronized while open and non-draft, or is edited by a non-bot human rather than Charlie while open and non-draft.
 routines:
   - Determine relevant issue IDs from linked issue metadata first, then branch name, title, and body.
   - Repair the PR title issue suffix when the primary issue is clear.
