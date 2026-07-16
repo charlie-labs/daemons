@@ -1,14 +1,85 @@
-import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { generateCatalogFromRepository, serializeCatalog } from '../catalog';
 import { isSupportPath } from '../paths';
+import { parseDaemonMarkdown } from '../schema';
 
 const FIXTURES_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
+const GENERATED_CATALOG_PATH = join(dirname(fileURLToPath(import.meta.url)), '../../../examples.json');
 
 describe('examples catalog generator and validator', () => {
+
+  test('preserves daemon routing and retry policy boundaries in the generated catalog', async () => {
+    const catalog = JSON.parse(await readFile(GENERATED_CATALOG_PATH, 'utf8')) as {
+      examples: Array<{ id: string; daemon: { content: string } }>;
+    };
+    const parsedDaemons = new Map(
+      catalog.examples.map((example) => {
+        const parsed = parseDaemonMarkdown({
+          content: example.daemon.content,
+          path: `daemons/${example.id}/DAEMON.md`,
+        });
+        if (!parsed.ok) {
+          throw new TypeError(`Expected generated ${example.id} daemon content to be valid.`);
+        }
+        return [example.id, parsed.value] as const;
+      })
+    );
+
+    expect(parsedDaemons.get('pr-review-triage')?.frontmatter.watch).toEqual([
+      'A GitHub pull request review is submitted on an open non-draft pull request.',
+      'A top-level GitHub PR comment is created by an author other than Charlie on an open non-draft pull request.',
+      'A GitHub pull request head commit changes on an open non-draft pull request.',
+    ]);
+    expect(parsedDaemons.get('pr-review-triage')?.frontmatter.deny).toContain(
+      'Do not process events authored by Charlie; exit with no action.'
+    );
+    expect(parsedDaemons.get('linear-pr-link-reconciler')?.frontmatter.watch).toEqual([
+      'A Linear issue is created mentioning active GitHub code work or missing pull request linkage.',
+      'A Linear issue comment is added by an author other than Charlie mentioning active GitHub code work or missing pull request linkage.',
+    ]);
+    expect(parsedDaemons.get('pr-check-repair')?.frontmatter.routines).toContain(
+      'Rerun a clearly flaky check at most once per check identity and head SHA when flake evidence is strong and no repo change is needed.'
+    );
+
+    const retryGuardMatrix = [
+      {
+        policy: 'same check and same head are not rerun after a recorded retry',
+        expected: 'same check identity on the same head SHA, no-op without another rerun',
+      },
+      {
+        policy: 'the current head is verified before rerunning',
+        expected: 'verify its current head SHA still equals the head SHA from the triggering failure',
+      },
+      {
+        policy: 'recent repair activity is inspected before rerunning',
+        expected: 'Inspect recent `pr-check-repair` activity for the same repository and pull request.',
+      },
+      {
+        policy: 'ambiguous prior activity fails closed',
+        expected: 'If prior rerun activity exists but its check identity or head SHA cannot be established, fail closed',
+      },
+      {
+        policy: 'same check on a new head remains eligible',
+        expected: 'the same check identity on a new head SHA remain eligible',
+      },
+      {
+        policy: 'a different check on the same head remains eligible',
+        expected: 'Different check identities on the same head SHA',
+      },
+      {
+        policy: 'the retry guard is explicitly non-atomic',
+        expected: 'do not provide atomic exactly-once execution',
+      },
+    ] as const;
+
+    for (const { policy, expected } of retryGuardMatrix) {
+      expect(parsedDaemons.get('pr-check-repair')?.body, policy).toContain(expected);
+    }
+  });
 
   test('validates daemon-directory-relative support path rules', () => {
     expect(isSupportPath('scripts/run.ts', 'scripts')).toBe(true);

@@ -7,7 +7,7 @@ routines:
   - Diagnose the triggering failing check using check logs, provider data, local reproduction, repo context, PR diff, and clear PR intent.
   - Push a focused evidence-grounded fix to the PR branch when the correct repo change is clear.
   - Coordinate with concurrent `pr-check-repair` activations before editing and before pushing.
-  - Rerun a clearly flaky check when flake evidence is strong and no repo change is needed.
+  - Rerun a clearly flaky check at most once per check identity and head SHA when flake evidence is strong and no repo change is needed.
 deny:
   - Do not refresh PR branches from base or resolve merge conflicts; use base only as read-only evidence when branch staleness affects the failing check.
   - Do not fix unrelated failing checks; assume each other failing check has its own `pr-check-repair` activation.
@@ -44,7 +44,7 @@ Stop/no-op and comment with the blocking reason when the fix requires human judg
 | E2E failures with clear evidence from traces, logs, repo behavior, or changed stable selectors          | Fix app code or tests, then push.                                                                  |
 | CI/workflow syntax errors introduced by the PR                                                          | Fix and push.                                                                                      |
 | Simple generated/schema migrations needed by a clear schema/model change                                | Generate or add them and push when the devbox has the required tooling and permissions.            |
-| Flaky checks with strong flake evidence                                                                 | Rerun once when no repo change is needed, or push the narrowest stabilizing fix when one is clear. |
+| Flaky checks with strong flake evidence                                                                 | Rerun once per check identity and head SHA when no repo change is needed, or push the narrowest stabilizing fix when one is clear. |
 | Ambiguous product intent, conflicting requirements, or unclear PR direction                             | Stop/no-op; comment if human action is needed.                                                     |
 | Secrets, provider config, CI project settings, or external service failures outside the repo            | Stop/no-op; comment if human action is needed.                                                     |
 | Dependency replacement or vulnerability/security choices                                                | Stop/no-op; comment if human action is needed.                                                     |
@@ -57,6 +57,17 @@ Stop/no-op and comment with the blocking reason when the fix requires human judg
 - If remote PR head moved, re-evaluate before continuing. Continue after compatible human/daemon pushes, but never overwrite them.
 - If branch staleness is the only failure cause, stop/no-op because branch refresh is outside `pr-check-repair` scope.
 - If staleness is ambiguous, compare against current base when available. If base already fixes the issue and the PR branch is merely stale, do not push a repair commit.
+
+## Flaky-check rerun guard
+
+Before rerunning a flaky check:
+
+1. Re-fetch the pull request and verify its current head SHA still equals the head SHA from the triggering failure. If the head changed, do not rerun for the stale trigger; a failure on the new head may be handled separately.
+2. Inspect recent `pr-check-repair` activity for the same repository and pull request. Establish the triggering check identity from provider-visible check data, and compare it with completed recent activations on the same head SHA.
+3. If a completed recent activation clearly records rerunning the same check identity on the same head SHA, no-op without another rerun unless human action is needed.
+4. If prior rerun activity exists but its check identity or head SHA cannot be established, fail closed and do not rerun. Different check identities on the same head SHA and the same check identity on a new head SHA remain eligible.
+
+Immediately before issuing the rerun, re-check the current PR head and recent activity again. If either check is unavailable or ambiguous, no-op unless human action is needed. These checks reduce duplicate reruns but do not provide atomic exactly-once execution.
 
 ## Comment policy
 
