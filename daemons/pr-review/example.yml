@@ -4,7 +4,7 @@ status: ready
 summary: Reviews pull requests for concise, evidence-backed correctness and repository-policy risks before merge.
 readiness: direct-copy
 showOnWebsite: true
-showInDashboard: false
+showInDashboard: true
 fit:
   jobsToBeDone:
     - review-with-confidence
