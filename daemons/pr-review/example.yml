@@ -1,0 +1,25 @@
+id: pr-review
+title: PR Review
+status: ready
+summary: Reviews pull requests for concise, evidence-backed correctness and repository-policy risks before merge.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: false
+fit:
+  jobsToBeDone:
+    - review-with-confidence
+  bestFor:
+    - Repositories that want consistent review of pull request correctness and explicit repository policy before merge.
+    - Teams that prefer evidence-backed inline findings and a low-noise clean-review signal.
+  notFor:
+    - Teams that require Charlie to approve pull requests or submit request-changes reviews.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other:
+    - GitHub pull requests and repository-authored guidance are the sources of truth for review context.
+specializationIdeas:
+  - Add opt-in review activation for every new head commit when the additional review frequency and cost are appropriate.
+  - Add focused lane references for security, architecture, testing, or repository-specific standards.
+  - Narrow activation to selected repositories, branches, labels, authors, or changed paths.
