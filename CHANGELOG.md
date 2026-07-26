@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.3 - 2026-07-22
+
+- Guard the `pr-metadata` daemon's edited-event handling from PR #31 so Charlie-authored edits do not trigger metadata update loops.
+- Add the public `pr-review` daemon example from PR #33 for focused correctness and repository-guidance review lanes.
+
 ## 2.0.2 - 2026-06-16
 
 - Release the daemon install PR body fix from PR #28 so empty optional integration lists render cleanly without a placeholder bullet.
