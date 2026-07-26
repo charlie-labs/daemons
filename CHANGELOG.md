@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0 - 2026-07-26
+
+- Show all daemon examples in the dashboard, including `pr-review-triage` (PR #37).
+- Add the `github-bug-context-researcher`, `github-issue-duplicate-finder`, and `github-issue-labeler` workflow examples (PR #40).
+- Avoid cross-daemon reactivations by ignoring Charlie-authored Linear comments and capping flaky-check reruns per check identity and head (PR #32).
+
 ## 2.0.3 - 2026-07-22
 
 - Guard the `pr-metadata` daemon's edited-event handling from PR #31 so Charlie-authored edits do not trigger metadata update loops.
