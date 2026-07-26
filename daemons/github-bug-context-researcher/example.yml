@@ -1,0 +1,28 @@
+id: github-bug-context-researcher
+title: GitHub Bug Context Researcher
+status: ready
+summary: Adds concise repository-aware triage context to newly opened GitHub bugs and regressions.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: true
+fit:
+  jobsToBeDone:
+    - operate
+    - explain
+  bestFor:
+    - Teams that receive bug reports in GitHub Issues and want fast repository context before manual triage.
+    - Repositories where issue titles, bodies, labels, and linked implementation evidence provide useful bug signals.
+  notFor:
+    - Teams that want Charlie to assign, prioritize, close, or otherwise manage GitHub issue lifecycle state automatically.
+    - Issues that require customer-private logs or production access that Charlie cannot inspect or summarize safely.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other:
+    - GitHub Issues is enabled in the installed repository and new bug reports contain enough signal to distinguish likely defects from other work.
+    - Charlie can read repository issues and supporting pull requests, commits, files, or documentation and can comment on issues.
+specializationIdeas:
+  - Add Sentry, support-ticket, or incident-system lookup steps when bug reports commonly include public-safe references to those systems.
+  - Specialize bug signals around repository-specific labels or issue templates.
+  - Add a standard missing-reproduction checklist used by the team.

@@ -161,6 +161,153 @@
       }
     },
     {
+      "id": "github-bug-context-researcher",
+      "title": "GitHub Bug Context Researcher",
+      "status": "ready",
+      "summary": "Adds concise repository-aware triage context to newly opened GitHub bugs and regressions.",
+      "readiness": "direct-copy",
+      "showOnWebsite": true,
+      "showInDashboard": true,
+      "fit": {
+        "jobsToBeDone": [
+          "operate",
+          "explain"
+        ],
+        "bestFor": [
+          "Teams that receive bug reports in GitHub Issues and want fast repository context before manual triage.",
+          "Repositories where issue titles, bodies, labels, and linked implementation evidence provide useful bug signals."
+        ],
+        "notFor": [
+          "Teams that want Charlie to assign, prioritize, close, or otherwise manage GitHub issue lifecycle state automatically.",
+          "Issues that require customer-private logs or production access that Charlie cannot inspect or summarize safely."
+        ]
+      },
+      "requirements": {
+        "requiredIntegrations": [
+          "github"
+        ],
+        "optionalIntegrations": [],
+        "other": [
+          "GitHub Issues is enabled in the installed repository and new bug reports contain enough signal to distinguish likely defects from other work.",
+          "Charlie can read repository issues and supporting pull requests, commits, files, or documentation and can comment on issues."
+        ]
+      },
+      "adaptations": [],
+      "specializationIdeas": [
+        "Add Sentry, support-ticket, or incident-system lookup steps when bug reports commonly include public-safe references to those systems.",
+        "Specialize bug signals around repository-specific labels or issue templates.",
+        "Add a standard missing-reproduction checklist used by the team."
+      ],
+      "daemon": {
+        "path": "DAEMON.md",
+        "content": "---\nid: github-bug-context-researcher\npurpose: Help teams triage likely GitHub bugs by adding concise repository context and next-step guidance to the issue.\nwatch:\n  - A new GitHub issue is opened with usable bug or regression signals, and the target is an issue rather than a pull request.\nroutines:\n  - Confirm the newly opened GitHub target is an issue, not a pull request, and decide whether it is a likely bug or regression from labels and issue text.\n  - Research related GitHub issues in the triggering repository from the last 180 days before consulting other evidence.\n  - Use pull requests, commits, files, and documentation as supporting repository evidence, and search another repository only when the triggering issue explicitly links it and establishes its relevance.\n  - Post one concise triage comment on the triggering GitHub issue when useful context or missing reproduction details are found.\ndeny:\n  - Do not act on pull requests or on issues that are not clearly bugs or regressions.\n  - Do not change GitHub issue fields, labels, state, assignees, milestone, project metadata, title, or body.\n  - Do not create, edit, close, merge, label, assign, or comment on any GitHub issue or pull request other than the one allowed triage comment on the triggering issue.\n  - Do not post more than five useful links in one triage comment.\n  - Do not repeat an equivalent triage comment for unchanged issue content and search results.\n---\n\n# GitHub Bug Context Researcher\n\n## Trigger and bug signals\n\nThe watch condition is intended only for newly opened GitHub issues that already look like bugs or regressions from observable issue metadata. GitHub issue APIs and searches may return pull requests; verify that the triggering target has no pull-request identity before researching or commenting. A pull request must never trigger this daemon.\n\nTreat an issue as in scope when at least one of these usable signals is present:\n\n- a GitHub label named `Bug`, `bug`, or an equivalent bug/regression label\n- title or body language such as bug, regression, broken, crash, error, exception, failing, failure, expected versus actual, repro, stack trace, or previously worked\n- screenshots, logs, stack traces, or reproduction steps describing behavior that should work but does not\n\nNo-op silently when the issue appears to be a feature request, task, question, planning note, support handoff without a defect, or any other non-bug item.\n\n## Research policy\n\nUse the triggering GitHub issue as the source of truth for the symptom and affected area. Derive search terms from the title, labels, component names, error text, stack frames, explicitly linked repository URLs, and concrete nouns in the issue body.\n\nSearch in this order:\n\n1. Related GitHub issues in the triggering repository that were created or updated in the last 180 days.\n2. Recent pull requests, commits, files, or documentation in the triggering repository when they directly explain the symptom, ownership, or likely changed area.\n3. Issues or supporting repository evidence in another repository only when the triggering issue explicitly links that repository and explains why it is relevant to the same symptom or component.\n\nRelated issues are the primary research context. Pull requests, commits, branches, files, and documentation may be cited only as supporting evidence; do not treat a pull request as an issue candidate or trigger target.\n\nPrefer fresh, specific evidence over broad matches. At most five total links may appear in the comment. Use fewer links when fewer are useful.\n\n## Comment format\n\nPost one comment on the triggering GitHub issue only when it adds useful triage value. Keep it concise and use this shape:\n\n```md\n**Bug triage context**\n\nRelated issues: <0-2 most relevant issue links with one-line relevance>\nRecent changes: <0-2 relevant pull requests or commits>\nSuspicious areas: <files, modules, services, or ownership clues with evidence>\nMissing repro details: <specific details needed, if any>\n```\n\nOmit empty sections. Do not include raw log dumps, long search transcripts, secrets, private customer context, or speculative blame. On a public repository, cite only evidence that is safe to expose publicly. Phrase findings as evidence and uncertainty, not final root cause, unless the root cause is directly proven.\n\n## Idempotency and deduplication\n\nBefore commenting, inspect existing Charlie comments on the issue. If an equivalent `Bug triage context` comment already covers the same issue title/body, relevant links, and search results, no-op.\n\nIf the issue changed materially and a fresh comment would reduce triage work, post one new concise follow-up rather than repeating the original content. Re-check that the target is still an issue and that the proposed comment is not equivalent immediately before writing.\n\n## No-op when\n\n- the triggering target is a pull request or cannot be proven to be an issue\n- the issue is not clearly a bug or regression\n- the triggering issue or repository cannot be read\n- another repository is not explicitly linked with clear relevance\n- no related context is found and no specific reproduction detail is missing\n- search results are too weak or ambiguous to be useful\n- the evidence cannot be shared safely on the triggering issue\n- an equivalent Charlie triage comment already exists\n"
+      },
+      "scripts": [],
+      "references": [],
+      "source": {
+        "directory": "daemons/github-bug-context-researcher",
+        "url": "https://github.com/charlie-labs/daemons/tree/master/daemons/github-bug-context-researcher"
+      }
+    },
+    {
+      "id": "github-issue-duplicate-finder",
+      "title": "GitHub Issue Duplicate Finder",
+      "status": "ready",
+      "summary": "Suggests likely duplicate or related GitHub issues when new issues are opened.",
+      "readiness": "direct-copy",
+      "showOnWebsite": true,
+      "showInDashboard": true,
+      "fit": {
+        "jobsToBeDone": [
+          "organize",
+          "operate"
+        ],
+        "bestFor": [
+          "Repositories with enough GitHub issue volume that duplicates or near-duplicates slow triage.",
+          "Issue workflows with concrete symptoms, error text, affected areas, or linked implementation evidence."
+        ],
+        "notFor": [
+          "Teams that want automatic issue closure, merging, state changes, or deduplication decisions.",
+          "Repositories where similar-looking issues frequently represent intentionally separate customer, project, or compliance work."
+        ]
+      },
+      "requirements": {
+        "requiredIntegrations": [
+          "github"
+        ],
+        "optionalIntegrations": [],
+        "other": [
+          "GitHub Issues is enabled in the installed repository and new issues usually contain enough searchable context for precise matching.",
+          "Charlie can read open and closed issues plus supporting repository artifacts and can comment on issues."
+        ]
+      },
+      "adaptations": [],
+      "specializationIdeas": [
+        "Broaden or narrow duplicate search across explicitly linked repositories.",
+        "Adjust the closed-issue lookback window.",
+        "Tune confidence thresholds before Charlie comments with possible matches."
+      ],
+      "daemon": {
+        "path": "DAEMON.md",
+        "content": "---\nid: github-issue-duplicate-finder\npurpose: Reduce duplicate GitHub issue triage by suggesting likely issue matches without changing issue state.\nwatch:\n  - A new GitHub issue is opened with usable title, body, labels, or linked repository context, and the target is an issue rather than a pull request.\nroutines:\n  - Confirm the newly opened GitHub target is an open issue and not a pull request.\n  - Search likely duplicate or related GitHub issues, checking the triggering repository before any explicitly linked relevant repository.\n  - Use pull requests, branches, commits, files, or documentation only as corroborating evidence for issue candidates.\n  - Comment only on the triggering GitHub issue with up to five candidate issues, confidence, and evidence when useful candidates exist.\ndeny:\n  - Do not treat a pull request as a trigger target or duplicate candidate, including pull requests returned by GitHub issue APIs or search queries.\n  - Do not close, reopen, merge, relabel, assign, reprioritize, transfer, lock, or otherwise change GitHub issues.\n  - Do not create, edit, close, label, assign, or comment on any issue other than the triggering issue.\n  - Do not edit, close, merge, label, assign, or comment on pull requests.\n  - Do not claim that an issue is definitely a duplicate unless the evidence is conclusive.\n  - Do not post more than five candidate issues or repeat an equivalent duplicate-finder comment for unchanged issue content and candidates.\n---\n\n# GitHub Issue Duplicate Finder\n\n## Trigger quality and state policy\n\nThe watch condition is intended only for newly opened GitHub issues with concrete searchable signals, such as a symptom, task, component, error text, named entity, label, milestone context, or explicitly linked repository URL.\n\nGitHub issue APIs and searches may include pull requests. Verify that the triggering target has no pull-request identity before searching or commenting. A pull request must never trigger this daemon.\n\nTreat an open GitHub issue as active. A closed issue is historical and may be considered only as a candidate when its prior discussion or resolution is relevant. No-op when the triggering issue is closed, unavailable, or too thin to support meaningful duplicate search.\n\n## Search policy\n\nUse the new issue title, body, labels, milestone context, linked repository URLs, user-visible symptom, error text, component names, and named entities as search terms.\n\nDefault search windows:\n\n- open issues in the triggering repository regardless of age when the terms strongly match\n- closed issues in the triggering repository updated in the last 180 days\n- pull requests, branches, commits, files, and documentation updated in the last 180 days when they corroborate an issue candidate\n\nSearch in this order:\n\n1. Open or recently active issues in the triggering repository.\n2. Closed or older issues in the triggering repository when their discussion or resolution may explain the duplicate.\n3. Supporting implementation artifacts in the triggering repository.\n4. Issues in another repository only when the triggering issue explicitly links that repository, establishes its relevance, and the candidate has strong concrete overlap.\n\nPrimary candidates must be GitHub issues. Explicitly filter out pull requests before ranking candidates and again before writing the comment. Pull requests, branches, commits, files, and documentation may corroborate shared symptoms or implementation context, but must never appear as candidate issues.\n\nPrefer candidates that share concrete symptoms, exact error strings, affected areas, direct links, or implementation artifacts. Treat broad wording or generic labels as weak evidence.\n\n## Candidate confidence\n\nAssign each candidate one confidence value:\n\n- `high`: same underlying problem, shared concrete symptom or link, and no meaningful contradiction\n- `medium`: likely related or possibly duplicate with some shared evidence, but not enough to recommend closing or merging work\n- `low`: weak similarity that may help discovery but should not drive triage decisions alone\n\nOnly comment when at least one `high` or `medium` candidate exists. Include `low` candidates only when they add useful context alongside stronger candidates.\n\n## Comment format\n\nPost one comment on the triggering GitHub issue:\n\n```md\nPossible duplicate or related issues\n\n1. <candidate issue link> — <high|medium|low> confidence\n   Evidence: <shared symptom, area, link, or implementation signal>\n   Difference: <known difference or uncertainty>\n\nSuggested action: <review the issue candidates before creating new work; no automatic state change was made>\n```\n\nLimit the list to the five best issue candidates. Prefer fewer candidates with clear evidence over a noisy list. Do not expose secrets or private customer context in the comment.\n\n## Idempotency and deduplication\n\nBefore commenting, check existing Charlie comments on the triggering issue. If the same candidate issue set and materially equivalent evidence were already posted for the current issue title and body, no-op.\n\nIf candidates changed materially after issue edits, post a new concise follow-up only when the updated evidence improves triage. Re-check that the trigger and every proposed candidate are issues rather than pull requests immediately before writing.\n\n## No-op when\n\n- the triggering target is a pull request, is closed, or cannot be proven to be an open issue\n- the issue title and body are too thin to support meaningful duplicate search\n- no issue candidate reaches medium confidence\n- the triggering issue or repository cannot be read\n- another repository is not explicitly linked with strong relevance and concrete overlap\n- search results are broad keyword matches without concrete duplicate evidence\n- a proposed candidate is a pull request or cannot be proven to be an issue\n- an equivalent Charlie duplicate-finder comment already exists\n"
+      },
+      "scripts": [],
+      "references": [],
+      "source": {
+        "directory": "daemons/github-issue-duplicate-finder",
+        "url": "https://github.com/charlie-labs/daemons/tree/master/daemons/github-issue-duplicate-finder"
+      }
+    },
+    {
+      "id": "github-issue-labeler",
+      "title": "GitHub Issue Labeler",
+      "status": "ready",
+      "summary": "Keeps recently changed GitHub issues aligned with the installed repository's current label set.",
+      "readiness": "direct-copy",
+      "showOnWebsite": true,
+      "showInDashboard": true,
+      "fit": {
+        "jobsToBeDone": [
+          "organize",
+          "operate"
+        ],
+        "bestFor": [
+          "Teams using GitHub issue labels for routing, reporting, or automation.",
+          "Repositories where issue labels drift, conflict, or are often missing and label descriptions or policy are informative."
+        ],
+        "notFor": [
+          "Teams whose GitHub label names, descriptions, and documented usage are intentionally ambiguous.",
+          "Workflows where labels are intentionally ad hoc or owner-specific."
+        ]
+      },
+      "requirements": {
+        "requiredIntegrations": [
+          "github"
+        ],
+        "optionalIntegrations": [],
+        "other": [
+          "GitHub Issues is enabled and Charlie can read repository labels, open issues, and current issue label state.",
+          "Label names, descriptions, documented repository policy, or observed usage are available enough to support high-confidence additions."
+        ]
+      },
+      "adaptations": [],
+      "specializationIdeas": [
+        "Narrow labeling to an explicit GitHub issue query within the installed repository.",
+        "Add explicit label-family rules if the repository has strict type, area, priority, or source families.",
+        "Allow safe label removals only after the team documents exact conflict rules and updates the daemon's additions-only policy."
+      ],
+      "daemon": {
+        "path": "DAEMON.md",
+        "content": "---\nid: github-issue-labeler\npurpose: Keep recently changed GitHub issues labeled according to the current label set in the installed repository.\nroutines:\n  - Survey recently created or updated open GitHub issues in the installed repository, explicitly filtering out pull requests.\n  - Load repository labels, including names, descriptions, colors, documented repository policy, and observed usage.\n  - Determine clearly supported missing labels from current GitHub label metadata and issue context.\n  - Re-confirm each target is an open issue rather than a pull request, then add unambiguous missing labels or post one compact repair proposal when label evidence conflicts.\ndeny:\n  - Do not select, label, or post repair proposals on pull requests, including pull requests returned by GitHub issue APIs or search queries.\n  - Do not treat a label as deprecated, disabled, or superseded without proof from its description, documented repository policy, or unambiguous current usage.\n  - Do not remove or replace existing labels.\n  - Do not change issue state, assignees, milestone, project metadata, title, body, or other lifecycle fields.\n  - Do not guess between two plausible labels in the same required label family.\n  - Do not repeat the same repair proposal for an unchanged conflict.\nschedule: '0 */4 * * *'\n---\n\n# GitHub Issue Labeler\n\n## Label discovery\n\nAt the start of each activation, load the current labels in the installed GitHub repository. Use label names, descriptions, colors only when semantically meaningful, documented repository policy, observed usage on current issues, and nearby issue context to infer how labels should be applied.\n\nGitHub labels do not expose archived, deprecated, or disabled lifecycle metadata. Do not invent those states. Treat a label as superseded only when its description, documented repository policy, or unambiguous current usage proves that another label has replaced it. When that proof is absent, do not classify the label as superseded and do not propose a repair on that basis.\n\nTreat the live repository label set as the source of truth. Do not rely on an unstated taxonomy. If label metadata or policy is missing, stale, contradictory, or too sparse to choose a label confidently, no-op or post a repair proposal instead of mutating labels.\n\n## Issue selection\n\nDefault scope:\n\n- issues created or updated in the last 4 hours\n- open issues only\n- the installed GitHub repository only\n- at most 100 recently changed issues per activation\n\nGitHub issue APIs and searches may include pull requests. At selection time, require each target to be an issue with no pull-request identity. Before adding a label or posting a repair proposal, fetch current target state again and require that it is still open and still an issue rather than a pull request.\n\nDo not scan other repositories or the repository's pull requests.\n\n## Decision policy\n\nAdd a missing label when:\n\n- the live GitHub label name, description, documented policy, or unambiguous observed usage makes the label's meaning clear\n- exactly one label in that family is supported by issue evidence\n- the label is not proven to be superseded\n- applying it does not conflict with existing labels\n\nPost a repair proposal instead of mutating when:\n\n- multiple labels in one family could apply\n- an existing label is proven to be superseded\n- existing labels conflict with current label metadata or documented repository policy\n- the issue body or title does not provide enough context for a requested label family\n\nWhen GitHub metadata and repository policy do not establish a safe decision, no-op rather than guessing. All label mutations are additions only.\n\n## Repair proposal format\n\nUse one concise comment on the affected GitHub issue:\n\n```md\nLabel repair needed\n\nRecommended labels: <labels>\nReason: <short rationale>\nBlocked because: <specific uncertainty or conflict>\n```\n\nDo not post the proposal on a pull request or a closed issue.\n\n## Limits\n\n- Max issues inspected per run: 100 recently changed issues\n- Max issues mutated per run: 30\n- Max repair proposal comments per run: 10\n- Max labels added per issue per run: 5\n\n## Idempotency\n\nNever add duplicate labels. Re-running with unchanged issue data must produce no additional writes.\n\nUse a conflict signature based on repository identity, issue number, current label set, title/body hash, and the observed label metadata and policy evidence. Do not repeat the same repair proposal while that signature is unchanged.\n\nImmediately before each write, re-check target type, open state, current labels, and the conflict signature. No-op if the target became a pull request or closed issue, the label was already added, or an equivalent repair proposal already exists.\n\n## No-op when\n\n- repository labels cannot be read\n- the target is a pull request, a closed issue, or cannot be proven to be an open issue\n- label names, descriptions, documented policy, and observed usage do not provide enough signal for confident labeling\n- a label would be considered superseded only by assuming unavailable lifecycle metadata\n- GitHub issue data is incomplete\n- no recently changed in-scope issues need labels\n- the correct label cannot be selected with high confidence\n"
+      },
+      "scripts": [],
+      "references": [],
+      "source": {
+        "directory": "daemons/github-issue-labeler",
+        "url": "https://github.com/charlie-labs/daemons/tree/master/daemons/github-issue-labeler"
+      }
+    },
+    {
       "id": "js-ts-dependency-upgrades",
       "title": "JavaScript/TypeScript Dependency Update Maintainer",
       "status": "ready",

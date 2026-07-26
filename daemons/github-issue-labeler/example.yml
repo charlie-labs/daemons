@@ -1,0 +1,28 @@
+id: github-issue-labeler
+title: GitHub Issue Labeler
+status: ready
+summary: Keeps recently changed GitHub issues aligned with the installed repository's current label set.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: true
+fit:
+  jobsToBeDone:
+    - organize
+    - operate
+  bestFor:
+    - Teams using GitHub issue labels for routing, reporting, or automation.
+    - Repositories where issue labels drift, conflict, or are often missing and label descriptions or policy are informative.
+  notFor:
+    - Teams whose GitHub label names, descriptions, and documented usage are intentionally ambiguous.
+    - Workflows where labels are intentionally ad hoc or owner-specific.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other:
+    - GitHub Issues is enabled and Charlie can read repository labels, open issues, and current issue label state.
+    - Label names, descriptions, documented repository policy, or observed usage are available enough to support high-confidence additions.
+specializationIdeas:
+  - Narrow labeling to an explicit GitHub issue query within the installed repository.
+  - Add explicit label-family rules if the repository has strict type, area, priority, or source families.
+  - Allow safe label removals only after the team documents exact conflict rules and updates the daemon's additions-only policy.
