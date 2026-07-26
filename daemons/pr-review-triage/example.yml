@@ -4,7 +4,7 @@ status: ready
 summary: Triages PR review threads and top-level PR comments for merge-readiness, duplicate feedback, fixed items, and safe low-noise follow-up.
 readiness: direct-copy
 showOnWebsite: true
-showInDashboard: false
+showInDashboard: true
 fit:
   jobsToBeDone:
     - review-with-confidence
