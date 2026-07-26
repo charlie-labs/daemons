@@ -1,0 +1,28 @@
+id: github-issue-duplicate-finder
+title: GitHub Issue Duplicate Finder
+status: ready
+summary: Suggests likely duplicate or related GitHub issues when new issues are opened.
+readiness: direct-copy
+showOnWebsite: true
+showInDashboard: true
+fit:
+  jobsToBeDone:
+    - organize
+    - operate
+  bestFor:
+    - Repositories with enough GitHub issue volume that duplicates or near-duplicates slow triage.
+    - Issue workflows with concrete symptoms, error text, affected areas, or linked implementation evidence.
+  notFor:
+    - Teams that want automatic issue closure, merging, state changes, or deduplication decisions.
+    - Repositories where similar-looking issues frequently represent intentionally separate customer, project, or compliance work.
+requirements:
+  requiredIntegrations:
+    - github
+  optionalIntegrations: []
+  other:
+    - GitHub Issues is enabled in the installed repository and new issues usually contain enough searchable context for precise matching.
+    - Charlie can read open and closed issues plus supporting repository artifacts and can comment on issues.
+specializationIdeas:
+  - Broaden or narrow duplicate search across explicitly linked repositories.
+  - Adjust the closed-issue lookback window.
+  - Tune confidence thresholds before Charlie comments with possible matches.
