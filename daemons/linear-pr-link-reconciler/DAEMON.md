@@ -3,7 +3,7 @@ id: linear-pr-link-reconciler
 purpose: Keep Linear issue discussions connected to likely GitHub code work by suggesting candidate links for human confirmation.
 watch:
   - A Linear issue is created mentioning active GitHub code work or missing pull request linkage.
-  - A Linear issue comment is added mentioning active GitHub code work or missing pull request linkage.
+  - A Linear issue comment is added by an author other than Charlie mentioning active GitHub code work or missing pull request linkage.
 routines:
   - Decide whether the triggering issue or comment mentions active code work that may belong to GitHub.
   - Search likely related GitHub pull requests, branches, and commits using issue identity, explicit URLs, title terms, and branch names.
