@@ -6,6 +6,64 @@
   },
   "examples": [
     {
+      "id": "bug-context-researcher",
+      "title": "Bug Context Researcher",
+      "status": "ready",
+      "summary": "Adds concise repo-aware triage context to newly created bugs and regressions on the selected issue platform.",
+      "readiness": "adapt-before-use",
+      "showOnWebsite": true,
+      "showInDashboard": true,
+      "fit": {
+        "jobsToBeDone": [
+          "operate",
+          "explain"
+        ],
+        "bestFor": [
+          "Teams that receive bug reports in GitHub Issues or Linear and want fast context before manual triage.",
+          "Issue workflows where titles, descriptions, labels, and linked repository evidence provide useful triage signals."
+        ],
+        "notFor": [
+          "Teams that want Charlie to assign, prioritize, close, or otherwise manage bug lifecycle state automatically.",
+          "Issues that require customer-private logs or production access that Charlie cannot inspect safely."
+        ]
+      },
+      "requirements": {
+        "requiredIntegrations": [],
+        "optionalIntegrations": [],
+        "other": [
+          "The integration for the selected issue platform must be connected and configured for the repository.",
+          "Issue titles, descriptions, or labels contain enough signal to distinguish likely bugs from other work."
+        ]
+      },
+      "adaptations": [
+        {
+          "key": "issue_platform",
+          "label": "Issue platform",
+          "description": "Choose exactly GitHub Issues or Linear as the issue system where this daemon should discover bugs and post triage comments.",
+          "required": true,
+          "suggestions": [
+            "GitHub Issues",
+            "Linear"
+          ]
+        }
+      ],
+      "specializationIdeas": [
+        "Add Sentry, support-ticket, or incident-system lookup steps when bug reports commonly include those references.",
+        "Specialize bug signals around team-specific labels or issue templates.",
+        "Add a standard missing-reproduction checklist used by the team."
+      ],
+      "daemon": {
+        "path": "DAEMON.md",
+        "content": "---\nid: bug-context-researcher\npurpose: Help teams triage likely bugs by adding concise issue and repository context on the configured issue platform.\nwatch:\n  - 'An issue is created on {{adapt.issue_platform}} with observable bug or regression signals.'\nroutines:\n  - Decide whether the new issue is a likely bug or regression from its labels and text.\n  - Research recent related issues on the configured issue platform and available repository evidence.\n  - Post one concise triage comment on the triggering issue when useful context or missing reproduction details are found.\ndeny:\n  - Do not act on issues that are not clearly bugs or regressions.\n  - Do not change issue fields, labels, lifecycle state, assignees, priority, project metadata, milestone, cycle, estimate, due date, title, or description.\n  - Do not create, edit, close, label, assign, or comment on any issue other than the triggering issue.\n  - Do not create, edit, close, merge, label, assign, or comment on pull requests.\n  - Do not post more than five useful links in one triage comment.\n  - Do not repeat an equivalent triage comment for unchanged issue content and search results.\n---\n\n# Bug Context Researcher\n\n## Platform policy\n\nThe configured issue platform is `{{adapt.issue_platform}}`. The only supported values are exactly `GitHub Issues` and `Linear`. Operate only on that platform for issue discovery and issue comments. Treat the triggering issue as the source of truth for the symptom and affected area. If the platform value is anything else, cannot be resolved, or lacks the access required for this work, no-op without comments or mutations.\n\nFor GitHub Issues, keep issue searches within the triggering repository unless the issue explicitly links another relevant repository. For Linear, search the triggering team first and expand to another mapped team only when the issue names the same component, error, or repository.\n\nGitHub pull requests, commits, files, and documentation may be used as supporting evidence when repository access is available. Their absence must not block issue-platform research or commenting. Do not search or require the other issue tracker.\n\n## Bug signals\n\nTreat an issue as in scope when at least one of these signals is present:\n\n- a label named `Bug`, `bug`, or an equivalent bug/regression label\n- title or description language such as bug, regression, broken, crash, error, exception, failing, failure, expected versus actual, repro, stack trace, or previously worked\n- screenshots, logs, stack traces, or reproduction steps describing behavior that should work but does not\n\nNo-op silently when the issue appears to be a feature request, task, question, planning note, support handoff without a defect, or any other non-bug item.\n\n## Research policy\n\nDerive search terms from the title, labels, component names, error text, stack frames, linked repository URLs, and concrete nouns in the issue body.\n\nSearch in this order:\n\n1. Related issues on the configured platform in the triggering repository or team from the last 180 days.\n2. Related issues in an explicitly linked or mapped nearby scope when the issue text names the same component or error.\n3. Recent pull requests from the last 30 days when repository evidence is available.\n4. Commits, files, or documentation only when they directly explain the symptom, ownership, or likely changed area.\n\nPrefer fresh, specific evidence over broad matches. At most five total links may appear in the comment. Use fewer links when fewer are useful.\n\n## Comment format\n\nPost one comment on the triggering issue only when it adds useful triage value. Keep it concise and use this shape:\n\n```md\n**Bug triage context**\n\nRelated items: <0-2 most relevant issue or repository links with one-line relevance>\nRecent changes: <0-2 recent pull requests or commits that may matter>\nSuspicious areas: <files, modules, services, or ownership clues with evidence>\nMissing repro details: <specific details needed, if any>\n```\n\nOmit empty sections. Do not include raw log dumps, long search transcripts, or speculative blame. Phrase findings as evidence and uncertainty, not final root cause, unless the root cause is directly proven.\n\n## Idempotency\n\nBefore commenting, inspect existing Charlie comments on the triggering issue. If an equivalent `Bug triage context` comment already covers the same issue content and search results, no-op.\n\nIf the issue changed materially and a fresh comment would reduce triage work, post one new concise follow-up rather than repeating the original content.\n\n## No-op when\n\n- the issue is not clearly a bug or regression\n- the configured issue platform cannot be read or the triggering issue is unavailable\n- the configured issue platform is not exactly `GitHub Issues` or `Linear`, cannot be resolved, or lacks required access\n- no related context is found and no specific reproduction detail is missing\n- search results are too weak or ambiguous to be useful\n- an equivalent Charlie triage comment already exists\n"
+      },
+      "scripts": [],
+      "references": [],
+      "source": {
+        "directory": "daemons/bug-context-researcher",
+        "url": "https://github.com/charlie-labs/daemons/tree/master/daemons/bug-context-researcher"
+      }
+    },
+    {
       "id": "docs-drift-maintainer",
       "title": "Recent Docs Drift Maintainer",
       "status": "ready",
@@ -161,6 +219,132 @@
       }
     },
     {
+      "id": "issue-duplicate-finder",
+      "title": "Issue Duplicate Finder",
+      "status": "ready",
+      "summary": "Suggests likely duplicate or related issues when new issues are created on the selected issue platform.",
+      "readiness": "adapt-before-use",
+      "showOnWebsite": true,
+      "showInDashboard": true,
+      "fit": {
+        "jobsToBeDone": [
+          "organize",
+          "operate"
+        ],
+        "bestFor": [
+          "Teams with enough GitHub Issues or Linear volume that duplicates or near-duplicates slow triage.",
+          "Issue workflows with concrete symptoms, error text, product areas, or linked implementation evidence."
+        ],
+        "notFor": [
+          "Teams that want automatic issue closure, merging, state changes, or deduplication decisions.",
+          "Workflows where similar-looking issues frequently represent intentionally separate customer, project, or compliance work."
+        ]
+      },
+      "requirements": {
+        "requiredIntegrations": [],
+        "optionalIntegrations": [],
+        "other": [
+          "The integration for the selected issue platform must be connected and configured for the repository.",
+          "The selected platform exposes enough issue lifecycle state to distinguish active trigger issues from inactive ones."
+        ]
+      },
+      "adaptations": [
+        {
+          "key": "issue_platform",
+          "label": "Issue platform",
+          "description": "Choose exactly GitHub Issues or Linear as the issue system where this daemon should search for candidates and post duplicate suggestions.",
+          "required": true,
+          "suggestions": [
+            "GitHub Issues",
+            "Linear"
+          ]
+        }
+      ],
+      "specializationIdeas": [
+        "Broaden or narrow duplicate search across explicitly related repositories or Linear teams.",
+        "Adjust the inactive-issue lookback window.",
+        "Tune confidence thresholds before Charlie comments with possible matches."
+      ],
+      "daemon": {
+        "path": "DAEMON.md",
+        "content": "---\nid: issue-duplicate-finder\npurpose: Reduce duplicate issue triage on the configured issue platform by suggesting likely matches without changing issue state.\nwatch:\n  - 'An issue is created on {{adapt.issue_platform}} with enough title, description, label, or linked repository context to search for likely duplicates.'\nroutines:\n  - Skip the new issue when its platform-specific lifecycle state is inactive.\n  - Search likely duplicate or related issues on the configured issue platform, checking the triggering repository or team before broader relevant scope.\n  - Use available pull requests, branches, commits, or repository files as corroborating evidence when useful.\n  - Comment on the triggering issue with up to five candidate matches, confidence, and evidence when useful candidates exist.\ndeny:\n  - Do not close, merge, cancel, archive, relabel, reassign, reprioritize, or otherwise change issues.\n  - Do not create, edit, close, label, assign, or comment on any issue other than the triggering issue.\n  - Do not edit, close, merge, label, assign, or comment on pull requests.\n  - Do not claim that an issue is definitely a duplicate unless the evidence is conclusive.\n  - Do not post more than five candidate duplicate or related items.\n  - Do not repeat an equivalent duplicate-finder comment for unchanged issue content and candidates.\n---\n\n# Issue Duplicate Finder\n\n## Platform and state policy\n\nThe configured issue platform is `{{adapt.issue_platform}}`. The only supported values are exactly `GitHub Issues` and `Linear`. Search and comment only on that platform. Do not search or require the other issue tracker. If the platform value is anything else, cannot be resolved, or lacks the access required for this work, no-op without comments or mutations.\n\nFor GitHub Issues, treat an open issue as active and a closed issue as inactive. For Linear, prefer workflow state type or category metadata when available; treat completed, canceled, or another explicitly inactive state as inactive, and do not infer inactivity from a custom state name alone. When the selected platform cannot expose reliable lifecycle state, no-op rather than guessing.\n\nThe watch condition is intended for newly created issues that include concrete searchable signals, such as a symptom, task, project, component, error text, named entity, or linked repository URL. No-op when the issue is inactive or when its title and body are too thin to support meaningful duplicate search.\n\n## Search policy\n\nUse the new issue title, description, labels, project or milestone context when exposed, repository or team scope, linked repository URLs, customer-facing symptom, error text, component names, and named entities as search terms.\n\nDefault search windows:\n\n- active issues regardless of age when the terms strongly match\n- inactive or historical issues updated in the last 180 days\n- pull requests, branches, commits, and repository files updated in the last 180 days when repository evidence is available\n\nSearch in this order:\n\n1. Active or recently updated issues in the same GitHub repository or Linear team.\n2. Older issues in that same scope, including inactive issues when their resolution may explain the duplicate.\n3. Linked or otherwise available implementation artifacts in the relevant repository.\n4. Issues in another explicitly linked repository or mapped Linear team only when terms strongly overlap.\n\nPrefer candidates that share concrete symptoms, error strings, product areas, links, or implementation artifacts. Treat broad wording or generic labels as weak evidence. Exclude inactive issues as trigger targets, but allow them as candidate evidence when they may explain prior duplicate handling.\n\n## Candidate confidence\n\nAssign each candidate one confidence value:\n\n- `high`: same underlying problem, shared concrete symptom or link, and no meaningful contradiction\n- `medium`: likely related or possibly duplicate with some shared evidence, but not enough to recommend merging\n- `low`: weak similarity that may help discovery but should not drive triage decisions alone\n\nOnly comment when at least one `high` or `medium` candidate exists. Include `low` candidates only when they add useful context alongside stronger candidates.\n\n## Comment format\n\nPost one comment on the triggering issue:\n\n```md\nPossible duplicate or related issues\n\n1. <candidate link> — <high|medium|low> confidence\n   Evidence: <shared symptom, area, link, or implementation signal>\n   Difference: <known difference or uncertainty>\n\nSuggested action: <review candidates before creating new work; no automatic state change was made>\n```\n\nLimit the list to the five best candidates. Prefer fewer candidates with clear evidence over a noisy list.\n\n## Idempotency\n\nBefore commenting, check existing Charlie comments on the triggering issue. If the same candidate set and evidence were already posted for the current issue title and body, no-op.\n\nIf candidates changed materially after issue edits, post a new concise follow-up only when the updated evidence improves triage.\n\n## No-op when\n\n- the triggering issue is inactive according to reliable selected-platform state metadata\n- the issue title and body are too thin to support meaningful duplicate search\n- no candidate reaches medium confidence\n- the configured issue platform, triggering issue, or primary repository/team scope is unavailable\n- the configured issue platform is not exactly `GitHub Issues` or `Linear`, cannot be resolved, or lacks required access\n- search results are broad keyword matches without concrete duplicate evidence\n- an equivalent Charlie duplicate-finder comment already exists\n"
+      },
+      "scripts": [],
+      "references": [],
+      "source": {
+        "directory": "daemons/issue-duplicate-finder",
+        "url": "https://github.com/charlie-labs/daemons/tree/master/daemons/issue-duplicate-finder"
+      }
+    },
+    {
+      "id": "issue-labeler",
+      "title": "Issue Labeler",
+      "status": "ready",
+      "summary": "Keeps recently changed issues aligned with the current label set on the selected issue platform.",
+      "readiness": "adapt-before-use",
+      "showOnWebsite": true,
+      "showInDashboard": true,
+      "fit": {
+        "jobsToBeDone": [
+          "organize",
+          "operate"
+        ],
+        "bestFor": [
+          "Teams using GitHub Issues or Linear labels for routing, reporting, or automation.",
+          "Issue scopes where labels drift, conflict, or are often missing and current label metadata is informative."
+        ],
+        "notFor": [
+          "Teams whose label names, descriptions, and documented usage are intentionally ambiguous.",
+          "Workflows where labels are intentionally ad hoc or owner-specific."
+        ]
+      },
+      "requirements": {
+        "requiredIntegrations": [],
+        "optionalIntegrations": [],
+        "other": [
+          "The integration for the selected issue platform must be connected and configured for the repository.",
+          "Label names, descriptions, or documented usage are available enough to support high-confidence label decisions."
+        ]
+      },
+      "adaptations": [
+        {
+          "key": "issue_platform",
+          "label": "Issue platform",
+          "description": "Choose exactly GitHub Issues or Linear as the issue system whose issues and label metadata this daemon should maintain.",
+          "required": true,
+          "suggestions": [
+            "GitHub Issues",
+            "Linear"
+          ]
+        },
+        {
+          "key": "issue_scope",
+          "label": "Issue scope",
+          "description": "Bounded GitHub repository or query, or Linear team, project, or workspace query, to survey on each scheduled activation.",
+          "required": true,
+          "suggestions": [
+            "owner/repository",
+            "Linear team or project"
+          ]
+        }
+      ],
+      "specializationIdeas": [
+        "Narrow the configured scope to a repository query, Linear project, or other low-noise issue subset.",
+        "Add explicit label-family rules if the issue scope has strict type, area, priority, or source families.",
+        "Allow safe label removals only after the team documents exact conflict rules."
+      ],
+      "daemon": {
+        "path": "DAEMON.md",
+        "content": "---\nid: issue-labeler\npurpose: Keep recently changed issues labeled according to the current label set on the configured issue platform and scope.\nroutines:\n  - 'Survey recently created or updated issues on {{adapt.issue_platform}} inside {{adapt.issue_scope}}.'\n  - Load available labels and the platform-specific metadata that explains whether and how they should be used.\n  - Determine clearly supported missing labels from current label metadata and issue context.\n  - Add unambiguous missing labels or post one compact repair proposal on the issue when label evidence conflicts.\ndeny:\n  - Do not discover or select GitHub pull requests as issues, or add labels or post repair-proposal comments on pull requests, including pull requests returned by GitHub issue APIs or search queries.\n  - Do not apply labels that selected-platform metadata marks inactive, deprecated, disabled, or clearly superseded.\n  - Do not remove or replace existing labels.\n  - Do not change issue lifecycle state, priority, assignee, project metadata, milestone, cycle, estimate, due date, title, or body.\n  - Do not guess between two plausible labels in the same required label family.\n  - Do not repeat the same repair proposal for an unchanged conflict.\nschedule: '0 */4 * * *'\n---\n\n# Issue Labeler\n\n## Platform and scope\n\nThe configured issue platform is `{{adapt.issue_platform}}`. The only supported values are exactly `GitHub Issues` and `Linear`. The configured issue scope is `{{adapt.issue_scope}}`. Read issues, mutate labels, and post repair proposals only on that platform and inside that scope. Do not search or require the other issue tracker. If the platform value is anything else, cannot be resolved, or lacks the access required for this work, no-op without comments or mutations.\n\nInterpret the scope using selected-platform capabilities: a GitHub repository or an intentionally narrower repository query for GitHub Issues, and a Linear team, project, or intentionally bounded workspace query for Linear. If the configured scope cannot be resolved unambiguously, no-op.\n\nFor GitHub Issues, select only issues and explicitly filter out pull requests, including pull requests returned by GitHub issue APIs or search queries. Never mutate labels or post repair proposals on pull requests. This exclusion does not apply to Linear issues, and an explicitly linked pull request may be read only as supporting issue context when otherwise useful.\n\n## Label discovery\n\nAt the start of each activation, load the current labels visible in the configured scope.\n\nFor GitHub Issues, use available label names, descriptions, and semantically meaningful colors plus documented and observed usage. GitHub does not provide Linear-style archived or deprecated label metadata; do not invent it. Treat a GitHub label as superseded only when its description, repository policy, or unambiguous current usage establishes that fact.\n\nFor Linear, use label names, descriptions, semantically meaningful colors, usage context, and archived, deprecated, disabled, or equivalent lifecycle metadata when the API exposes it. If a capability or metadata field is unavailable, skip that signal rather than treating absence as proof.\n\nTreat the selected platform's live label set as the source of truth. Do not rely on a static taxonomy file. If label metadata is missing, stale, contradictory, or too sparse to choose a label confidently, no-op or post a repair proposal instead of mutating labels.\n\n## Issue selection\n\nDefault scope within each activation:\n\n- issues created or updated in the last 4 hours\n- active issues only\n- at most the configured repository, team, project, or narrower query\n\nFor GitHub Issues, active means open, and pull requests are never eligible for selection. For Linear, use workflow state type or category metadata when available and exclude completed, canceled, or another explicitly inactive state; do not assume Linear has only open and closed states. If reliable state metadata is unavailable, skip ambiguous issues.\n\nDo not scan beyond the configured scope.\n\n## Decision policy\n\nAdd a missing label when:\n\n- the selected platform's live label metadata makes the label's meaning clear\n- exactly one label in that family is supported by issue evidence\n- available lifecycle metadata does not mark the label inactive or superseded\n- applying it does not conflict with existing labels\n\nPost a repair proposal instead of mutating when:\n\n- multiple labels in one family could apply\n- an existing label is demonstrably inactive or superseded\n- existing labels conflict with live label metadata\n- the issue body or title does not provide enough context\n\nWhen the selected platform lacks a metadata capability needed for a decision, no-op on that decision rather than guessing.\n\n## Repair proposal format\n\nUse one concise comment on the affected issue:\n\n```md\nLabel repair needed\n\nRecommended labels: <labels>\nReason: <short rationale>\nBlocked because: <specific uncertainty or conflict>\n```\n\n## Limits\n\n- Max issues inspected per run: 100 recently changed issues\n- Max issues mutated per run: 30\n- Max repair proposal comments per run: 10\n- Max labels added per issue per run: 5\n\n## Idempotency\n\nNever add duplicate labels. Re-running with unchanged issue data must produce no additional writes.\n\nUse a conflict signature based on platform, issue ID, current label set, title/body hash, and the observed label metadata. Do not repeat the same repair proposal while that signature is unchanged.\n\n## No-op when\n\n- the configured issue platform or scope cannot be read\n- the configured issue platform is not exactly `GitHub Issues` or `Linear`, cannot be resolved, or lacks required access\n- live label metadata does not provide enough signal for confident labeling\n- issue data is incomplete or lifecycle state is ambiguous\n- no recently changed in-scope issues need labels\n- the correct label cannot be selected with high confidence\n"
+      },
+      "scripts": [],
+      "references": [],
+      "source": {
+        "directory": "daemons/issue-labeler",
+        "url": "https://github.com/charlie-labs/daemons/tree/master/daemons/issue-labeler"
+      }
+    },
+    {
       "id": "js-ts-dependency-upgrades",
       "title": "JavaScript/TypeScript Dependency Update Maintainer",
       "status": "ready",
@@ -224,11 +408,11 @@
     {
       "id": "linear-bug-context-researcher",
       "title": "Linear Bug Context Researcher",
-      "status": "ready",
+      "status": "deprecated",
       "summary": "Adds concise repo-aware triage context to newly created Linear bugs and regressions.",
       "readiness": "direct-copy",
-      "showOnWebsite": true,
-      "showInDashboard": true,
+      "showOnWebsite": false,
+      "showInDashboard": false,
       "fit": {
         "jobsToBeDone": [
           "operate",
@@ -256,6 +440,7 @@
       },
       "adaptations": [],
       "specializationIdeas": [
+        "For new installs, use the bug-context-researcher example and configure issue_platform as Linear.",
         "Add Sentry, support-ticket, or incident-system lookup steps when bug reports commonly include those references.",
         "Specialize bug signals around team-specific labels or issue templates.",
         "Add a standard missing-repro checklist used by the team."
@@ -274,11 +459,11 @@
     {
       "id": "linear-issue-duplicate-finder",
       "title": "Linear Issue Duplicate Finder",
-      "status": "ready",
+      "status": "deprecated",
       "summary": "Suggests likely duplicate or related Linear issues when new issues are created.",
       "readiness": "direct-copy",
-      "showOnWebsite": true,
-      "showInDashboard": true,
+      "showOnWebsite": false,
+      "showInDashboard": false,
       "fit": {
         "jobsToBeDone": [
           "organize",
@@ -306,6 +491,7 @@
       },
       "adaptations": [],
       "specializationIdeas": [
+        "For new installs, use the issue-duplicate-finder example and configure issue_platform as Linear.",
         "Broaden or narrow duplicate search across Linear teams mapped to the same repository.",
         "Adjust the completed or canceled issue lookback window.",
         "Tune confidence thresholds before Charlie comments with possible matches."
@@ -324,11 +510,11 @@
     {
       "id": "linear-issue-labeler",
       "title": "Issue Label Hygiene Helper",
-      "status": "ready",
+      "status": "deprecated",
       "summary": "Keeps recently changed Linear issues aligned with the current Linear label set.",
       "readiness": "direct-copy",
-      "showOnWebsite": true,
-      "showInDashboard": true,
+      "showOnWebsite": false,
+      "showInDashboard": false,
       "fit": {
         "jobsToBeDone": [
           "organize",
@@ -354,6 +540,7 @@
       },
       "adaptations": [],
       "specializationIdeas": [
+        "For new installs, use the issue-labeler example and configure issue_platform as Linear.",
         "Restrict labeling to specific Linear teams or projects.",
         "Add explicit label-family rules if the workspace has strict type, area, priority, or source families.",
         "Allow safe label removals only after the team documents exact conflict rules."

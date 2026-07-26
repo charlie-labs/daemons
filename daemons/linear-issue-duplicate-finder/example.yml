@@ -1,10 +1,10 @@
 id: linear-issue-duplicate-finder
 title: Linear Issue Duplicate Finder
-status: ready
+status: deprecated
 summary: Suggests likely duplicate or related Linear issues when new issues are created.
 readiness: direct-copy
-showOnWebsite: true
-showInDashboard: true
+showOnWebsite: false
+showInDashboard: false
 fit:
   jobsToBeDone:
     - organize
@@ -24,6 +24,7 @@ requirements:
     - Linear issue teams are mapped to the repositories that own their work.
     - Completed and canceled Linear workflow states are identifiable through Linear state metadata.
 specializationIdeas:
+  - For new installs, use the issue-duplicate-finder example and configure issue_platform as Linear.
   - Broaden or narrow duplicate search across Linear teams mapped to the same repository.
   - Adjust the completed or canceled issue lookback window.
   - Tune confidence thresholds before Charlie comments with possible matches.

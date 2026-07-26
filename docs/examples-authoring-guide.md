@@ -76,7 +76,7 @@ Good IDs:
 
 - `docs-drift-maintainer`
 - `github-activity-digest`
-- `linear-issue-labeler`
+- `issue-labeler`
 
 Avoid IDs that are:
 

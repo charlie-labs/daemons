@@ -1,0 +1,42 @@
+id: issue-labeler
+title: Issue Labeler
+status: ready
+summary: Keeps recently changed issues aligned with the current label set on the selected issue platform.
+readiness: adapt-before-use
+showOnWebsite: true
+showInDashboard: true
+fit:
+  jobsToBeDone:
+    - organize
+    - operate
+  bestFor:
+    - Teams using GitHub Issues or Linear labels for routing, reporting, or automation.
+    - Issue scopes where labels drift, conflict, or are often missing and current label metadata is informative.
+  notFor:
+    - Teams whose label names, descriptions, and documented usage are intentionally ambiguous.
+    - Workflows where labels are intentionally ad hoc or owner-specific.
+requirements:
+  requiredIntegrations: []
+  optionalIntegrations: []
+  other:
+    - The integration for the selected issue platform must be connected and configured for the repository.
+    - Label names, descriptions, or documented usage are available enough to support high-confidence label decisions.
+adaptations:
+  - key: issue_platform
+    label: Issue platform
+    description: Choose exactly GitHub Issues or Linear as the issue system whose issues and label metadata this daemon should maintain.
+    required: true
+    suggestions:
+      - GitHub Issues
+      - Linear
+  - key: issue_scope
+    label: Issue scope
+    description: Bounded GitHub repository or query, or Linear team, project, or workspace query, to survey on each scheduled activation.
+    required: true
+    suggestions:
+      - owner/repository
+      - Linear team or project
+specializationIdeas:
+  - Narrow the configured scope to a repository query, Linear project, or other low-noise issue subset.
+  - Add explicit label-family rules if the issue scope has strict type, area, priority, or source families.
+  - Allow safe label removals only after the team documents exact conflict rules.

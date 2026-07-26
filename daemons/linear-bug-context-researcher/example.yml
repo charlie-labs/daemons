@@ -1,10 +1,10 @@
 id: linear-bug-context-researcher
 title: Linear Bug Context Researcher
-status: ready
+status: deprecated
 summary: Adds concise repo-aware triage context to newly created Linear bugs and regressions.
 readiness: direct-copy
-showOnWebsite: true
-showInDashboard: true
+showOnWebsite: false
+showInDashboard: false
 fit:
   jobsToBeDone:
     - operate
@@ -24,6 +24,7 @@ requirements:
     - Linear issue teams are mapped to the repositories that own their work.
     - Linear issue titles, descriptions, or labels contain enough signal to distinguish likely bugs from other work.
 specializationIdeas:
+  - For new installs, use the bug-context-researcher example and configure issue_platform as Linear.
   - Add Sentry, support-ticket, or incident-system lookup steps when bug reports commonly include those references.
   - Specialize bug signals around team-specific labels or issue templates.
   - Add a standard missing-repro checklist used by the team.

@@ -1,10 +1,10 @@
 id: linear-issue-labeler
 title: Issue Label Hygiene Helper
-status: ready
+status: deprecated
 summary: Keeps recently changed Linear issues aligned with the current Linear label set.
 readiness: direct-copy
-showOnWebsite: true
-showInDashboard: true
+showOnWebsite: false
+showInDashboard: false
 fit:
   jobsToBeDone:
     - organize
@@ -22,6 +22,7 @@ requirements:
   other:
     - Linear label names and descriptions are available enough to support high-confidence label decisions.
 specializationIdeas:
+  - For new installs, use the issue-labeler example and configure issue_platform as Linear.
   - Restrict labeling to specific Linear teams or projects.
   - Add explicit label-family rules if the workspace has strict type, area, priority, or source families.
   - Allow safe label removals only after the team documents exact conflict rules.

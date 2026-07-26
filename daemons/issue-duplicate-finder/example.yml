@@ -1,0 +1,35 @@
+id: issue-duplicate-finder
+title: Issue Duplicate Finder
+status: ready
+summary: Suggests likely duplicate or related issues when new issues are created on the selected issue platform.
+readiness: adapt-before-use
+showOnWebsite: true
+showInDashboard: true
+fit:
+  jobsToBeDone:
+    - organize
+    - operate
+  bestFor:
+    - Teams with enough GitHub Issues or Linear volume that duplicates or near-duplicates slow triage.
+    - Issue workflows with concrete symptoms, error text, product areas, or linked implementation evidence.
+  notFor:
+    - Teams that want automatic issue closure, merging, state changes, or deduplication decisions.
+    - Workflows where similar-looking issues frequently represent intentionally separate customer, project, or compliance work.
+requirements:
+  requiredIntegrations: []
+  optionalIntegrations: []
+  other:
+    - The integration for the selected issue platform must be connected and configured for the repository.
+    - The selected platform exposes enough issue lifecycle state to distinguish active trigger issues from inactive ones.
+adaptations:
+  - key: issue_platform
+    label: Issue platform
+    description: Choose exactly GitHub Issues or Linear as the issue system where this daemon should search for candidates and post duplicate suggestions.
+    required: true
+    suggestions:
+      - GitHub Issues
+      - Linear
+specializationIdeas:
+  - Broaden or narrow duplicate search across explicitly related repositories or Linear teams.
+  - Adjust the inactive-issue lookback window.
+  - Tune confidence thresholds before Charlie comments with possible matches.
