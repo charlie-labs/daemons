@@ -4,6 +4,7 @@ purpose: Give pull request authors concise, evidence-backed review feedback unde
 watch:
   - A non-draft pull request is opened.
   - A draft pull request is marked ready for review.
+  - A new commit is pushed to an open non-draft pull request.
   - The user CharlieHelps is requested as a reviewer.
   - A comment on a pull request requests a review from CharlieHelps.
 routines:
