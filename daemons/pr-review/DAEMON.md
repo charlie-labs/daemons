@@ -21,7 +21,6 @@ PR review protocol: pr-review/v1
 
 - If the current wake is the runtime's internal scheduled activation or scheduled tick for this daemon, run only `references/self-improvement.md`. Do not bootstrap or inspect a pull request, delegate review lanes, publish a PR review or review comment, or add a clean-review reaction.
 - For every other activation, preserve the existing PR-review behavior below exactly.
-- Route from the current wake context, not from static `activationMode` metadata. Do not introduce a third ambiguous or no-op activation mode.
 
 ## Never leave feedback about
 
