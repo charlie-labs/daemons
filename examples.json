@@ -722,7 +722,7 @@
       "id": "pr-review",
       "title": "PR Review",
       "status": "ready",
-      "summary": "Reviews pull requests for concise, evidence-backed risks and makes bounded weekly proposals to improve its review policy.",
+      "summary": "Reviews pull requests for concise, evidence-backed correctness and repository-policy risks before merge.",
       "readiness": "direct-copy",
       "showOnWebsite": true,
       "showInDashboard": true,
@@ -732,12 +732,10 @@
         ],
         "bestFor": [
           "Repositories that want consistent review of pull request correctness and explicit repository policy before merge.",
-          "Teams that prefer evidence-backed inline findings and a low-noise clean-review signal.",
-          "Teams that want small, human-reviewed review-policy proposals based on bounded recent evidence."
+          "Teams that prefer evidence-backed inline findings and a low-noise clean-review signal."
         ],
         "notFor": [
-          "Teams that require Charlie to approve pull requests or submit request-changes reviews.",
-          "Teams that do not want scheduled proposal-only refinement of the installed review policy."
+          "Teams that require Charlie to approve pull requests or submit request-changes reviews."
         ]
       },
       "requirements": {
@@ -746,8 +744,7 @@
         ],
         "optionalIntegrations": [],
         "other": [
-          "GitHub pull requests and repository-authored guidance are the sources of truth for review context.",
-          "Scheduled self-improvement remains proposal-only and requires human review before policy changes merge."
+          "GitHub pull requests and repository-authored guidance are the sources of truth for review context."
         ]
       },
       "adaptations": [],
