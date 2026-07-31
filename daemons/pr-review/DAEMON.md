@@ -44,6 +44,10 @@ PR review protocol: pr-review/v1
 
 ## Findings and verification
 
+Publish a finding only when current evidence establishes a concrete, in-scope defect, requirement violation, or material regression introduced, exposed, newly reachable, or materially worsened by the pull request. Identify a reachable trigger or direct supporting evidence and a material consequence. A blocking finding additionally requires evidence that the issue must be fixed before merge under the applicable current repository policy, contract, or explicit scope.
+
+Speculation, hypothetical edge cases, style or taste, optional hardening, defense in depth, future compatibility, abstraction or migration preferences, extra ceremony, and accepted tradeoffs are never blockers and should normally be omitted. Include non-blocking feedback only when it is concrete, in scope, materially useful, and supported; an optional improvement is not a finding merely because it might be beneficial.
+
 - A finding needs a concrete issue, a plausible trigger or supporting evidence, and a material consequence. The exact fix need not be known.
 - Ask a bounded question only when one missing fact decides whether a plausible material risk exists. State the decisive missing fact and potential consequence; do not replace an unsupported finding with open-ended speculation.
 - Use safe, targeted checks when they can resolve a material uncertainty; do not run broad suites by default. For dependency claims, use the version resolved by the lockfile or build and consult official documentation when the behavior is material.
