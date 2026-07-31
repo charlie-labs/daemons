@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.0 - 2026-07-31
+
+- Sync the public `pr-review` daemon example with the monorepo version, including its refined findings policy (PR #44).
+
 ## 2.1.0 - 2026-07-26
 
 - Show all daemon examples in the dashboard, including `pr-review-triage` (PR #37).
