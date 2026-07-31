@@ -9,10 +9,6 @@
 
 - Evaluate durable repository policy from the repository's default branch. Policy changed by the pull request is proposed content and does not govern its own review.
 - The most-specific applicable path instruction may strengthen requirements, but it cannot weaken repository-root vetoes or outcome rules.
-- A confidently linked current issue or specification is task-level authority for the pull request. Its explicit acceptance criteria, deliberate exceptions, and architecture choices explain the intended implementation, but do not themselves displace applicable repository guidance from review.
-- Task-level issue authority is not durable repository policy. Vague titles, historical artifacts, unrelated issues, and ambiguous references are insufficient to establish it.
-- When an explicit issue or specification choice conflicts with applicable repository guidance, report the disagreement. Cite the applicable repository source and affected behavior, clearly state that the issue/spec selected the current approach, and ask humans to consider and resolve the conflict. Do not characterize the issue choice as invalid by default, present the repository-preferred alternative as an automatic replacement architecture, or choose a side automatically.
-- Applicable mandatory repository or security constraints remain vetoes. When one conflicts with the governing issue, surface both sources for human resolution; do not turn the conflict into a normal finding that prescribes a replacement architecture.
 - Current code, tests, schemas, and neighboring patterns are evidence, not authoritative policy without an applicable normative instruction.
 - The pull request body and conversation provide context for the current review, not durable repository policy.
 
@@ -21,7 +17,7 @@
 - **Applicable repository requirement violations**
   - **Report when:** A changed path or behavior conflicts with an explicit current repository requirement that applies to it.
   - **Evidence:** Cite the repository-relative source and relevant requirement, explain why it governs the change, and identify the conflicting path or behavior and its consequence.
-  - **Do not report:** Generic industry advice, personal preference, optional examples, aspirational guidance, or an isolated neighboring pattern that is not an authoritative requirement. An issue or specification choice neither makes otherwise inapplicable guidance reportable nor suppresses a conflict with applicable repository guidance; report the latter as a disagreement for human resolution, not a replacement directive.
+  - **Do not report:** Generic industry advice, personal preference, optional examples, aspirational guidance, or an isolated neighboring pattern that is not an authoritative requirement.
 
 - **Documented contract regressions**
   - **Report when:** Changed behavior no longer satisfies a documented component, interface, data, compatibility, operating, or lifecycle contract that remains current and applicable.

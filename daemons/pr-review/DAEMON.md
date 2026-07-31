@@ -8,18 +8,11 @@ watch:
   - A comment on a pull request requests a review from CharlieHelps.
 routines:
   - Review the activated pull request according to this daemon's policy and applicable review lanes.
-  - On a scheduled activation, propose at most one small improvement following references/self-improvement.md.
-schedule: 0 */2 * * *
 ---
 
 # PR Review
 
 PR review protocol: pr-review/v1
-
-## Activation router
-
-- If the current wake is the runtime's internal scheduled activation or scheduled tick for this daemon, run only `references/self-improvement.md`. Do not bootstrap or inspect a pull request, delegate review lanes, publish a PR review or review comment, or add a clean-review reaction.
-- For every other activation, preserve the existing PR-review behavior below exactly.
 
 ## Never leave feedback about
 
@@ -52,10 +45,6 @@ PR review protocol: pr-review/v1
 ## Findings and verification
 
 Publish a finding only when current evidence establishes a concrete, in-scope defect, requirement violation, or material regression introduced, exposed, newly reachable, or materially worsened by the pull request. Identify a reachable trigger or direct supporting evidence and a material consequence. A blocking finding additionally requires evidence that the issue must be fixed before merge under the applicable current repository policy, contract, or explicit scope.
-
-- For each finding, identify an authoritative source that establishes expected behavior for this pull request, such as an applicable contract, explicit linked issue or specification, test, or repository policy. Apply the linked-issue authority, source-precedence, and mandatory-veto rules in `references/lanes/repository-guidance.md`.
-- Do not infer intended behavior or a defect from a repository default, neighboring implementation, convention, pattern, generic best practice, or reviewer preference alone.
-- When intent is decisive but no authoritative source establishes it, omit the finding or ask one bounded question instead of asserting a defect.
 
 Speculation, hypothetical edge cases, style or taste, optional hardening, defense in depth, future compatibility, abstraction or migration preferences, extra ceremony, and accepted tradeoffs are never blockers and should normally be omitted. Include non-blocking feedback only when it is concrete, in scope, materially useful, and supported; an optional improvement is not a finding merely because it might be beneficial.
 
