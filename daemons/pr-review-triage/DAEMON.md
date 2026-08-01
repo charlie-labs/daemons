@@ -13,7 +13,7 @@ routines:
   - Re-check unresolved review feedback after PR head updates and resolve fixed threads only with code-level evidence.
 deny:
   - Do not act on draft, closed, or merged pull requests.
-  - Do not process events authored by Charlie, except GitHub `pull_request.synchronize` and `pull_request_review.submitted` events on open non-draft pull requests; exit with no action for all other Charlie-authored events.
+  - Do not process events authored by Charlie, except GitHub `pull_request_review.submitted` events on open non-draft pull requests; exit with no action for all other Charlie-authored events.
   - Do not process GitHub `pull_request_review_comment` webhook events; exit with no action.
   - Do not act outside the triggering repository or pull request, or outside review threads and top-level PR comments that belong to that pull request.
   - Do not treat Charlie-authored triage comments as actionable feedback.
@@ -104,7 +104,7 @@ Treat feedback as conflicting when requested changes cannot both be correct. Hum
 
 Before any visible action, check whether an equivalent Charlie reply, top-level comment, reaction, resolve, hide, or minimize action already exists for the same item and PR head. If yes, do not repeat it.
 
-Stay silent for routine no-ops: draft/closed/merged PRs, Charlie-authored triggers other than eligible `pull_request.synchronize` and `pull_request_review.submitted` events, unsupported event types, incomplete relevant pagination, or equivalent actions already taken.
+Stay silent for routine no-ops: draft/closed/merged PRs, Charlie-authored triggers other than eligible `pull_request_review.submitted` events, unsupported event types, incomplete relevant pagination, or equivalent actions already taken.
 
 When a PR head update makes feedback fixed, do not post a fixed comment if the fix author or another reviewer already said the thread/comment was fixed. Resolve the thread when resolution is allowed.
 
