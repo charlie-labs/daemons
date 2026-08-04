@@ -126,7 +126,7 @@ export type DaemonInstallMarkerV2 = {
   registrySlug: string | null;
   registryRepo: string | null;
   registryRef: string | null;
-  reviewedFiles: Array<{ path: string; mode: '100644' | '100755'; sha256: string | null }>;
+  reviewedFiles: Array<{ path: string; mode: '100644' | '100755'; sha256: string }> | null;
   targetDirectory: string;
   destinationFiles: string[];
   adaptationKeys: string[];
@@ -341,14 +341,25 @@ export function createDaemonInstallMarker(marker: DaemonInstallMarker): string {
   return `<!-- ${markerName} ${stableJson(marker)} -->`;
 }
 
+function normalizedRelativePosixPath(value: string): boolean {
+  if (!value || value.trim() !== value || value.startsWith('/') || value.includes('\\') || value.includes('//')) return false;
+  const parts = value.split('/');
+  return parts.every((part) => part !== '' && part !== '.' && part !== '..') && path.posix.normalize(value) === value;
+}
+
+function sortedUnique(values: readonly string[]): boolean {
+  return values.every((value, index) => index === 0 || values[index - 1]!.localeCompare(value) < 0);
+}
+
 export function parseDaemonInstallMarker(body: string | null | undefined):
   | { ok: true; marker: DaemonInstallMarker }
   | { ok: false; present: boolean; error: CliIssue | null } {
   if (!body) return { ok: false, present: false, error: null };
-  const regex = new RegExp(`<!--\\s*(?:${DAEMON_INSTALL_MARKER_V2_NAME}|${DAEMON_INSTALL_MARKER_NAME})\\s+([\\s\\S]*?)\\s*-->`);
+  const regex = new RegExp(`<!--\\s*(${DAEMON_INSTALL_MARKER_V2_NAME}|${DAEMON_INSTALL_MARKER_NAME})\\s+([\\s\\S]*?)\\s*-->`);
   const match = body.match(regex);
   if (!match) return { ok: false, present: false, error: null };
-  const rawJson = match[1] ?? '';
+  const markerName = match[1] ?? '';
+  const rawJson = match[2] ?? '';
   let parsed: unknown;
   try {
     parsed = JSON.parse(rawJson);
@@ -368,25 +379,46 @@ export function parseDaemonInstallMarker(body: string | null | undefined):
   }
   const record = parsed as Record<string, unknown>;
   if (record.version === 2) {
-    const destinationFiles = Array.isArray(record.destinationFiles) ? record.destinationFiles.filter((item): item is string => typeof item === 'string') : [];
-    const adaptationKeys = Array.isArray(record.adaptationKeys) ? record.adaptationKeys.filter((item): item is string => typeof item === 'string') : [];
-    const reviewedFiles = Array.isArray(record.reviewedFiles) ? record.reviewedFiles : [];
+    const destinationFiles = Array.isArray(record.destinationFiles) && record.destinationFiles.every((item): item is string => typeof item === 'string')
+      ? record.destinationFiles
+      : null;
+    const adaptationKeys = Array.isArray(record.adaptationKeys) && record.adaptationKeys.every((item): item is string => typeof item === 'string')
+      ? record.adaptationKeys
+      : null;
+    const reviewedFiles = Array.isArray(record.reviewedFiles) ? record.reviewedFiles : null;
+    const sourceType = record.sourceType;
+    const communityReviewedFilesValid = reviewedFiles !== null && reviewedFiles.length > 0 && reviewedFiles.every((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
+      const reviewed = item as Record<string, unknown>;
+      return typeof reviewed.path === 'string' && normalizedRelativePosixPath(reviewed.path) &&
+        (reviewed.mode === '100644' || reviewed.mode === '100755') &&
+        typeof reviewed.sha256 === 'string' && /^[0-9a-f]{64}$/.test(reviewed.sha256);
+    }) && sortedUnique(reviewedFiles.map((item) => (item as Record<string, unknown>).path as string));
     if (
+      markerName !== DAEMON_INSTALL_MARKER_V2_NAME ||
       typeof record.daemonId !== 'string' ||
-      (record.sourceType !== 'first-party' && record.sourceType !== 'community') ||
-      typeof record.sourceRepo !== 'string' || typeof record.sourceRef !== 'string' || typeof record.canonicalSourceUrl !== 'string' ||
+      (sourceType !== 'first-party' && sourceType !== 'community') ||
+      typeof record.sourceRepo !== 'string' || !record.sourceRepo || typeof record.sourceRef !== 'string' || !record.sourceRef ||
+      typeof record.canonicalSourceUrl !== 'string' || !record.canonicalSourceUrl ||
       typeof record.catalogPath !== 'string' || typeof record.catalogSchemaVersion !== 'number' ||
       (record.registrySlug !== null && typeof record.registrySlug !== 'string') ||
       (record.registryRepo !== null && typeof record.registryRepo !== 'string') ||
       (record.registryRef !== null && typeof record.registryRef !== 'string') ||
       typeof record.targetDirectory !== 'string' || typeof record.branch !== 'string' ||
-      destinationFiles.length !== (Array.isArray(record.destinationFiles) ? record.destinationFiles.length : -1) ||
-      adaptationKeys.length !== (Array.isArray(record.adaptationKeys) ? record.adaptationKeys.length : -1) ||
-      reviewedFiles.some((item) => !item || typeof item !== 'object' || Array.isArray(item) || typeof (item as Record<string, unknown>).path !== 'string' ||
-        !['100644', '100755'].includes(String((item as Record<string, unknown>).mode)) ||
-        ((item as Record<string, unknown>).sha256 !== null && typeof (item as Record<string, unknown>).sha256 !== 'string'))
+      destinationFiles === null || destinationFiles.length === 0 ||
+      !destinationFiles.every(normalizedRelativePosixPath) || !sortedUnique(destinationFiles) ||
+      adaptationKeys === null || !sortedUnique(adaptationKeys) ||
+      (sourceType === 'community' && (
+        typeof record.registrySlug !== 'string' || !record.registrySlug ||
+        typeof record.registryRepo !== 'string' || !record.registryRepo ||
+        typeof record.registryRef !== 'string' || !record.registryRef ||
+        !communityReviewedFilesValid
+      )) ||
+      (sourceType === 'first-party' && (
+        record.registrySlug !== null || record.registryRepo !== null || record.registryRef !== null || record.reviewedFiles !== null
+      ))
     ) {
-      return { ok: false, present: true, error: markerIssue('INSTALL_MARKER_INVALID', 'Install marker payload is missing required v2 fields.') };
+      return { ok: false, present: true, error: markerIssue('INSTALL_MARKER_INVALID', 'Install marker payload contains invalid v2 fields.') };
     }
     return { ok: true, marker: parsed as DaemonInstallMarkerV2 };
   }
@@ -395,6 +427,7 @@ export function parseDaemonInstallMarker(body: string | null | undefined):
     ? record.adaptationKeys.filter((item): item is string => typeof item === 'string')
     : [];
   if (
+    markerName !== DAEMON_INSTALL_MARKER_NAME ||
     record.version !== 1 ||
     typeof record.exampleId !== 'string' ||
     typeof record.sourceRepo !== 'string' ||
@@ -633,7 +666,7 @@ function markerForInstall(args: {
     registryRef: args.communityEntry ? 'master' : null,
     reviewedFiles: args.communityEntry
       ? args.communityEntry.reviewedFiles.map((file) => ({ ...file }))
-      : args.files.map((file) => ({ path: file.sourcePath, mode: file.mode, sha256: null })),
+      : null,
     targetDirectory: args.targetDirectory,
     destinationFiles: plannedPaths(args.files),
     adaptationKeys: [...args.adaptationKeys].sort((left, right) => left.localeCompare(right)),
@@ -853,10 +886,30 @@ async function branchContainsRenderedFiles(args: {
   branchSha: string;
   files: readonly RenderedDaemonInstallFile[];
   installRoot: string;
+  targetDirectory: string;
 }): Promise<boolean> {
   const branchCommit = await getCommit({ githubClient: args.githubClient, repository: args.repository, sha: args.branchSha });
   const branchTree = await getTree({ githubClient: args.githubClient, repository: args.repository, sha: branchCommit.tree.sha, recursive: true });
+  if (branchTree.truncated) return false;
   const entries = treeEntryMap(branchTree);
+  const expectedPaths = new Set(args.files.map((file) => toDisplayPath(args.installRoot, file.destinationPath)));
+  const expectedDirectories = new Set<string>();
+  for (const expectedPath of expectedPaths) {
+    let directory = path.posix.dirname(expectedPath);
+    while (directory !== args.targetDirectory && directory.startsWith(`${args.targetDirectory}/`)) {
+      expectedDirectories.add(directory);
+      directory = path.posix.dirname(directory);
+    }
+  }
+  const targetPrefix = `${args.targetDirectory}/`;
+  for (const [entryPath, entry] of entries) {
+    if (!entryPath.startsWith(targetPrefix)) continue;
+    if (entry.type === 'tree') {
+      if (!expectedDirectories.has(entryPath)) return false;
+    } else if (!expectedPaths.has(entryPath)) {
+      return false;
+    }
+  }
   for (const file of args.files) {
     const targetPath = toDisplayPath(args.installRoot, file.destinationPath);
     const entry = entries.get(targetPath);
@@ -938,22 +991,15 @@ async function recoverExistingBranch(args: {
   body: string;
   renderedFiles: readonly RenderedDaemonInstallFile[];
   installRoot: string;
+  targetDirectory: string;
 }): Promise<{ status: 'existing_open' | 'recovered_branch'; pull: GitHubPull }> {
-  const open = await findOpenPullRequestForExactHead({
-    githubClient: args.githubClient,
-    repository: args.repository,
-    branch: args.branch,
-    headSha: args.branchSha,
-    baseBranch: args.baseBranch,
-  });
-  if (open) return { status: 'existing_open', pull: open };
-
   const branchMatches = await branchContainsRenderedFiles({
     githubClient: args.githubClient,
     repository: args.repository,
     branchSha: args.branchSha,
     files: args.renderedFiles,
     installRoot: args.installRoot,
+    targetDirectory: args.targetDirectory,
   });
   if (!branchMatches) {
     throw new DaemonInstallPullRequestError({
@@ -1124,6 +1170,7 @@ export async function createDaemonInstallPullRequest(
       body,
       renderedFiles: rendered.files,
       installRoot,
+      targetDirectory,
     });
     return {
       status: recovered.status,
@@ -1154,6 +1201,12 @@ export async function createDaemonInstallPullRequest(
   }
   const baseCommit = await getCommit({ githubClient, repository, sha: baseRef.object.sha });
   const baseTree = await getTree({ githubClient, repository, sha: baseCommit.tree.sha, recursive: true });
+  if (baseTree.truncated) {
+    throw new DaemonInstallPullRequestError({
+      code: 'INSTALL_TARGET_TREE_TRUNCATED',
+      message: `GitHub returned a truncated recursive tree for base branch '${baseBranch}'.`,
+    });
+  }
   const collisions = detectBaseCollisions({
     baseTree,
     targetDirectory,
@@ -1205,6 +1258,7 @@ export async function createDaemonInstallPullRequest(
       body,
       renderedFiles: rendered.files,
       installRoot,
+      targetDirectory,
     });
     return {
       status: recovered.status,

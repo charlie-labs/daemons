@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.3.0 - 2026-08-04
+
+- Add approved external daemon delivery from the fixed public `charlie-labs/daemon-registry` catalog while keeping installs limited to approved slugs and commit-pinned reviewed manifests.
+- Fail closed on incomplete GitHub trees, stale or mismatched reviewed files, unexpected install-subtree files, and malformed source-specific v2 install markers.
+
 ## 2.2.0 - 2026-07-31
 
 - Sync the public `pr-review` daemon example with the monorepo version, including its refined findings policy (PR #44).

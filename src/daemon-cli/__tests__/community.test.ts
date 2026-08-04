@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, test } from 'vitest';
@@ -92,6 +92,8 @@ describe('approved community CLI delivery', () => {
       expect(added.json.data.sourceRef).toBe(commit);
       expect(added.json.data.filesWritten).toEqual(['.agents/daemons/community-daemon/DAEMON.md', '.agents/daemons/community-daemon/scripts/run.sh']);
       expect(await readFile(path.join(directory, '.agents/daemons/community-daemon/DAEMON.md'), 'utf8')).toBe(daemon);
+      expect((await stat(path.join(directory, '.agents/daemons/community-daemon/DAEMON.md'))).mode & 0o777).toBe(0o644);
+      expect((await stat(path.join(directory, '.agents/daemons/community-daemon/scripts/run.sh'))).mode & 0o777).toBe(0o755);
     } finally { await rm(directory, { recursive: true, force: true }); }
   });
 

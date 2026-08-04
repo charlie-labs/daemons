@@ -163,6 +163,22 @@ function gitBlobSha(content: string): string {
     .digest('hex');
 }
 
+function renderedInstallTree(args: { daemon?: string; extra?: boolean; truncated?: boolean } = {}) {
+  const renderedDaemon = args.daemon ?? templatedDaemon.replaceAll('{{adapt.required_value}}', 'secret-target').replaceAll('{{adapt.optional_value}}', 'from-default');
+  const renderedScript = '#!/usr/bin/env bash\necho secret-target from-default\n';
+  const renderedReference = '# Rendered\n\nTarget: secret-target\nOptional: from-default\n';
+  return {
+    sha: 'existing-tree',
+    truncated: args.truncated ?? false,
+    tree: [
+      { path: '.agents/daemons/templated-daemon/DAEMON.md', type: 'blob', mode: '100644', sha: gitBlobSha(renderedDaemon) },
+      { path: '.agents/daemons/templated-daemon/references/render.md', type: 'blob', mode: '100644', sha: gitBlobSha(renderedReference) },
+      { path: '.agents/daemons/templated-daemon/scripts/render.sh', type: 'blob', mode: '100755', sha: gitBlobSha(renderedScript) },
+      ...(args.extra ? [{ path: '.agents/daemons/templated-daemon/scripts/unreviewed.sh', type: 'blob', mode: '100755', sha: 'extra' }] : []),
+    ],
+  };
+}
+
 function makePull(args: {
   number: number;
   branch: string;
@@ -445,6 +461,12 @@ ${result.markerText}`);
         if (method === 'GET' && requestPath.endsWith('/pulls')) {
           return [makePull({ number: 7, branch: 'charlie/daemon-installs/templated-daemon', sha: 'existing-sha' })] as T;
         }
+        if (method === 'GET' && requestPath.endsWith('/git/commits/existing-sha')) {
+          return { sha: 'existing-sha', tree: { sha: 'existing-tree' } } as T;
+        }
+        if (method === 'GET' && requestPath.endsWith('/git/trees/existing-tree')) {
+          return renderedInstallTree() as T;
+        }
         throw new Error(`unexpected GitHub request ${method} ${requestPath}`);
       },
     };
@@ -466,9 +488,6 @@ ${result.markerText}`);
   });
 
   test('recovers an existing deterministic branch without a pull request when files match', async () => {
-    const renderedDaemon = templatedDaemon.replaceAll('{{adapt.required_value}}', 'secret-target').replaceAll('{{adapt.optional_value}}', 'from-default');
-    const renderedScript = '#!/usr/bin/env bash\necho secret-target from-default\n';
-    const renderedReference = '# Rendered\n\nTarget: secret-target\nOptional: from-default\n';
     const calls: RecordedCall[] = [];
     const githubClient: DaemonInstallPrGitHubClient = {
       async request<T>(method: string, requestPath: string, options?: unknown): Promise<T> {
@@ -483,14 +502,7 @@ ${result.markerText}`);
           return { sha: 'existing-sha', tree: { sha: 'existing-tree' } } as T;
         }
         if (method === 'GET' && requestPath.endsWith('/git/trees/existing-tree')) {
-          return {
-            sha: 'existing-tree',
-            tree: [
-              { path: '.agents/daemons/templated-daemon/DAEMON.md', type: 'blob', mode: '100644', sha: gitBlobSha(renderedDaemon) },
-              { path: '.agents/daemons/templated-daemon/scripts/render.sh', type: 'blob', mode: '100755', sha: gitBlobSha(renderedScript) },
-              { path: '.agents/daemons/templated-daemon/references/render.md', type: 'blob', mode: '100644', sha: gitBlobSha(renderedReference) },
-            ],
-          } as T;
+          return renderedInstallTree() as T;
         }
         if (method === 'POST' && requestPath.endsWith('/pulls')) {
           const body = (options as { body: { body: string } }).body.body;
@@ -513,6 +525,41 @@ ${result.markerText}`);
     expect(result.status).toBe('recovered_branch');
     expect(result.pullRequest.number).toBe(8);
     expect(calls.some((call) => call.method === 'POST' && call.path.endsWith('/git/refs'))).toBe(false);
+  });
+
+  test.each([
+    ['changed expected content', { daemon: templatedDaemon.replaceAll('{{adapt.required_value}}', 'changed').replaceAll('{{adapt.optional_value}}', 'from-default') }],
+    ['an extra unreviewed support file', { extra: true }],
+    ['a truncated branch tree', { truncated: true }],
+  ])('refuses an existing open PR when its install subtree has %s', async (_name, treeArgs) => {
+    const calls: RecordedCall[] = [];
+    const githubClient: DaemonInstallPrGitHubClient = {
+      async request<T>(method: string, requestPath: string, options?: unknown): Promise<T> {
+        calls.push({ method, path: requestPath, options });
+        if (method === 'GET' && requestPath.endsWith('/git/ref/heads/charlie/daemon-installs/templated-daemon')) {
+          return { ref: 'refs/heads/charlie/daemon-installs/templated-daemon', object: { sha: 'existing-sha', type: 'commit' } } as T;
+        }
+        if (method === 'GET' && requestPath.endsWith('/git/commits/existing-sha')) {
+          return { sha: 'existing-sha', tree: { sha: 'existing-tree' } } as T;
+        }
+        if (method === 'GET' && requestPath.endsWith('/git/trees/existing-tree')) {
+          return renderedInstallTree(treeArgs) as T;
+        }
+        throw new Error(`unexpected GitHub request ${method} ${requestPath}`);
+      },
+    };
+
+    await expect(createDaemonInstallPullRequest({
+      repo: 'acme/widgets',
+      exampleId: 'templated-daemon',
+      base: 'main',
+      sourceRef: 'test-ref',
+      adaptations: { required_value: 'secret-target' },
+      catalogClient,
+      githubClient,
+    })).rejects.toMatchObject({ code: 'INSTALL_BRANCH_COLLISION' });
+    expect(calls.some((call) => call.method === 'POST')).toBe(false);
+    expect(calls.some((call) => call.method === 'GET' && call.path.endsWith('/pulls'))).toBe(false);
   });
 
   test('refuses target path collisions on the target base before creating a branch', async () => {
@@ -551,6 +598,33 @@ ${result.markerText}`);
       })
     ).rejects.toMatchObject({ code: 'INSTALL_COLLISION' });
     expect(calls.some((call) => call.method === 'POST' && call.path.endsWith('/git/trees'))).toBe(false);
+  });
+
+  test('rejects a truncated target tree before collision detection or mutation', async () => {
+    const calls: RecordedCall[] = [];
+    const githubClient: DaemonInstallPrGitHubClient = {
+      async request<T>(method: string, requestPath: string, options?: unknown): Promise<T> {
+        calls.push({ method, path: requestPath, options });
+        if (method === 'GET' && requestPath.endsWith('/git/ref/heads/charlie/daemon-installs/templated-daemon')) throw githubError(404, 'branch missing');
+        if (method === 'GET' && requestPath.endsWith('/git/ref/heads/main')) return { ref: 'refs/heads/main', object: { sha: 'base-sha', type: 'commit' } } as T;
+        if (method === 'GET' && requestPath.endsWith('/git/commits/base-sha')) return { sha: 'base-sha', tree: { sha: 'base-tree' } } as T;
+        if (method === 'GET' && requestPath.endsWith('/git/trees/base-tree')) {
+          return { sha: 'base-tree', truncated: true, tree: [{ path: '.agents/daemons/templated-daemon/DAEMON.md', type: 'blob', mode: '100644', sha: 'old' }] } as T;
+        }
+        throw new Error(`unexpected GitHub request ${method} ${requestPath}`);
+      },
+    };
+
+    await expect(createDaemonInstallPullRequest({
+      repo: 'acme/widgets',
+      exampleId: 'templated-daemon',
+      base: 'main',
+      sourceRef: 'test-ref',
+      adaptations: { required_value: 'secret-target' },
+      catalogClient,
+      githubClient,
+    })).rejects.toMatchObject({ code: 'INSTALL_TARGET_TREE_TRUNCATED' });
+    expect(calls.some((call) => call.method === 'POST' && /\/(git\/trees|git\/commits|git\/refs|pulls)$/.test(call.path))).toBe(false);
   });
 
   test('lists marker-backed PRs and reconciles edited-body install branches', async () => {
@@ -668,6 +742,98 @@ ${result.markerText}`);
       ok: false,
       present: true,
       error: { code: 'INSTALL_MARKER_INVALID_JSON' },
+    });
+  });
+
+  test('marker parser accepts valid v1 and source-specific v2 markers', () => {
+    const v1 = {
+      version: 1 as const,
+      exampleId: 'templated-daemon',
+      sourceRepo: 'charlie-labs/daemons',
+      sourceRef: 'test-ref',
+      catalogPath: 'examples.json',
+      catalogSchemaVersion: 2,
+      targetDirectory: '.agents/daemons/templated-daemon',
+      files: ['.agents/daemons/templated-daemon/DAEMON.md'],
+      adaptationKeys: [],
+      branch: 'charlie/daemon-installs/templated-daemon',
+    };
+    const firstParty = {
+      version: 2 as const,
+      daemonId: 'templated-daemon',
+      sourceType: 'first-party' as const,
+      sourceRepo: 'charlie-labs/daemons',
+      sourceRef: 'test-ref',
+      canonicalSourceUrl: 'https://github.com/charlie-labs/daemons/tree/test-ref/daemons/templated-daemon',
+      catalogPath: 'examples.json',
+      catalogSchemaVersion: 2,
+      registrySlug: null,
+      registryRepo: null,
+      registryRef: null,
+      reviewedFiles: null,
+      targetDirectory: '.agents/daemons/templated-daemon',
+      destinationFiles: ['.agents/daemons/templated-daemon/DAEMON.md'],
+      adaptationKeys: [],
+      branch: 'charlie/daemon-installs/templated-daemon',
+    };
+    const community = {
+      ...firstParty,
+      daemonId: 'community-daemon',
+      sourceType: 'community' as const,
+      sourceRepo: 'acme/daemons',
+      sourceRef: 'a'.repeat(40),
+      canonicalSourceUrl: `https://github.com/acme/daemons/blob/${'a'.repeat(40)}/pack/DAEMON.md`,
+      catalogPath: 'catalog.json',
+      catalogSchemaVersion: 1,
+      registrySlug: 'community-daemon',
+      registryRepo: 'charlie-labs/daemon-registry',
+      registryRef: 'master',
+      reviewedFiles: [{ path: 'pack/DAEMON.md', mode: '100644' as const, sha256: 'b'.repeat(64) }],
+      targetDirectory: '.agents/daemons/community-daemon',
+      destinationFiles: ['.agents/daemons/community-daemon/DAEMON.md'],
+      branch: 'charlie/daemon-installs/community-daemon',
+    };
+
+    expect(parseDaemonInstallMarker(createDaemonInstallMarker(v1))).toEqual({ ok: true, marker: v1 });
+    expect(parseDaemonInstallMarker(createDaemonInstallMarker(firstParty))).toEqual({ ok: true, marker: firstParty });
+    expect(parseDaemonInstallMarker(createDaemonInstallMarker(community))).toEqual({ ok: true, marker: community });
+  });
+
+  test.each([
+    ['v1 name with v2 payload', 'charlie-daemon-install-v1', {}],
+    ['empty community reviewed files', 'charlie-daemon-install-v2', { reviewedFiles: [] }],
+    ['missing community registry ref', 'charlie-daemon-install-v2', { registryRef: null }],
+    ['unnormalized reviewed path', 'charlie-daemon-install-v2', { reviewedFiles: [{ path: 'pack/../DAEMON.md', mode: '100644', sha256: 'b'.repeat(64) }] }],
+    ['unsorted reviewed paths', 'charlie-daemon-install-v2', { reviewedFiles: [{ path: 'pack/z.md', mode: '100644', sha256: 'b'.repeat(64) }, { path: 'pack/a.md', mode: '100644', sha256: 'c'.repeat(64) }] }],
+    ['invalid reviewed mode', 'charlie-daemon-install-v2', { reviewedFiles: [{ path: 'pack/DAEMON.md', mode: '100600', sha256: 'b'.repeat(64) }] }],
+    ['uppercase reviewed hash', 'charlie-daemon-install-v2', { reviewedFiles: [{ path: 'pack/DAEMON.md', mode: '100644', sha256: 'B'.repeat(64) }] }],
+    ['duplicate destination paths', 'charlie-daemon-install-v2', { destinationFiles: ['.agents/daemons/community-daemon/DAEMON.md', '.agents/daemons/community-daemon/DAEMON.md'] }],
+    ['first-party registry provenance', 'charlie-daemon-install-v2', { sourceType: 'first-party', registrySlug: 'community-daemon', registryRepo: 'charlie-labs/daemon-registry', registryRef: 'master', reviewedFiles: null }],
+    ['first-party reviewed manifest', 'charlie-daemon-install-v2', { sourceType: 'first-party', registrySlug: null, registryRepo: null, registryRef: null, reviewedFiles: [{ path: 'pack/DAEMON.md', mode: '100644', sha256: 'b'.repeat(64) }] }],
+  ])('rejects malformed v2 marker: %s', (_name, markerName, overrides) => {
+    const marker = {
+      version: 2,
+      daemonId: 'community-daemon',
+      sourceType: 'community',
+      sourceRepo: 'acme/daemons',
+      sourceRef: 'a'.repeat(40),
+      canonicalSourceUrl: `https://github.com/acme/daemons/blob/${'a'.repeat(40)}/pack/DAEMON.md`,
+      catalogPath: 'catalog.json',
+      catalogSchemaVersion: 1,
+      registrySlug: 'community-daemon',
+      registryRepo: 'charlie-labs/daemon-registry',
+      registryRef: 'master',
+      reviewedFiles: [{ path: 'pack/DAEMON.md', mode: '100644', sha256: 'b'.repeat(64) }],
+      targetDirectory: '.agents/daemons/community-daemon',
+      destinationFiles: ['.agents/daemons/community-daemon/DAEMON.md'],
+      adaptationKeys: [],
+      branch: 'charlie/daemon-installs/community-daemon',
+      ...overrides,
+    };
+    expect(parseDaemonInstallMarker(`<!-- ${markerName} ${JSON.stringify(marker)} -->`)).toMatchObject({
+      ok: false,
+      present: true,
+      error: { code: 'INSTALL_MARKER_INVALID' },
     });
   });
 
