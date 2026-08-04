@@ -16,7 +16,11 @@ import { resolveAdaptations, type AdaptationValues } from './daemon-cli/adaptati
 import type { CatalogClient, CliIssue, InstallFilePlan } from './daemon-cli/types';
 import type { CatalogExample } from './examples/types';
 import { communityRelativePath, loadDaemonCatalogs, prepareCommunityInstall, resolveDaemon } from './daemon-cli/community';
-import type { CommunityRegistryEntry } from './community-registry/types';
+import {
+  COMMUNITY_REGISTRY_REF,
+  COMMUNITY_REGISTRY_REPO,
+  type CommunityRegistryEntry,
+} from './community-registry/types';
 
 export const DAEMON_INSTALL_BRANCH_PREFIX = 'charlie/daemon-installs/';
 export const DAEMON_INSTALL_MARKER_NAME = 'charlie-daemon-install-v1';
@@ -395,9 +399,10 @@ export function parseDaemonInstallMarker(body: string | null | undefined):
         typeof reviewed.sha256 === 'string' && /^[0-9a-f]{64}$/.test(reviewed.sha256);
     }) && sortedUnique(reviewedFiles.map((item) => (item as Record<string, unknown>).path as string));
     const registryProvenanceComplete =
-      typeof record.registrySlug === 'string' && record.registrySlug.length > 0 &&
-      typeof record.registryRepo === 'string' && record.registryRepo.length > 0 &&
-      typeof record.registryRef === 'string' && record.registryRef.length > 0 &&
+      typeof record.registrySlug === 'string' && record.registrySlug === record.daemonId &&
+      record.registryRepo === COMMUNITY_REGISTRY_REPO &&
+      record.registryRef === COMMUNITY_REGISTRY_REF &&
+      typeof record.sourceRef === 'string' && /^[0-9a-f]{40}$/.test(record.sourceRef) &&
       reviewedFilesValid;
     const registryProvenanceNull =
       record.registrySlug === null && record.registryRepo === null && record.registryRef === null && record.reviewedFiles === null;
@@ -662,8 +667,8 @@ function markerForInstall(args: {
     catalogPath: args.registryEntry ? 'catalog.json' : CATALOG_PATH,
     catalogSchemaVersion: args.catalogSchemaVersion,
     registrySlug: args.registryEntry?.slug ?? null,
-    registryRepo: args.registryEntry ? 'charlie-labs/daemon-registry' : null,
-    registryRef: args.registryEntry ? 'master' : null,
+    registryRepo: args.registryEntry ? COMMUNITY_REGISTRY_REPO : null,
+    registryRef: args.registryEntry ? COMMUNITY_REGISTRY_REF : null,
     reviewedFiles: args.registryEntry
       ? args.registryEntry.reviewedFiles.map((file) => ({ ...file }))
       : null,
@@ -711,7 +716,7 @@ function createPullRequestBody(args: {
       '',
       `- Repository: ${args.communityEntry.repositoryUrl}`,
       `- Pinned commit: \`${args.communityEntry.commit}\``,
-      `- Registry: \`charlie-labs/daemon-registry@master\` entry \`${args.communityEntry.slug}\``,
+      `- Registry: \`${COMMUNITY_REGISTRY_REPO}@${COMMUNITY_REGISTRY_REF}\` entry \`${args.communityEntry.slug}\``,
       '- Reviewed files:',
       ...args.communityEntry.reviewedFiles.map((file) => `  - \`${file.path}\` (${file.mode}, SHA-256 \`${file.sha256}\`)`),
       '',
