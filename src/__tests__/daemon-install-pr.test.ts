@@ -745,7 +745,7 @@ ${result.markerText}`);
     });
   });
 
-  test('marker parser accepts valid v1 and source-specific v2 markers', () => {
+  test('marker parser accepts valid v1, bundled v2, and registry-backed v2 markers', () => {
     const v1 = {
       version: 1 as const,
       exampleId: 'templated-daemon',
@@ -793,10 +793,12 @@ ${result.markerText}`);
       destinationFiles: ['.agents/daemons/community-daemon/DAEMON.md'],
       branch: 'charlie/daemon-installs/community-daemon',
     };
+    const registryFirstParty = { ...community, sourceType: 'first-party' as const };
 
     expect(parseDaemonInstallMarker(createDaemonInstallMarker(v1))).toEqual({ ok: true, marker: v1 });
     expect(parseDaemonInstallMarker(createDaemonInstallMarker(firstParty))).toEqual({ ok: true, marker: firstParty });
     expect(parseDaemonInstallMarker(createDaemonInstallMarker(community))).toEqual({ ok: true, marker: community });
+    expect(parseDaemonInstallMarker(createDaemonInstallMarker(registryFirstParty))).toEqual({ ok: true, marker: registryFirstParty });
   });
 
   test.each([
@@ -808,8 +810,8 @@ ${result.markerText}`);
     ['invalid reviewed mode', 'charlie-daemon-install-v2', { reviewedFiles: [{ path: 'pack/DAEMON.md', mode: '100600', sha256: 'b'.repeat(64) }] }],
     ['uppercase reviewed hash', 'charlie-daemon-install-v2', { reviewedFiles: [{ path: 'pack/DAEMON.md', mode: '100644', sha256: 'B'.repeat(64) }] }],
     ['duplicate destination paths', 'charlie-daemon-install-v2', { destinationFiles: ['.agents/daemons/community-daemon/DAEMON.md', '.agents/daemons/community-daemon/DAEMON.md'] }],
-    ['first-party registry provenance', 'charlie-daemon-install-v2', { sourceType: 'first-party', registrySlug: 'community-daemon', registryRepo: 'charlie-labs/daemon-registry', registryRef: 'master', reviewedFiles: null }],
-    ['first-party reviewed manifest', 'charlie-daemon-install-v2', { sourceType: 'first-party', registrySlug: null, registryRepo: null, registryRef: null, reviewedFiles: [{ path: 'pack/DAEMON.md', mode: '100644', sha256: 'b'.repeat(64) }] }],
+    ['incomplete first-party registry provenance', 'charlie-daemon-install-v2', { sourceType: 'first-party', reviewedFiles: null }],
+    ['community without registry provenance', 'charlie-daemon-install-v2', { sourceType: 'community', registrySlug: null, registryRepo: null, registryRef: null, reviewedFiles: null }],
   ])('rejects malformed v2 marker: %s', (_name, markerName, overrides) => {
     const marker = {
       version: 2,

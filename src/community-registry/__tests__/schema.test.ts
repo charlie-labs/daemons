@@ -25,9 +25,12 @@ function validEntry() {
 }
 
 describe('approved community registry schema v1', () => {
-  test('accepts empty and valid catalogs', () => {
+  test('accepts an empty catalog', () => {
     expect(parseCommunityRegistryValue({ value: { schemaVersion: 1, entries: [] } }).ok).toBe(true);
-    expect(parseCommunityRegistryValue({ value: { schemaVersion: 1, entries: [validEntry()] } }).ok).toBe(true);
+  });
+
+  test('accepts the daemon-registry producer representative fixture', () => {
+    expect(parseCommunityRegistryValue({ value: { schemaVersion: 1, entries: [validEntry()] } })).toMatchObject({ ok: true });
   });
 
   test.each([
@@ -36,6 +39,9 @@ describe('approved community registry schema v1', () => {
     ['canonical mismatch', () => ({ ...validEntry(), canonicalSourceUrl: 'https://github.com/acme/daemons/blob/main/DAEMON.md' })],
     ['short commit', () => ({ ...validEntry(), commit: 'abc' })],
     ['unsafe daemon path', () => ({ ...validEntry(), daemonPath: '../DAEMON.md' })],
+    ['README daemon path', () => ({ ...validEntry(), daemonPath: 'packages/community-daemon/README.md' })],
+    ['owner underscore', () => ({ ...validEntry(), repositoryUrl: 'https://github.com/acme_org/daemons' })],
+    ['invalid path segment', () => ({ ...validEntry(), daemonPath: 'packages/community daemon/DAEMON.md' })],
     ['bad hash', () => ({ ...validEntry(), reviewedFiles: [{ ...validEntry().reviewedFiles[0], sha256: 'ABC' }] })],
     ['executable daemon', () => ({ ...validEntry(), reviewedFiles: [{ ...validEntry().reviewedFiles[0], mode: '100755' }] })],
     ['extra package file', () => ({ ...validEntry(), reviewedFiles: [...validEntry().reviewedFiles, { path: 'packages/community-daemon/notes.md', mode: '100644', sha256 }] })],

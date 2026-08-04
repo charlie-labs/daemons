@@ -207,7 +207,7 @@ export async function runShowCommand(args: {
       };
     }
 
-    if (resolved.sourceType === 'community') {
+    if (resolved.kind === 'registry') {
       const entry = resolved.entry;
       const daemonDirectory = path.posix.dirname(entry.daemonPath);
       const relativeFiles = entry.reviewedFiles.map((file) => path.posix.relative(daemonDirectory, file.path));
@@ -496,7 +496,7 @@ export async function runAddCommand(args: {
       };
     }
 
-    if (resolved.sourceType === 'community') {
+    if (resolved.kind === 'registry') {
       return await runCommunityAdd({
         commandName: args.commandName,
         entry: resolved.entry,

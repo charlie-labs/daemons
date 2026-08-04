@@ -387,13 +387,20 @@ export function parseDaemonInstallMarker(body: string | null | undefined):
       : null;
     const reviewedFiles = Array.isArray(record.reviewedFiles) ? record.reviewedFiles : null;
     const sourceType = record.sourceType;
-    const communityReviewedFilesValid = reviewedFiles !== null && reviewedFiles.length > 0 && reviewedFiles.every((item) => {
+    const reviewedFilesValid = reviewedFiles !== null && reviewedFiles.length > 0 && reviewedFiles.every((item) => {
       if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
       const reviewed = item as Record<string, unknown>;
       return typeof reviewed.path === 'string' && normalizedRelativePosixPath(reviewed.path) &&
         (reviewed.mode === '100644' || reviewed.mode === '100755') &&
         typeof reviewed.sha256 === 'string' && /^[0-9a-f]{64}$/.test(reviewed.sha256);
     }) && sortedUnique(reviewedFiles.map((item) => (item as Record<string, unknown>).path as string));
+    const registryProvenanceComplete =
+      typeof record.registrySlug === 'string' && record.registrySlug.length > 0 &&
+      typeof record.registryRepo === 'string' && record.registryRepo.length > 0 &&
+      typeof record.registryRef === 'string' && record.registryRef.length > 0 &&
+      reviewedFilesValid;
+    const registryProvenanceNull =
+      record.registrySlug === null && record.registryRepo === null && record.registryRef === null && record.reviewedFiles === null;
     if (
       markerName !== DAEMON_INSTALL_MARKER_V2_NAME ||
       typeof record.daemonId !== 'string' ||
@@ -408,15 +415,8 @@ export function parseDaemonInstallMarker(body: string | null | undefined):
       destinationFiles === null || destinationFiles.length === 0 ||
       !destinationFiles.every(normalizedRelativePosixPath) || !sortedUnique(destinationFiles) ||
       adaptationKeys === null || !sortedUnique(adaptationKeys) ||
-      (sourceType === 'community' && (
-        typeof record.registrySlug !== 'string' || !record.registrySlug ||
-        typeof record.registryRepo !== 'string' || !record.registryRepo ||
-        typeof record.registryRef !== 'string' || !record.registryRef ||
-        !communityReviewedFilesValid
-      )) ||
-      (sourceType === 'first-party' && (
-        record.registrySlug !== null || record.registryRepo !== null || record.registryRef !== null || record.reviewedFiles !== null
-      ))
+      (!registryProvenanceComplete && !registryProvenanceNull) ||
+      (registryProvenanceNull && sourceType !== 'first-party')
     ) {
       return { ok: false, present: true, error: markerIssue('INSTALL_MARKER_INVALID', 'Install marker payload contains invalid v2 fields.') };
     }
@@ -646,7 +646,7 @@ function markerForInstall(args: {
   sourceRef: string;
   canonicalSourceUrl: string;
   catalogSchemaVersion: number;
-  communityEntry: CommunityRegistryEntry | null;
+  registryEntry: CommunityRegistryEntry | null;
   targetDirectory: string;
   files: readonly InstallFilePlan[];
   adaptationKeys: readonly string[];
@@ -659,13 +659,13 @@ function markerForInstall(args: {
     sourceRepo: args.sourceRepo,
     sourceRef: args.sourceRef,
     canonicalSourceUrl: args.canonicalSourceUrl,
-    catalogPath: args.sourceType === 'community' ? 'catalog.json' : CATALOG_PATH,
+    catalogPath: args.registryEntry ? 'catalog.json' : CATALOG_PATH,
     catalogSchemaVersion: args.catalogSchemaVersion,
-    registrySlug: args.communityEntry?.slug ?? null,
-    registryRepo: args.communityEntry ? 'charlie-labs/daemon-registry' : null,
-    registryRef: args.communityEntry ? 'master' : null,
-    reviewedFiles: args.communityEntry
-      ? args.communityEntry.reviewedFiles.map((file) => ({ ...file }))
+    registrySlug: args.registryEntry?.slug ?? null,
+    registryRepo: args.registryEntry ? 'charlie-labs/daemon-registry' : null,
+    registryRef: args.registryEntry ? 'master' : null,
+    reviewedFiles: args.registryEntry
+      ? args.registryEntry.reviewedFiles.map((file) => ({ ...file }))
       : null,
     targetDirectory: args.targetDirectory,
     destinationFiles: plannedPaths(args.files),
@@ -1041,7 +1041,7 @@ export async function createDaemonInstallPullRequest(
       message: `No daemon example found for '${exampleId}'.`,
     });
   }
-  if (resolved.sourceType === 'first-party' && resolved.entry.status === 'deprecated' && options.allowDeprecated !== true) {
+  if (resolved.kind === 'bundled' && resolved.entry.status === 'deprecated' && options.allowDeprecated !== true) {
     throw new DaemonInstallPullRequestError({
       code: 'DEPRECATED_EXAMPLE_BLOCKED',
       message: `Example '${exampleId}' is deprecated.`,
@@ -1059,9 +1059,9 @@ export async function createDaemonInstallPullRequest(
   let catalogSchemaVersion: number = catalogs.firstParty.schemaVersion;
   let communityEntry: CommunityRegistryEntry | null = null;
 
-  if (resolved.sourceType === 'community') {
+  if (resolved.kind === 'registry') {
     if (fileValues.size > 0 || cliValues.size > 0) {
-      throw new DaemonInstallPullRequestError({ code: 'COMMUNITY_ADAPTATIONS_UNSUPPORTED', message: 'Approved community daemons do not accept adaptation inputs.' });
+      throw new DaemonInstallPullRequestError({ code: 'COMMUNITY_ADAPTATIONS_UNSUPPORTED', message: 'Approved registry daemons do not accept adaptation inputs.' });
     }
     let prepared: Awaited<ReturnType<typeof prepareCommunityInstall>>;
     try {
@@ -1120,7 +1120,7 @@ export async function createDaemonInstallPullRequest(
     sourceRef: effectiveSourceRef,
     canonicalSourceUrl: communityEntry?.canonicalSourceUrl ?? entry.source.url,
     catalogSchemaVersion,
-    communityEntry,
+    registryEntry: communityEntry,
     targetDirectory,
     files: plannedDisplayFiles,
     adaptationKeys: adaptationsApplied,

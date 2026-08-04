@@ -10,8 +10,8 @@ import type { CommunityRegistryCatalog, CommunityRegistryEntry } from '../commun
 import type { RenderedDaemonInstallFile } from './install-rendering';
 
 export type ResolvedDaemon =
-  | { sourceType: 'first-party'; entry: CatalogExample; sourceRef: string; catalogSchemaVersion: number }
-  | { sourceType: 'community'; entry: CommunityRegistryEntry; sourceRef: string; catalogSchemaVersion: number };
+  | { kind: 'bundled'; entry: CatalogExample; sourceRef: string; catalogSchemaVersion: number }
+  | { kind: 'registry'; entry: CommunityRegistryEntry; sourceRef: string; catalogSchemaVersion: number };
 
 export async function loadDaemonCatalogs(args: { catalogClient: CatalogClient; ref: string }): Promise<{
   firstParty: ExamplesCatalog;
@@ -41,9 +41,9 @@ export function resolveDaemon(args: {
   firstPartyRef: string;
 }): ResolvedDaemon | null {
   const firstParty = args.firstParty.examples.find((entry) => entry.id === args.slug);
-  if (firstParty) return { sourceType: 'first-party', entry: firstParty, sourceRef: args.firstPartyRef, catalogSchemaVersion: args.firstParty.schemaVersion };
+  if (firstParty) return { kind: 'bundled', entry: firstParty, sourceRef: args.firstPartyRef, catalogSchemaVersion: args.firstParty.schemaVersion };
   const community = args.community.entries.find((entry) => entry.slug === args.slug);
-  if (community) return { sourceType: 'community', entry: community, sourceRef: community.commit, catalogSchemaVersion: args.community.schemaVersion };
+  if (community) return { kind: 'registry', entry: community, sourceRef: community.commit, catalogSchemaVersion: args.community.schemaVersion };
   return null;
 }
 

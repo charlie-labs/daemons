@@ -9,16 +9,24 @@ import type {
 
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
-const REPOSITORY_PATTERN = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/;
+const REPOSITORY_PATTERN = /^https:\/\/github\.com\/([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))\/([A-Za-z0-9_.-]+)$/;
+const PATH_SEGMENT_PATTERN = /^[A-Za-z0-9._-]+$/;
+
+function canonicalRepositoryUrl(value: string): boolean {
+  const repository = value.match(REPOSITORY_PATTERN);
+  if (!repository) return false;
+  const repo = repository[2]!;
+  return repo.length <= 100 && repo !== '.' && repo !== '..' && !repo.toLowerCase().endsWith('.git');
+}
 
 function normalizedRelativePosixPath(value: string): boolean {
   if (!value || value.trim() !== value || value.startsWith('/') || value.includes('\\') || value.includes('//')) return false;
   const parts = value.split('/');
-  return parts.every((part) => part !== '' && part !== '.' && part !== '..') && path.posix.normalize(value) === value;
+  return parts.every((part) => part !== '' && part !== '.' && part !== '..' && PATH_SEGMENT_PATTERN.test(part)) && path.posix.normalize(value) === value;
 }
 
 function sortedUnique(values: readonly string[]): boolean {
-  return values.every((value, index) => index === 0 || values[index - 1]!.localeCompare(value) < 0);
+  return values.every((value, index) => index === 0 || values[index - 1]! < value);
 }
 
 const reviewedFileSchema = z
@@ -35,7 +43,7 @@ const entrySchema = z
     displayName: z.string().trim().min(1),
     summary: z.string().trim().min(1),
     sourceType: z.enum(['first-party', 'community']),
-    repositoryUrl: z.string().regex(REPOSITORY_PATTERN, 'Expected canonical https://github.com/owner/repo URL.'),
+    repositoryUrl: z.string().refine(canonicalRepositoryUrl, 'Expected canonical https://github.com/owner/repo URL.'),
     canonicalSourceUrl: z.string().url(),
     daemonPath: z.string().refine(normalizedRelativePosixPath, 'Expected a normalized relative POSIX path.'),
     commit: z.string().regex(COMMIT_PATTERN, 'Expected a full lowercase 40-hex commit.'),
@@ -48,6 +56,9 @@ const entrySchema = z
     if (!sortedUnique(value.integrations)) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ['integrations'], message: 'integrations must be sorted and unique.' });
     }
+    if (value.daemonPath !== 'DAEMON.md' && !value.daemonPath.endsWith('/DAEMON.md')) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ['daemonPath'], message: 'daemonPath must identify DAEMON.md.' });
+    }
     const reviewedPaths = value.reviewedFiles.map((file) => file.path);
     if (!sortedUnique(reviewedPaths)) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ['reviewedFiles'], message: 'reviewedFiles must be sorted by unique path.' });
@@ -55,6 +66,10 @@ const entrySchema = z
     const daemonMatches = value.reviewedFiles.filter((file) => file.path === value.daemonPath);
     if (daemonMatches.length !== 1) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ['reviewedFiles'], message: 'Exactly one reviewed file must equal daemonPath.' });
+    }
+    const daemonPaths = reviewedPaths.filter((filePath) => filePath === 'DAEMON.md' || filePath.endsWith('/DAEMON.md'));
+    if (daemonPaths.length !== 1) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ['reviewedFiles'], message: 'reviewedFiles must contain exactly one DAEMON.md path.' });
     }
     const daemonDirectory = path.posix.dirname(value.daemonPath);
     for (const [index, file] of value.reviewedFiles.entries()) {

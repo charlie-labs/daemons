@@ -207,7 +207,7 @@ The implementation writes via GitHub's tree, commit, ref, and pull-request REST 
 <!-- charlie-daemon-install-v1 {"adaptationKeys":["package_manager"],"...":"..."} -->
 ```
 
-New installs write a `charlie-daemon-install-v2` marker with source type/repository/ref/canonical URL, registry provenance for approved external entries, the reviewed manifest, destination files, and adaptation key names. Reconciliation discovers and parses both existing v1 markers and new v2 markers. Markers never store raw adaptation values; JSON output likewise reports `adaptationsApplied[]` keys only.
+New installs write a `charlie-daemon-install-v2` marker with source type/repository/ref/canonical URL, registry provenance for approved external entries, the reviewed manifest, destination files, and adaptation key names. Registry `sourceType` is an ownership classification (`first-party` or `community`); non-null registry provenance controls pinned-manifest registry delivery, while bundled first-party examples have null registry provenance. Reconciliation discovers and parses both existing v1 markers and new v2 markers. Markers never store raw adaptation values; JSON output likewise reports `adaptationsApplied[]` keys only.
 
 For approved external installs, the PR body includes the pinned repository/commit and complete reviewed file hashes so reviewers can verify provenance. The daemon becomes eligible only after the PR is merged to the target default branch and Charlie ingests that merged version.
 

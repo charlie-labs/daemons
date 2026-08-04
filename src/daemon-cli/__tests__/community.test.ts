@@ -7,7 +7,7 @@ import { executeCli } from '../cli';
 import type { CatalogClient } from '../types';
 import type { CommunityRegistryCatalog, CommunitySourceFile } from '../../community-registry/types';
 import type { ExamplesCatalog } from '../../examples/types';
-import { createDaemonInstallPullRequest, parseDaemonInstallMarker, type DaemonInstallPrGitHubClient } from '../../daemon-install-pr';
+import { createDaemonInstallPullRequest, listDaemonInstallPullRequests, parseDaemonInstallMarker, type DaemonInstallPrGitHubClient } from '../../daemon-install-pr';
 
 const commit = 'a'.repeat(40);
 const daemon = `---\nid: community-daemon\npurpose: Exercise approved community delivery.\nwatch:\n  - when approved tests run\nroutines:\n  - verify reviewed files\ndeny:\n  - do not execute upstream content\n---\n\n# Community daemon\n\nApproved content.\n`;
@@ -18,7 +18,7 @@ const firstParty: ExamplesCatalog = { schemaVersion: 2, source: { repository: 'c
 const community: CommunityRegistryCatalog = {
   schemaVersion: 1,
   entries: [{
-    slug: 'community-daemon', displayName: 'Community daemon', summary: 'Approved external fixture.', sourceType: 'community',
+    slug: 'community-daemon', displayName: 'Community daemon', summary: 'Approved external fixture.', sourceType: 'first-party',
     repositoryUrl: 'https://github.com/acme/daemon-pack',
     canonicalSourceUrl: `https://github.com/acme/daemon-pack/blob/${commit}/pack/DAEMON.md`,
     daemonPath: 'pack/DAEMON.md', commit, integrations: ['github', 'slack'], approvalStatus: 'approved',
@@ -70,15 +70,20 @@ function githubTargetClient(): DaemonInstallPrGitHubClient & { calls: Array<{ me
   };
 }
 
-describe('approved community CLI delivery', () => {
+describe('approved registry CLI delivery', () => {
   test('merges list/show and keeps an empty registry compatible', async () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'community-cli-'));
     try {
       const listed = await runJson(['list'], directory);
-      expect(listed.json.data.examples[0]).toMatchObject({ id: 'community-daemon', sourceType: 'community' });
+      expect(listed.json.data.examples[0]).toMatchObject({ id: 'community-daemon', sourceType: 'first-party' });
       const shown = await runJson(['show', 'community-daemon', '--ref', 'other-ref'], directory);
-      expect(shown.json.data).toMatchObject({ sourceType: 'community', sourceRef: commit, pinnedCommit: commit, repositoryUrl: 'https://github.com/acme/daemon-pack' });
+      expect(shown.json.data).toMatchObject({ sourceType: 'first-party', sourceRef: commit, pinnedCommit: commit, repositoryUrl: 'https://github.com/acme/daemon-pack' });
       expect(shown.json.data.reviewedFiles).toHaveLength(2);
+      const communityOwned = { ...community, entries: [{ ...community.entries[0]!, sourceType: 'community' as const }] };
+      const communityListed = await runJson(['list'], directory, client({ communityCatalog: communityOwned }));
+      expect(communityListed.json.data.examples[0]).toMatchObject({ id: 'community-daemon', sourceType: 'community' });
+      const communityShown = await runJson(['show', 'community-daemon'], directory, client({ communityCatalog: communityOwned }));
+      expect(communityShown.json.data).toMatchObject({ sourceType: 'community', sourceRef: commit });
       const empty = await runJson(['list'], directory, client({ communityCatalog: { schemaVersion: 1, entries: [] } }));
       expect(empty.json.data.count).toBe(0);
     } finally { await rm(directory, { recursive: true, force: true }); }
@@ -118,12 +123,46 @@ describe('approved community CLI delivery', () => {
     expect(result.sourceRef).toBe(commit);
     expect(result.filesPlanned.map((file) => file.destinationPath)).toEqual(['.agents/daemons/community-daemon/DAEMON.md', '.agents/daemons/community-daemon/scripts/run.sh']);
     expect(result.marker.version).toBe(2);
+    expect(result.marker).toMatchObject({
+      sourceType: 'first-party',
+      catalogPath: 'catalog.json',
+      registrySlug: 'community-daemon',
+      registryRepo: 'charlie-labs/daemon-registry',
+      registryRef: 'master',
+    });
     expect(parseDaemonInstallMarker(result.markerText)).toEqual({ ok: true, marker: result.marker });
     const pullCall = target.calls.find((call) => call.method === 'POST' && call.path.endsWith('/pulls'))!;
     const body = (pullCall.options as any).body.body as string;
     expect(body).toContain('Approved external source');
     expect(body).toContain(commit);
     expect(body).toContain('eligible for live activations after both are true');
+
+    const listed = await listDaemonInstallPullRequests({
+      repo: 'acme/target',
+      githubClient: {
+        async request<T>(method: string, requestPath: string): Promise<T> {
+          if (method === 'GET' && requestPath === '/search/issues') return { items: [{ number: 7, pull_request: {} }] } as T;
+          if (method === 'GET' && requestPath.endsWith('/pulls/7')) {
+            return {
+              number: 7,
+              title: 'Install community-daemon daemon',
+              html_url: 'https://github.com/acme/target/pull/7',
+              state: 'open',
+              merged_at: null,
+              body,
+              head: { ref: 'charlie/daemon-installs/community-daemon', sha: 'new-commit' },
+              base: { ref: 'main' },
+            } as T;
+          }
+          if (method === 'GET' && requestPath.includes('/git/matching-refs/heads/charlie/daemon-installs/')) return [] as T;
+          throw new Error(`unexpected ${method} ${requestPath}`);
+        },
+      },
+    });
+    expect(listed.installPullRequests[0]).toMatchObject({
+      markerValid: true,
+      marker: { version: 2, sourceType: 'first-party', registrySlug: 'community-daemon' },
+    });
   });
 
   test('leaves local destination untouched on late or stale external preparation failure', async () => {
