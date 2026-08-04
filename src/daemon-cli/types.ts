@@ -1,5 +1,6 @@
 import type { CatalogExample, ExamplesCatalog } from '../examples/types';
 import type { DaemonInstallPullRequestListing, DaemonInstallPullRequestOpenResult } from '../daemon-install-pr';
+import type { CommunityRegistryCatalog, CommunityRegistryEntry, CommunitySourceFile } from '../community-registry/types';
 
 export type CliIssue = {
   code: string;
@@ -21,6 +22,8 @@ export type CliCommandResult<TData = unknown> = {
 export type CatalogClient = {
   loadCatalog(ref: string): Promise<ExamplesCatalog>;
   readTextFile(ref: string, path: string): Promise<string>;
+  loadCommunityCatalog?(): Promise<CommunityRegistryCatalog>;
+  fetchCommunitySource?(entry: CommunityRegistryEntry): Promise<CommunitySourceFile[]>;
 };
 
 export type CatalogListItem = {
@@ -29,6 +32,7 @@ export type CatalogListItem = {
   status: CatalogExample['status'];
   readiness: CatalogExample['readiness'];
   summary: string;
+  sourceType?: 'first-party' | 'community';
 };
 
 export type ListData = {
@@ -54,6 +58,11 @@ export type ShowData = CatalogListItem & {
   adaptations: CatalogExample['adaptations'];
   specializationIdeas: string[];
   activationRequired: string;
+  repositoryUrl?: string;
+  canonicalSourceUrl?: string;
+  pinnedCommit?: string;
+  integrations?: string[];
+  reviewedFiles?: Array<{ path: string; mode: InstallFileMode; sha256: string }>;
 };
 
 export type InstallFileMode = '100644' | '100755';
@@ -84,6 +93,9 @@ export type AddData = {
   filesWritten: string[];
   collisions: string[];
   deprecatedBlocked: boolean;
+  sourceType?: 'first-party' | 'community';
+  repositoryUrl?: string;
+  canonicalSourceUrl?: string;
 };
 
 

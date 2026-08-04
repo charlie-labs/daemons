@@ -24,6 +24,12 @@ export type DaemonInstallPlanResult =
       errors: CliIssue[];
     };
 
+export type SourceNeutralInstallFile = {
+  sourcePath: string;
+  relativePath: string;
+  mode: DaemonInstallFileMode;
+};
+
 function validateSafeRelativePath(pathValue: string, field: string): CliIssue | null {
   if (pathValue.trim() !== pathValue || pathValue.length === 0) {
     return issue({ code: 'INVALID_CATALOG_PATH', message: `Catalog path '${pathValue}' must be non-empty with no surrounding whitespace.`, field });
@@ -62,6 +68,54 @@ function validateDestinationPath(args: {
 
 function supportFileMode(kind: InstallFilePlan['kind']): DaemonInstallFileMode {
   return kind === 'script' ? '100755' : '100644';
+}
+
+function kindForRelativePath(relativePath: string): InstallFilePlan['kind'] | null {
+  if (relativePath === DAEMON_FILENAME) return 'daemon';
+  if (relativePath.startsWith('scripts/')) return 'script';
+  if (relativePath.startsWith('references/')) return 'reference';
+  return null;
+}
+
+export function createSourceNeutralDaemonInstallPlan(args: {
+  daemonId: string;
+  installRoot: string;
+  files: readonly SourceNeutralInstallFile[];
+}): DaemonInstallPlanResult {
+  const errors: CliIssue[] = [];
+  if (!DAEMON_ID_PATTERN.test(args.daemonId)) {
+    errors.push(issue({ code: 'INVALID_DAEMON_ID', message: `Invalid daemon id '${args.daemonId}'. Expected kebab-case.`, field: 'id' }));
+  }
+  const destinationDirectory = path.resolve(args.installRoot, DEFAULT_DAEMON_ROOT, args.daemonId);
+  const files: InstallFilePlan[] = [];
+  const seen = new Set<string>();
+  for (const [index, sourceFile] of args.files.entries()) {
+    const field = `files[${index.toString()}]`;
+    const invalid = validateSafeRelativePath(sourceFile.relativePath, `${field}.relativePath`);
+    if (invalid) errors.push(invalid);
+    const kind = kindForRelativePath(sourceFile.relativePath);
+    if (!kind) {
+      errors.push(issue({ code: 'INVALID_INSTALL_SOURCE_PATH', message: `Unsupported daemon package path '${sourceFile.relativePath}'.`, field }));
+      continue;
+    }
+    const expectedMode = kind === 'script' ? null : supportFileMode(kind);
+    if (expectedMode && sourceFile.mode !== expectedMode) {
+      errors.push(issue({ code: 'INVALID_INSTALL_FILE_MODE', message: `${sourceFile.relativePath} must use mode ${expectedMode}.`, field: `${field}.mode` }));
+    }
+    if (seen.has(sourceFile.relativePath)) {
+      errors.push(issue({ code: 'DUPLICATE_INSTALL_FILE', message: `Duplicate install path '${sourceFile.relativePath}'.`, field }));
+    }
+    seen.add(sourceFile.relativePath);
+    const destinationPath = path.join(destinationDirectory, ...sourceFile.relativePath.split('/'));
+    const destinationError = validateDestinationPath({ destinationPath, destinationDirectory, field });
+    if (destinationError) errors.push(destinationError);
+    files.push({ sourcePath: sourceFile.sourcePath, destinationPath, kind, mode: sourceFile.mode });
+  }
+  if (files.filter((file) => file.kind === 'daemon').length !== 1) {
+    errors.push(issue({ code: 'INSTALL_PLAN_MISSING_DAEMON', message: 'Install plan must include exactly one DAEMON.md.' }));
+  }
+  if (errors.length > 0) return { ok: false, errors };
+  return { ok: true, plan: { daemonId: args.daemonId, destinationDirectory, files } };
 }
 
 function supportFilePlan(args: {

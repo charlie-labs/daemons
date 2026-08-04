@@ -20,15 +20,15 @@ Exit codes:
 
 export function getCommandHelpText(command: string): string {
   if (command === 'list') {
-    return 'Usage: daemon list [--ref <sha|branch|tag>] [--json]\n\nReads root examples.json and lists catalog example IDs.';
+    return 'Usage: daemon list [--ref <sha|branch|tag>] [--json]\n\nLists first-party examples and approved external daemon slugs. --ref pins only the first-party catalog; approved external commits are registry-pinned.';
   }
 
   if (command === 'show') {
-    return 'Usage: daemon show <example-id> [--ref <sha|branch|tag>] [--json]\n\nShows catalog metadata, support files, integrations, structured adaptation inputs, and optional specialization ideas.';
+    return 'Usage: daemon show <example-id> [--ref <sha|branch|tag>] [--json]\n\nShows catalog metadata and provenance. Approved external entries include their repository, pinned commit, integrations, and complete reviewed file plan.';
   }
 
   if (command === 'add') {
-    return 'Usage: daemon add <example-id> [--ref <sha|branch|tag>] [--adapt key=value] [--adapt-file adaptations.json] [--dry-run] [--force] [--allow-deprecated] [--json]\n\nScaffolds catalog-listed files into .agents/daemons/<id>/ without activating the daemon. Adaptation values render documented {{adapt.key}} tokens before validation and writes.';
+    return 'Usage: daemon add <example-id> [--ref <sha|branch|tag>] [--adapt key=value] [--adapt-file adaptations.json] [--dry-run] [--force] [--allow-deprecated] [--json]\n\nScaffolds catalog-listed files into .agents/daemons/<id>/ without activating the daemon. Approved external installs use only registry-reviewed files at their pinned commit and do not accept adaptations.';
   }
 
   if (command === 'pr') {
@@ -36,7 +36,7 @@ export function getCommandHelpText(command: string): string {
   }
 
   if (command === 'pr open') {
-    return 'Usage: daemon pr open <example-id> --repo owner/repo [--ref <sha|branch|tag>] [--base <branch>] [--adapt key=value] [--adapt-file adaptations.json] [--force] [--json]\n\nRenders a catalog example and opens an idempotent GitHub pull request from a deterministic charlie/daemon-installs/<example-id> branch. Raw adaptation values are not included in output or PR markers.';
+    return 'Usage: daemon pr open <example-id> --repo owner/repo [--ref <sha|branch|tag>] [--base <branch>] [--adapt key=value] [--adapt-file adaptations.json] [--force] [--json]\n\nOpens an idempotent install PR from a deterministic charlie/daemon-installs/<example-id> branch. Approved external installs include pinned source and reviewed-file provenance in the PR body and v2 marker.';
   }
 
   if (command === 'pr list') {

@@ -253,7 +253,7 @@ describe('daemon install PR API', () => {
       '.agents/daemons/templated-daemon/references/render.md',
     ]);
     expect(result.adaptationsApplied).toEqual(['optional_value', 'required_value']);
-    expect(result.markerText).toContain('charlie-daemon-install-v1');
+    expect(result.markerText).toContain('charlie-daemon-install-v2');
     expect(result.markerText).toContain('required_value');
     expect(result.markerText).not.toContain('secret-target');
     expect(result.markerText).not.toContain('secret-option');
@@ -369,7 +369,7 @@ https://github.com/charlie-labs/daemons/blob/master/README.md
 ${result.markerText}`);
     expect(pullBody).toContain('secret-target');
     expect(pullBody).toContain('secret-option');
-    expect(result.markerText).toContain('charlie-daemon-install-v1');
+    expect(result.markerText).toContain('charlie-daemon-install-v2');
     expect(result.markerText).toContain('required_value');
     expect(result.markerText).not.toContain('secret-target');
     expect(result.markerText).not.toContain('secret-option');

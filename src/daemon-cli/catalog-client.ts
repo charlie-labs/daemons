@@ -3,6 +3,8 @@ import { normalizeErrorMessage } from './issues';
 import type { CatalogClient } from './types';
 import { parseExamplesCatalogContent } from '../examples/schema';
 import type { ExamplesCatalog } from '../examples/types';
+import { createGitHubCommunityRegistryClient } from '../community-registry/client';
+import type { CommunityGitHubRequestOptions } from '../community-registry/source';
 
 export class CatalogClientError extends Error {
   readonly code: string;
@@ -58,7 +60,32 @@ async function readGitHubTextFile(args: { ref: string; path: string }): Promise<
   return await response.text();
 }
 
+async function requestGitHubJson<T>(method: string, requestPath: string, options: CommunityGitHubRequestOptions = {}): Promise<T> {
+  const url = new URL(requestPath, 'https://api.github.com');
+  for (const [key, value] of Object.entries(options.query ?? {})) {
+    if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
+  }
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': '@charlie-labs/daemons community registry client',
+    ...(options.headers ?? {}),
+  };
+  const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const response = await fetch(url, { method, headers });
+  if (!response.ok) {
+    throw new CatalogClientError({
+      code: response.status === 404 ? 'COMMUNITY_CATALOG_NOT_FOUND' : 'COMMUNITY_GITHUB_REQUEST_FAILED',
+      path: requestPath,
+      message: `GitHub ${method} ${requestPath} failed: HTTP ${response.status.toString()} ${response.statusText}`,
+    });
+  }
+  return await response.json() as T;
+}
+
 export function createGitHubCatalogClient(): CatalogClient {
+  const community = createGitHubCommunityRegistryClient({ request: requestGitHubJson });
   return {
     async loadCatalog(ref: string): Promise<ExamplesCatalog> {
       const content = await readGitHubTextFile({ ref, path: CATALOG_PATH });
@@ -76,6 +103,21 @@ export function createGitHubCatalogClient(): CatalogClient {
 
     async readTextFile(ref: string, path: string): Promise<string> {
       return await readGitHubTextFile({ ref, path });
+    },
+
+    async loadCommunityCatalog() {
+      try {
+        return await community.loadCatalog();
+      } catch (error) {
+        if (error instanceof CatalogClientError && error.code === 'COMMUNITY_CATALOG_NOT_FOUND') {
+          return { schemaVersion: 1, entries: [] };
+        }
+        throw error;
+      }
+    },
+
+    async fetchCommunitySource(entry) {
+      return await community.fetchSource(entry);
     },
   };
 }

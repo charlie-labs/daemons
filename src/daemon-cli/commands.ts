@@ -51,6 +51,14 @@ import type {
 } from './types';
 import { validateRuntimeDaemonMarkdown } from './validation/runtime';
 import type { CatalogExample } from '../examples/types';
+import {
+  communityListItem,
+  communitySourceMetadata,
+  firstPartyListItem,
+  loadDaemonCatalogs,
+  prepareCommunityInstall,
+  resolveDaemon,
+} from './community';
 
 function usageResult(command: string, summary: string): CliCommandResult {
   return {
@@ -120,18 +128,8 @@ function parseRefOnly(command: string, commandArgs: readonly string[]):
   }
 }
 
-function findCatalogEntry(catalogExamples: readonly CatalogExample[], exampleId: string): CatalogExample | null {
-  return catalogExamples.find((example) => example.id === exampleId) ?? null;
-}
-
 function listItem(entry: CatalogExample) {
-  return {
-    id: entry.id,
-    title: entry.title,
-    status: entry.status,
-    readiness: entry.readiness,
-    summary: entry.summary,
-  };
+  return firstPartyListItem(entry);
 }
 
 export async function runListCommand(args: {
@@ -142,8 +140,11 @@ export async function runListCommand(args: {
   if (!parsed.ok) return parsed.result as CliCommandResult<ListData>;
 
   try {
-    const catalog = await args.catalogClient.loadCatalog(parsed.ref);
-    const examples = catalog.examples.map(listItem);
+    const catalogs = await loadDaemonCatalogs({ catalogClient: args.catalogClient, ref: parsed.ref });
+    const examples = [
+      ...catalogs.firstParty.examples.map(listItem),
+      ...catalogs.community.entries.map(communityListItem),
+    ];
     return {
       command: 'list',
       ok: true,
@@ -154,7 +155,7 @@ export async function runListCommand(args: {
       data: {
         sourceRepo: SOURCE_REPO,
         sourceRef: parsed.ref,
-        schemaVersion: catalog.schemaVersion,
+        schemaVersion: catalogs.firstParty.schemaVersion,
         count: examples.length,
         exampleIds: examples.map((example) => example.id),
         examples,
@@ -192,9 +193,9 @@ export async function runShowCommand(args: {
 
   const ref = parsed.values.ref ?? DEFAULT_CATALOG_REF;
   try {
-    const catalog = await args.catalogClient.loadCatalog(ref);
-    const entry = findCatalogEntry(catalog.examples, exampleId);
-    if (!entry) {
+    const catalogs = await loadDaemonCatalogs({ catalogClient: args.catalogClient, ref });
+    const resolved = resolveDaemon({ ...catalogs, slug: exampleId, firstPartyRef: ref });
+    if (!resolved) {
       return {
         command: 'show',
         ok: false,
@@ -206,6 +207,38 @@ export async function runShowCommand(args: {
       };
     }
 
+    if (resolved.sourceType === 'community') {
+      const entry = resolved.entry;
+      const daemonDirectory = path.posix.dirname(entry.daemonPath);
+      const relativeFiles = entry.reviewedFiles.map((file) => path.posix.relative(daemonDirectory, file.path));
+      return {
+        command: 'show',
+        ok: true,
+        exitCode: EXIT_CODE_SUCCESS,
+        summary: `${entry.slug}: ${entry.displayName}`,
+        warnings: [],
+        errors: [],
+        data: {
+          ...communityListItem(entry),
+          ...communitySourceMetadata(entry),
+          requiredIntegrations: [...entry.integrations],
+          optionalIntegrations: [],
+          otherRequirements: [],
+          scripts: relativeFiles.filter((file) => file.startsWith('scripts/')),
+          references: relativeFiles.filter((file) => file.startsWith('references/')),
+          daemonPath: entry.daemonPath,
+          sourceDirectory: daemonDirectory,
+          sourceUrl: entry.canonicalSourceUrl,
+          adaptations: [],
+          specializationIdeas: [],
+          pinnedCommit: entry.commit,
+          integrations: [...entry.integrations],
+          reviewedFiles: entry.reviewedFiles.map((file) => ({ ...file })),
+        },
+      };
+    }
+
+    const entry = resolved.entry;
     return {
       command: 'show',
       ok: true,
@@ -299,6 +332,83 @@ function dataErrorResult<TData>(command: string, summary: string, errors: CliIss
   };
 }
 
+async function runCommunityAdd(args: {
+  commandName: 'add' | 'install';
+  entry: import('../community-registry/types').CommunityRegistryEntry;
+  catalogClient: CatalogClient;
+  installRoot: string;
+  dryRun: boolean;
+  force: boolean;
+  hasAdaptationInput: boolean;
+}): Promise<CliCommandResult<AddData>> {
+  if (args.hasAdaptationInput) {
+    return dataErrorResult<AddData>(args.commandName, 'Approved community daemons do not accept adaptation inputs.', [
+      issue({ code: 'COMMUNITY_ADAPTATIONS_UNSUPPORTED', message: 'Remove --adapt and --adapt-file for approved community daemons.' }),
+    ], null);
+  }
+  let prepared: Awaited<ReturnType<typeof prepareCommunityInstall>>;
+  try {
+    prepared = await prepareCommunityInstall({ entry: args.entry, catalogClient: args.catalogClient, installRoot: args.installRoot });
+  } catch (error) {
+    const code = error instanceof Error && 'code' in error ? String(error.code) : 'COMMUNITY_SOURCE_FETCH_FAILED';
+    const pathValue = error instanceof Error && 'path' in error ? String(error.path) : null;
+    return dataErrorResult<AddData>(args.commandName, `Approved community daemon '${args.entry.slug}' failed source validation.`, [
+      issue({ code, message: normalizeErrorMessage(error), path: pathValue }),
+    ], null);
+  }
+  if (!prepared.ok) {
+    return dataErrorResult<AddData>(args.commandName, `Approved community daemon '${args.entry.slug}' failed source validation.`, prepared.errors, null);
+  }
+  const collisions = await findCollisions(prepared.plan.files, args.installRoot, prepared.plan.destinationDirectory);
+  const metadata = communitySourceMetadata(args.entry);
+  const data: AddData = {
+    daemonId: args.entry.slug,
+    filePath: toDisplayPath(args.installRoot, prepared.plan.destinationDirectory),
+    targetRoot: args.installRoot,
+    dryRun: args.dryRun,
+    force: args.force,
+    overwritten: collisions.length > 0,
+    mode: 'remote',
+    fileCount: prepared.plan.files.length,
+    sourceRepo: metadata.sourceRepo,
+    sourceRef: args.entry.commit,
+    sourceType: args.entry.sourceType,
+    repositoryUrl: args.entry.repositoryUrl,
+    canonicalSourceUrl: args.entry.canonicalSourceUrl,
+    status: 'ready',
+    readiness: 'direct-copy',
+    adaptationsApplied: [],
+    activationRequired: ACTIVATION_CAVEAT,
+    filesPlanned: prepared.plan.files.map((file) => ({ ...file, destinationPath: toDisplayPath(args.installRoot, file.destinationPath) })),
+    filesWritten: [],
+    collisions,
+    deprecatedBlocked: false,
+  };
+  if (collisions.length > 0 && !args.force) {
+    return dataErrorResult(args.commandName, `Refusing to overwrite ${collisions.length.toString()} existing daemon path${collisions.length === 1 ? '' : 's'}.`, collisions.map((collision) =>
+      issue({ code: 'INSTALL_COLLISION', message: `Destination already exists: ${collision}`, path: collision })
+    ), data);
+  }
+  if (!args.dryRun) {
+    await mkdir(prepared.plan.destinationDirectory, { recursive: true });
+    for (const file of prepared.files) {
+      await writeTextFileEnsuringDirectory({ path: file.destinationPath, content: file.content, mode: file.mode });
+      data.filesWritten.push(toDisplayPath(args.installRoot, file.destinationPath));
+    }
+  }
+  return {
+    command: args.commandName,
+    ok: true,
+    exitCode: EXIT_CODE_SUCCESS,
+    summary: args.dryRun
+      ? `Dry run: would scaffold approved community daemon '${args.entry.slug}' into ${data.filePath}.`
+      : `Scaffolded approved community daemon '${args.entry.slug}' into ${data.filePath}; daemon is not active yet.`,
+    warnings: [],
+    errors: [],
+    data,
+  };
+}
+
 async function loadAdaptFileValues(args: { cwd: string; adaptFile: string | undefined }): Promise<
   | { ok: true; fileValues: Map<string, string>; displayPath: string | null }
   | { ok: false; errors: CliIssue[] }
@@ -369,12 +479,12 @@ export async function runAddCommand(args: {
   }
 
   try {
-    const [catalog, installRoot] = await Promise.all([
-      args.catalogClient.loadCatalog(ref),
+    const [catalogs, installRoot] = await Promise.all([
+      loadDaemonCatalogs({ catalogClient: args.catalogClient, ref }),
       findInstallRoot(args.cwd),
     ]);
-    const entry = findCatalogEntry(catalog.examples, exampleId);
-    if (!entry) {
+    const resolved = resolveDaemon({ ...catalogs, slug: exampleId, firstPartyRef: ref });
+    if (!resolved) {
       return {
         command: args.commandName,
         ok: false,
@@ -385,6 +495,20 @@ export async function runAddCommand(args: {
         data: null,
       };
     }
+
+    if (resolved.sourceType === 'community') {
+      return await runCommunityAdd({
+        commandName: args.commandName,
+        entry: resolved.entry,
+        catalogClient: args.catalogClient,
+        installRoot,
+        dryRun,
+        force,
+        hasAdaptationInput: parsedAdaptFlags.values.size > 0 || adaptFile !== undefined,
+      });
+    }
+
+    const entry = resolved.entry;
 
     const installPlanResult = createDaemonInstallPlan({ entry, installRoot });
     if (!installPlanResult.ok) {

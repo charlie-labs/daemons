@@ -15,9 +15,12 @@ import { issue, normalizeErrorMessage } from './daemon-cli/issues';
 import { resolveAdaptations, type AdaptationValues } from './daemon-cli/adaptations';
 import type { CatalogClient, CliIssue, InstallFilePlan } from './daemon-cli/types';
 import type { CatalogExample } from './examples/types';
+import { communityRelativePath, loadDaemonCatalogs, prepareCommunityInstall, resolveDaemon } from './daemon-cli/community';
+import type { CommunityRegistryEntry } from './community-registry/types';
 
 export const DAEMON_INSTALL_BRANCH_PREFIX = 'charlie/daemon-installs/';
 export const DAEMON_INSTALL_MARKER_NAME = 'charlie-daemon-install-v1';
+export const DAEMON_INSTALL_MARKER_V2_NAME = 'charlie-daemon-install-v2';
 
 const DEFAULT_INSTALL_ROOT = '/repo';
 const GITHUB_API_BASE_URL = 'https://api.github.com';
@@ -98,7 +101,7 @@ export type DaemonInstallPullRequestListResult = {
   warnings: CliIssue[];
 };
 
-export type DaemonInstallMarker = {
+export type DaemonInstallMarkerV1 = {
   version: 1;
   exampleId: string;
   sourceRepo: string;
@@ -110,6 +113,27 @@ export type DaemonInstallMarker = {
   adaptationKeys: string[];
   branch: string;
 };
+
+export type DaemonInstallMarkerV2 = {
+  version: 2;
+  daemonId: string;
+  sourceType: 'first-party' | 'community';
+  sourceRepo: string;
+  sourceRef: string;
+  canonicalSourceUrl: string;
+  catalogPath: string;
+  catalogSchemaVersion: number;
+  registrySlug: string | null;
+  registryRepo: string | null;
+  registryRef: string | null;
+  reviewedFiles: Array<{ path: string; mode: '100644' | '100755'; sha256: string | null }>;
+  targetDirectory: string;
+  destinationFiles: string[];
+  adaptationKeys: string[];
+  branch: string;
+};
+
+export type DaemonInstallMarker = DaemonInstallMarkerV1 | DaemonInstallMarkerV2;
 
 export type CreateDaemonInstallPullRequestOptions = {
   repo: GitHubRepositoryRef;
@@ -277,6 +301,27 @@ function toValueMap(values: Record<string, string> | ReadonlyMap<string, string>
   return new Map(Object.entries(values));
 }
 
+function communityCatalogExample(entry: CommunityRegistryEntry, daemonContent: string): CatalogExample {
+  const relativeFiles = entry.reviewedFiles.map((file) => communityRelativePath(entry, file.path));
+  return {
+    id: entry.slug,
+    title: entry.displayName,
+    status: 'ready',
+    summary: entry.summary,
+    readiness: 'direct-copy',
+    showOnWebsite: false,
+    showInDashboard: false,
+    fit: { jobsToBeDone: ['operate'], bestFor: ['approved community daemon installs'], notFor: ['unreviewed upstream content'] },
+    requirements: { requiredIntegrations: [...entry.integrations], optionalIntegrations: [], other: [] },
+    adaptations: [],
+    specializationIdeas: [],
+    daemon: { path: 'DAEMON.md', content: daemonContent },
+    scripts: relativeFiles.filter((file) => file.startsWith('scripts/')),
+    references: relativeFiles.filter((file) => file.startsWith('references/')),
+    source: { directory: path.posix.dirname(entry.daemonPath), url: entry.canonicalSourceUrl },
+  };
+}
+
 function deterministicInstallBranch(exampleId: string): string {
   return `${DAEMON_INSTALL_BRANCH_PREFIX}${exampleId}`;
 }
@@ -292,14 +337,15 @@ function stableJson(value: unknown): string {
 }
 
 export function createDaemonInstallMarker(marker: DaemonInstallMarker): string {
-  return `<!-- ${DAEMON_INSTALL_MARKER_NAME} ${stableJson(marker)} -->`;
+  const markerName = marker.version === 2 ? DAEMON_INSTALL_MARKER_V2_NAME : DAEMON_INSTALL_MARKER_NAME;
+  return `<!-- ${markerName} ${stableJson(marker)} -->`;
 }
 
 export function parseDaemonInstallMarker(body: string | null | undefined):
   | { ok: true; marker: DaemonInstallMarker }
   | { ok: false; present: boolean; error: CliIssue | null } {
   if (!body) return { ok: false, present: false, error: null };
-  const regex = new RegExp(`<!--\\s*${DAEMON_INSTALL_MARKER_NAME}\\s+([\\s\\S]*?)\\s*-->`);
+  const regex = new RegExp(`<!--\\s*(?:${DAEMON_INSTALL_MARKER_V2_NAME}|${DAEMON_INSTALL_MARKER_NAME})\\s+([\\s\\S]*?)\\s*-->`);
   const match = body.match(regex);
   if (!match) return { ok: false, present: false, error: null };
   const rawJson = match[1] ?? '';
@@ -321,6 +367,29 @@ export function parseDaemonInstallMarker(body: string | null | undefined):
     };
   }
   const record = parsed as Record<string, unknown>;
+  if (record.version === 2) {
+    const destinationFiles = Array.isArray(record.destinationFiles) ? record.destinationFiles.filter((item): item is string => typeof item === 'string') : [];
+    const adaptationKeys = Array.isArray(record.adaptationKeys) ? record.adaptationKeys.filter((item): item is string => typeof item === 'string') : [];
+    const reviewedFiles = Array.isArray(record.reviewedFiles) ? record.reviewedFiles : [];
+    if (
+      typeof record.daemonId !== 'string' ||
+      (record.sourceType !== 'first-party' && record.sourceType !== 'community') ||
+      typeof record.sourceRepo !== 'string' || typeof record.sourceRef !== 'string' || typeof record.canonicalSourceUrl !== 'string' ||
+      typeof record.catalogPath !== 'string' || typeof record.catalogSchemaVersion !== 'number' ||
+      (record.registrySlug !== null && typeof record.registrySlug !== 'string') ||
+      (record.registryRepo !== null && typeof record.registryRepo !== 'string') ||
+      (record.registryRef !== null && typeof record.registryRef !== 'string') ||
+      typeof record.targetDirectory !== 'string' || typeof record.branch !== 'string' ||
+      destinationFiles.length !== (Array.isArray(record.destinationFiles) ? record.destinationFiles.length : -1) ||
+      adaptationKeys.length !== (Array.isArray(record.adaptationKeys) ? record.adaptationKeys.length : -1) ||
+      reviewedFiles.some((item) => !item || typeof item !== 'object' || Array.isArray(item) || typeof (item as Record<string, unknown>).path !== 'string' ||
+        !['100644', '100755'].includes(String((item as Record<string, unknown>).mode)) ||
+        ((item as Record<string, unknown>).sha256 !== null && typeof (item as Record<string, unknown>).sha256 !== 'string'))
+    ) {
+      return { ok: false, present: true, error: markerIssue('INSTALL_MARKER_INVALID', 'Install marker payload is missing required v2 fields.') };
+    }
+    return { ok: true, marker: parsed as DaemonInstallMarkerV2 };
+  }
   const files = Array.isArray(record.files) ? record.files.filter((item): item is string => typeof item === 'string') : [];
   const adaptationKeys = Array.isArray(record.adaptationKeys)
     ? record.adaptationKeys.filter((item): item is string => typeof item === 'string')
@@ -539,22 +608,34 @@ function plannedPaths(files: readonly InstallFilePlan[]): string[] {
 
 function markerForInstall(args: {
   entry: CatalogExample;
+  sourceType: 'first-party' | 'community';
+  sourceRepo: string;
   sourceRef: string;
+  canonicalSourceUrl: string;
   catalogSchemaVersion: number;
+  communityEntry: CommunityRegistryEntry | null;
   targetDirectory: string;
   files: readonly InstallFilePlan[];
   adaptationKeys: readonly string[];
   branch: string;
 }): DaemonInstallMarker {
   return {
-    version: 1,
-    exampleId: args.entry.id,
-    sourceRepo: SOURCE_REPO,
+    version: 2,
+    daemonId: args.entry.id,
+    sourceType: args.sourceType,
+    sourceRepo: args.sourceRepo,
     sourceRef: args.sourceRef,
-    catalogPath: CATALOG_PATH,
+    canonicalSourceUrl: args.canonicalSourceUrl,
+    catalogPath: args.sourceType === 'community' ? 'catalog.json' : CATALOG_PATH,
     catalogSchemaVersion: args.catalogSchemaVersion,
+    registrySlug: args.communityEntry?.slug ?? null,
+    registryRepo: args.communityEntry ? 'charlie-labs/daemon-registry' : null,
+    registryRef: args.communityEntry ? 'master' : null,
+    reviewedFiles: args.communityEntry
+      ? args.communityEntry.reviewedFiles.map((file) => ({ ...file }))
+      : args.files.map((file) => ({ path: file.sourcePath, mode: file.mode, sha256: null })),
     targetDirectory: args.targetDirectory,
-    files: plannedPaths(args.files),
+    destinationFiles: plannedPaths(args.files),
     adaptationKeys: [...args.adaptationKeys].sort((left, right) => left.localeCompare(right)),
     branch: args.branch,
   };
@@ -578,6 +659,7 @@ function markdownListLines(items: readonly string[], args: { code?: boolean | un
 
 function createPullRequestBody(args: {
   entry: CatalogExample;
+  communityEntry: CommunityRegistryEntry | null;
   repository: ParsedRepository;
   daemon: DaemonInstallPrBodyDaemonMetadata;
   markerText: string;
@@ -590,10 +672,26 @@ function createPullRequestBody(args: {
   if (args.body) {
     lines.push(args.body.trim(), '');
   }
+  if (args.communityEntry) {
+    lines.push(
+      '## Approved external source',
+      '',
+      `- Repository: ${args.communityEntry.repositoryUrl}`,
+      `- Pinned commit: \`${args.communityEntry.commit}\``,
+      `- Registry: \`charlie-labs/daemon-registry@master\` entry \`${args.communityEntry.slug}\``,
+      '- Reviewed files:',
+      ...args.communityEntry.reviewedFiles.map((file) => `  - \`${file.path}\` (${file.mode}, SHA-256 \`${file.sha256}\`)`),
+      '',
+      'Only the reviewed files above were fetched through GitHub APIs at the pinned commit. No upstream code was executed.',
+      ''
+    );
+  }
   lines.push(
     '## Summary',
     '',
-    `This PR installs the \`${daemonId}\` Charlie daemon to \`.agents/daemons/${daemonId}/DAEMON.md\`. It was generated by Charlie from the [\`${daemonId}\` example](https://github.com/${SOURCE_REPO}/blob/master/daemons/${daemonId}/DAEMON.md).`,
+    args.communityEntry
+      ? `This PR installs the \`${daemonId}\` Charlie daemon to \`.agents/daemons/${daemonId}/DAEMON.md\`. It was generated by Charlie from the [reviewed source](${args.communityEntry.canonicalSourceUrl}).`
+      : `This PR installs the \`${daemonId}\` Charlie daemon to \`.agents/daemons/${daemonId}/DAEMON.md\`. It was generated by Charlie from the [\`${daemonId}\` example](https://github.com/${SOURCE_REPO}/blob/master/daemons/${daemonId}/DAEMON.md).`,
     '',
     `The daemon won't start working until it's merged to the repo's default branch.`,
     '',
@@ -889,55 +987,73 @@ export async function createDaemonInstallPullRequest(
   const installRoot = options.installRoot ?? DEFAULT_INSTALL_ROOT;
   const catalogClient = options.catalogClient ?? createGitHubCatalogClient();
   const githubClient = options.githubClient ?? createDaemonInstallPrGitHubClient({ authToken: options.authToken });
-  const catalog = await catalogClient.loadCatalog(sourceRef);
-  const entry = catalog.examples.find((candidate) => candidate.id === exampleId);
-  if (!entry) {
+  const catalogs = await loadDaemonCatalogs({ catalogClient, ref: sourceRef });
+  const resolved = resolveDaemon({ ...catalogs, slug: exampleId, firstPartyRef: sourceRef });
+  if (!resolved) {
     throw new DaemonInstallPullRequestError({
       code: 'EXAMPLE_NOT_FOUND',
       message: `No daemon example found for '${exampleId}'.`,
     });
   }
-  if (entry.status === 'deprecated' && options.allowDeprecated !== true) {
+  if (resolved.sourceType === 'first-party' && resolved.entry.status === 'deprecated' && options.allowDeprecated !== true) {
     throw new DaemonInstallPullRequestError({
       code: 'DEPRECATED_EXAMPLE_BLOCKED',
       message: `Example '${exampleId}' is deprecated.`,
     });
   }
 
-  const installPlanResult = createDaemonInstallPlan({ entry, installRoot });
-  if (!installPlanResult.ok) {
-    throw new DaemonInstallPullRequestError({
-      code: 'INSTALL_PLAN_INVALID',
-      message: `Catalog entry '${exampleId}' cannot be installed safely.`,
-      errors: installPlanResult.errors,
-    });
-  }
-
   const fileValues = toValueMap(options.adaptationFileValues);
   const cliValues = toValueMap(options.adaptations);
-  const adaptationResolution = resolveAdaptations({ entry, fileValues, cliValues });
-  if (!adaptationResolution.ok) {
-    throw new DaemonInstallPullRequestError({
-      code: 'ADAPTATION_INPUTS_INVALID',
-      message: `Adaptation inputs for '${exampleId}' are incomplete or invalid.`,
-      errors: adaptationResolution.errors,
-    });
-  }
+  let entry: CatalogExample;
+  let installPlanResult: { ok: true; plan: import('./daemon-cli/install-plan').DaemonInstallPlan };
+  let rendered: { ok: true; files: RenderedDaemonInstallFile[] };
+  let adaptationsApplied: string[] = [];
+  let effectiveSourceRepo = SOURCE_REPO;
+  let effectiveSourceRef = sourceRef;
+  let catalogSchemaVersion: number = catalogs.firstParty.schemaVersion;
+  let communityEntry: CommunityRegistryEntry | null = null;
 
-  const rendered = await prepareDaemonInstallFiles({
-    entry,
-    ref: sourceRef,
-    catalogClient,
-    installRoot,
-    files: installPlanResult.plan.files,
-    resolution: adaptationResolution.resolution,
-  });
-  if (!rendered.ok) {
-    throw new DaemonInstallPullRequestError({
-      code: 'RENDERED_INSTALL_INVALID',
-      message: `Rendered daemon example '${exampleId}' is invalid.`,
-      errors: rendered.errors,
-    });
+  if (resolved.sourceType === 'community') {
+    if (fileValues.size > 0 || cliValues.size > 0) {
+      throw new DaemonInstallPullRequestError({ code: 'COMMUNITY_ADAPTATIONS_UNSUPPORTED', message: 'Approved community daemons do not accept adaptation inputs.' });
+    }
+    let prepared: Awaited<ReturnType<typeof prepareCommunityInstall>>;
+    try {
+      prepared = await prepareCommunityInstall({ entry: resolved.entry, catalogClient, installRoot });
+    } catch (error) {
+      throw new DaemonInstallPullRequestError({
+        code: error instanceof Error && 'code' in error ? String(error.code) : 'COMMUNITY_SOURCE_FETCH_FAILED',
+        message: normalizeErrorMessage(error),
+      });
+    }
+    if (!prepared.ok) {
+      throw new DaemonInstallPullRequestError({ code: 'COMMUNITY_SOURCE_INVALID', message: `Approved community daemon '${exampleId}' failed source validation.`, errors: prepared.errors });
+    }
+    const daemonFile = prepared.files.find((file) => file.kind === 'daemon')!;
+    entry = communityCatalogExample(resolved.entry, daemonFile.content);
+    installPlanResult = { ok: true, plan: prepared.plan };
+    rendered = { ok: true, files: prepared.files };
+    effectiveSourceRepo = resolved.entry.repositoryUrl.replace('https://github.com/', '');
+    effectiveSourceRef = resolved.entry.commit;
+    catalogSchemaVersion = catalogs.community.schemaVersion;
+    communityEntry = resolved.entry;
+  } else {
+    entry = resolved.entry;
+    const planned = createDaemonInstallPlan({ entry, installRoot });
+    if (!planned.ok) {
+      throw new DaemonInstallPullRequestError({ code: 'INSTALL_PLAN_INVALID', message: `Catalog entry '${exampleId}' cannot be installed safely.`, errors: planned.errors });
+    }
+    installPlanResult = planned;
+    const adaptationResolution = resolveAdaptations({ entry, fileValues, cliValues });
+    if (!adaptationResolution.ok) {
+      throw new DaemonInstallPullRequestError({ code: 'ADAPTATION_INPUTS_INVALID', message: `Adaptation inputs for '${exampleId}' are incomplete or invalid.`, errors: adaptationResolution.errors });
+    }
+    const prepared = await prepareDaemonInstallFiles({ entry, ref: sourceRef, catalogClient, installRoot, files: planned.plan.files, resolution: adaptationResolution.resolution });
+    if (!prepared.ok) {
+      throw new DaemonInstallPullRequestError({ code: 'RENDERED_INSTALL_INVALID', message: `Rendered daemon example '${exampleId}' is invalid.`, errors: prepared.errors });
+    }
+    rendered = prepared;
+    adaptationsApplied = adaptationResolution.resolution.appliedKeys;
   }
 
   const baseBranch = options.base ?? (await getDefaultBranch({ githubClient, repository }));
@@ -953,11 +1069,15 @@ export async function createDaemonInstallPullRequest(
   const targetDirectory = toDisplayPath(installRoot, installPlanResult.plan.destinationDirectory);
   const marker = markerForInstall({
     entry,
-    sourceRef,
-    catalogSchemaVersion: catalog.schemaVersion,
+    sourceType: communityEntry?.sourceType ?? 'first-party',
+    sourceRepo: effectiveSourceRepo,
+    sourceRef: effectiveSourceRef,
+    canonicalSourceUrl: communityEntry?.canonicalSourceUrl ?? entry.source.url,
+    catalogSchemaVersion,
+    communityEntry,
     targetDirectory,
     files: plannedDisplayFiles,
-    adaptationKeys: adaptationResolution.resolution.appliedKeys,
+    adaptationKeys: adaptationsApplied,
     branch: headBranch,
   });
   const markerText = createDaemonInstallMarker(marker);
@@ -985,6 +1105,7 @@ export async function createDaemonInstallPullRequest(
   const title = options.title ?? `Install ${entry.id} daemon`;
   const body = createPullRequestBody({
     entry,
+    communityEntry,
     repository,
     daemon: daemonValidation.daemon,
     markerText,
@@ -1008,16 +1129,16 @@ export async function createDaemonInstallPullRequest(
       status: recovered.status,
       repository: repository.fullName,
       daemonId: entry.id,
-      sourceRepo: SOURCE_REPO,
-      sourceRef,
-      catalogSchemaVersion: catalog.schemaVersion,
+      sourceRepo: effectiveSourceRepo,
+      sourceRef: effectiveSourceRef,
+      catalogSchemaVersion,
       baseBranch,
       headBranch,
       headSha: recovered.pull.head.sha,
       pullRequest: pullInfo(recovered.pull),
       filesPlanned: plannedDisplayFiles,
       filesWritten: plannedDisplayFiles.map((file) => file.destinationPath),
-      adaptationsApplied: adaptationResolution.resolution.appliedKeys,
+      adaptationsApplied,
       marker,
       markerText,
       warnings: [],
@@ -1089,16 +1210,16 @@ export async function createDaemonInstallPullRequest(
       status: recovered.status,
       repository: repository.fullName,
       daemonId: entry.id,
-      sourceRepo: SOURCE_REPO,
-      sourceRef,
-      catalogSchemaVersion: catalog.schemaVersion,
+      sourceRepo: effectiveSourceRepo,
+      sourceRef: effectiveSourceRef,
+      catalogSchemaVersion,
       baseBranch,
       headBranch,
       headSha: recovered.pull.head.sha,
       pullRequest: pullInfo(recovered.pull),
       filesPlanned: plannedDisplayFiles,
       filesWritten: plannedDisplayFiles.map((file) => file.destinationPath),
-      adaptationsApplied: adaptationResolution.resolution.appliedKeys,
+      adaptationsApplied,
       marker,
       markerText,
       warnings: [],
@@ -1132,16 +1253,16 @@ export async function createDaemonInstallPullRequest(
     status: 'created',
     repository: repository.fullName,
     daemonId: entry.id,
-    sourceRepo: SOURCE_REPO,
-    sourceRef,
-    catalogSchemaVersion: catalog.schemaVersion,
+    sourceRepo: effectiveSourceRepo,
+    sourceRef: effectiveSourceRef,
+    catalogSchemaVersion,
     baseBranch,
     headBranch,
     headSha: createdCommit.sha,
     pullRequest: pullInfo(pull),
     filesPlanned: plannedDisplayFiles,
     filesWritten: plannedDisplayFiles.map((file) => file.destinationPath),
-    adaptationsApplied: adaptationResolution.resolution.appliedKeys,
+    adaptationsApplied,
     marker,
     markerText,
     warnings: [],
@@ -1171,7 +1292,7 @@ async function searchMarkerPullRequests(args: {
   try {
     const search = await args.githubClient.request<GitHubSearchIssuesResponse>('GET', '/search/issues', {
       query: {
-        q: `repo:${args.repository.fullName} is:pr in:body ${DAEMON_INSTALL_MARKER_NAME}`,
+        q: `repo:${args.repository.fullName} is:pr in:body charlie-daemon-install-v`,
         per_page: '100',
       },
     });
@@ -1227,7 +1348,7 @@ function listingFromPull(args: { repository: ParsedRepository; pull: GitHubPull 
   return {
     status: classifyPull(args.pull),
     repository: args.repository.fullName,
-    daemonId: marker?.exampleId ?? daemonIdFromBranch(args.pull.head.ref),
+    daemonId: marker ? (marker.version === 1 ? marker.exampleId : marker.daemonId) : daemonIdFromBranch(args.pull.head.ref),
     sourceRepo: marker?.sourceRepo ?? null,
     sourceRef: marker?.sourceRef ?? null,
     catalogSchemaVersion: marker?.catalogSchemaVersion ?? null,

@@ -51,6 +51,23 @@ A single command uses the same ref for `examples.json` and every support-file fe
 
 The v2 catalog uses `schemaVersion: 2`, and the CLI fails closed on unsupported catalog schema versions. When v2 reaches `master`, old `@charlie-labs/daemons@0.0.1` clients that read the default `master` catalog will stop working until they upgrade to `@charlie-labs/daemons@2.0.0` or pin an older compatible ref.
 
+### Approved external daemons
+
+The CLI also reads the approved community registry from the fixed source `charlie-labs/daemon-registry@master:catalog.json`. Registry schema v1 is strict and contains only approved, commit-pinned GitHub sources with a complete reviewed-file manifest.
+
+Approved external slugs participate in `list`, `show`, `add`, and `pr open` alongside first-party examples. First-party slugs are reserved, so a registry collision invalidates the combined catalog rather than shadowing the first-party entry. Arbitrary GitHub URLs are never accepted.
+
+External delivery is fail-closed:
+
+- the registry commit is authoritative and cannot be overridden by `--ref`;
+- source files are fetched only through GitHub tree/blob APIs at the exact 40-character commit;
+- only manifest-listed `DAEMON.md`, same-directory `scripts/**`, and `references/**` paths are fetched;
+- tree truncation, missing or non-blob entries, symlinks, submodules, wrong modes, SHA-256 mismatches, invalid UTF-8, incomplete manifests, and `{{adapt.*}}` tokens are rejected;
+- upstream content is never cloned, checked out, archived, or executed;
+- the complete source artifact is fetched, hashed, decoded, planned, rendered, and runtime-validated before local writes or target-repository GitHub mutations begin.
+
+`show` includes the external source type, repository URL, canonical blob URL, pinned commit, integrations, and complete reviewed file plan. Installs contain only reviewed files under `.agents/daemons/<slug>/`.
+
 ## Commands
 
 ### `daemon list`
@@ -190,7 +207,9 @@ The implementation writes via GitHub's tree, commit, ref, and pull-request REST 
 <!-- charlie-daemon-install-v1 {"adaptationKeys":["package_manager"],"...":"..."} -->
 ```
 
-The marker is used for reconciliation and intentionally stores only adaptation keys, never raw adaptation values. JSON output likewise reports `adaptationsApplied[]` keys only.
+New installs write a `charlie-daemon-install-v2` marker with source type/repository/ref/canonical URL, registry provenance for approved external entries, the reviewed manifest, destination files, and adaptation key names. Reconciliation continues to parse existing v1 markers. Markers never store raw adaptation values; JSON output likewise reports `adaptationsApplied[]` keys only.
+
+For approved external installs, the PR body includes the pinned repository/commit and complete reviewed file hashes so reviewers can verify provenance. The daemon becomes eligible only after the PR is merged to the target default branch and Charlie ingests that merged version.
 
 JSON data includes:
 
