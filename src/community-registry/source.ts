@@ -10,8 +10,11 @@ export type CommunityGitHubClient = {
   request<T>(method: string, path: string, options?: CommunityGitHubRequestOptions): Promise<T>;
 };
 
+type GitCommit = { sha?: string; tree?: { sha?: string } };
 type GitTree = { truncated: boolean; tree: Array<{ path?: string; mode?: string; type?: string; sha?: string }> };
 type GitBlob = { content: string; encoding: string; truncated?: boolean };
+
+const FULL_GIT_SHA_PATTERN = /^[0-9a-f]{40}$/;
 
 export class CommunitySourceError extends Error {
   readonly code: string;
@@ -44,7 +47,15 @@ export async function fetchApprovedCommunitySource(args: {
 }): Promise<CommunitySourceFile[]> {
   const repository = repositoryParts(args.entry.repositoryUrl);
   const basePath = `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.repo)}`;
-  const tree = await args.githubClient.request<GitTree>('GET', `${basePath}/git/trees/${args.entry.commit}`, { query: { recursive: '1' } });
+  const commit = await args.githubClient.request<GitCommit>('GET', `${basePath}/git/commits/${args.entry.commit}`);
+  if (!commit || typeof commit.sha !== 'string' || commit.sha !== args.entry.commit || !FULL_GIT_SHA_PATTERN.test(commit.sha)) {
+    throw new CommunitySourceError({ code: 'COMMUNITY_SOURCE_COMMIT_MISMATCH', message: 'GitHub did not return the exact pinned source commit.' });
+  }
+  const treeSha = commit.tree?.sha;
+  if (typeof treeSha !== 'string' || !FULL_GIT_SHA_PATTERN.test(treeSha)) {
+    throw new CommunitySourceError({ code: 'COMMUNITY_SOURCE_INVALID_TREE_SHA', message: 'GitHub did not return a valid source tree SHA.' });
+  }
+  const tree = await args.githubClient.request<GitTree>('GET', `${basePath}/git/trees/${treeSha}`, { query: { recursive: '1' } });
   if (tree.truncated) {
     throw new CommunitySourceError({ code: 'COMMUNITY_SOURCE_TRUNCATED_TREE', message: 'GitHub returned a truncated source tree.' });
   }
