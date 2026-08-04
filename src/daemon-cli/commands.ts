@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { lstat, mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import {
@@ -389,7 +389,38 @@ async function runCommunityAdd(args: {
       issue({ code: 'INSTALL_COLLISION', message: `Destination already exists: ${collision}`, path: collision })
     ), data);
   }
+  if (args.force) {
+    const expectedDestination = path.resolve(args.installRoot, DEFAULT_DAEMON_ROOT, args.entry.slug);
+    const destinationIsExact = prepared.plan.destinationDirectory === expectedDestination;
+    const filesStayInsideDestination = prepared.files.every((file) => {
+      const relative = path.relative(expectedDestination, file.destinationPath);
+      return relative.length > 0 && !relative.startsWith('..') && !path.isAbsolute(relative);
+    });
+    if (!destinationIsExact || !filesStayInsideDestination) {
+      return dataErrorResult(args.commandName, `Approved community daemon '${args.entry.slug}' has an unsafe install destination.`, [
+        issue({ code: 'INVALID_INSTALL_DESTINATION', message: 'Forced registry installs must stay inside the exact normalized daemon directory.' }),
+      ], data);
+    }
+
+    let parentPath = path.resolve(args.installRoot);
+    for (const segment of DEFAULT_DAEMON_ROOT.split('/')) {
+      parentPath = path.join(parentPath, segment);
+      try {
+        if ((await lstat(parentPath)).isSymbolicLink()) {
+          const displayPath = toDisplayPath(args.installRoot, parentPath);
+          return dataErrorResult(args.commandName, `Approved community daemon '${args.entry.slug}' has an unsafe install destination.`, [
+            issue({ code: 'INVALID_INSTALL_DESTINATION', message: `Install parent '${displayPath}' must not be a symbolic link.`, path: displayPath }),
+          ], data);
+        }
+      } catch (error) {
+        if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
+      }
+    }
+  }
   if (!args.dryRun) {
+    if (args.force) {
+      await rm(prepared.plan.destinationDirectory, { recursive: true, force: true });
+    }
     await mkdir(prepared.plan.destinationDirectory, { recursive: true });
     for (const file of prepared.files) {
       await writeTextFileEnsuringDirectory({ path: file.destinationPath, content: file.content, mode: file.mode });

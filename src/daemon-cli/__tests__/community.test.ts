@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, test } from 'vitest';
@@ -13,6 +13,10 @@ const commit = 'a'.repeat(40);
 const daemon = `---\nid: community-daemon\npurpose: Exercise approved community delivery.\nwatch:\n  - when approved tests run\nroutines:\n  - verify reviewed files\ndeny:\n  - do not execute upstream content\n---\n\n# Community daemon\n\nApproved content.\n`;
 const script = '#!/usr/bin/env bash\necho approved\n';
 const sha = (content: string) => createHash('sha256').update(content).digest('hex');
+const gitBlobSha = (content: string) => {
+  const buffer = Buffer.from(content, 'utf8');
+  return createHash('sha1').update(Buffer.from(`blob ${buffer.length.toString()}\0`, 'utf8')).update(buffer).digest('hex');
+};
 
 const firstParty: ExamplesCatalog = { schemaVersion: 2, source: { repository: 'charlie-labs/daemons', baseDirectory: 'daemons' }, examples: [] };
 const community: CommunityRegistryCatalog = {
@@ -102,6 +106,54 @@ describe('approved registry CLI delivery', () => {
     } finally { await rm(directory, { recursive: true, force: true }); }
   });
 
+  test('local registry add --force replaces only the exact reviewed daemon directory', async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'community-force-add-'));
+    try {
+      const daemonDirectory = path.join(directory, '.agents/daemons/community-daemon');
+      const outsidePath = path.join(directory, '.agents/daemons/other-daemon/keep.txt');
+      await mkdir(path.join(daemonDirectory, 'scripts'), { recursive: true });
+      await mkdir(path.dirname(outsidePath), { recursive: true });
+      await writeFile(path.join(daemonDirectory, 'extra.txt'), 'remove me', 'utf8');
+      await writeFile(path.join(daemonDirectory, 'scripts/old.sh'), 'remove me', 'utf8');
+      await writeFile(outsidePath, 'keep me', 'utf8');
+
+      const added = await runJson(['add', 'community-daemon', '--force'], directory);
+      expect(added.code).toBe(0);
+      expect(added.json.data.overwritten).toBe(true);
+      await expect(readFile(path.join(daemonDirectory, 'extra.txt'), 'utf8')).rejects.toThrow();
+      await expect(readFile(path.join(daemonDirectory, 'scripts/old.sh'), 'utf8')).rejects.toThrow();
+      await expect(readFile(outsidePath, 'utf8')).resolves.toBe('keep me');
+      await expect(readFile(path.join(daemonDirectory, 'DAEMON.md'), 'utf8')).resolves.toBe(daemon);
+      await expect(readFile(path.join(daemonDirectory, 'scripts/run.sh'), 'utf8')).resolves.toBe(script);
+    } finally { await rm(directory, { recursive: true, force: true }); }
+  });
+
+  test('local registry force validates before replacement and rejects symlinked install parents', async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'community-force-boundary-'));
+    const external = await mkdtemp(path.join(tmpdir(), 'community-force-external-'));
+    try {
+      const daemonDirectory = path.join(directory, '.agents/daemons/community-daemon');
+      await mkdir(daemonDirectory, { recursive: true });
+      await writeFile(path.join(daemonDirectory, 'existing.txt'), 'unchanged', 'utf8');
+      const failed = await runJson(['add', 'community-daemon', '--force'], directory, client({ sourceError: new Error('late source failure') }));
+      expect(failed.code).toBe(65);
+      await expect(readFile(path.join(daemonDirectory, 'existing.txt'), 'utf8')).resolves.toBe('unchanged');
+
+      await rm(path.join(directory, '.agents'), { recursive: true, force: true });
+      await mkdir(path.join(directory, '.agents'), { recursive: true });
+      await writeFile(path.join(external, 'keep.txt'), 'outside', 'utf8');
+      await symlink(external, path.join(directory, '.agents/daemons'));
+      const escaped = await runJson(['add', 'community-daemon', '--force'], directory);
+      expect(escaped.code).toBe(65);
+      expect(escaped.json.errors[0].code).toBe('INVALID_INSTALL_DESTINATION');
+      await expect(readFile(path.join(external, 'keep.txt'), 'utf8')).resolves.toBe('outside');
+      await expect(readFile(path.join(external, 'community-daemon/DAEMON.md'), 'utf8')).rejects.toThrow();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+      await rm(external, { recursive: true, force: true });
+    }
+  });
+
   test('rejects collisions, arbitrary URLs, and adaptation input', async () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'community-errors-'));
     try {
@@ -163,6 +215,86 @@ describe('approved registry CLI delivery', () => {
       markerValid: true,
       marker: { version: 2, sourceType: 'first-party', registrySlug: 'community-daemon' },
     });
+  });
+
+  test('registry PR --force deletes inherited extras and reuses the exact open PR', async () => {
+    const calls: Array<{ method: string; path: string; options: any }> = [];
+    let branchExists = false;
+    const pull = {
+      number: 9,
+      title: 'Install community-daemon daemon',
+      html_url: 'https://github.com/acme/target/pull/9',
+      state: 'open',
+      merged_at: null,
+      head: { ref: 'charlie/daemon-installs/community-daemon', sha: 'new-commit' },
+      base: { ref: 'main' },
+    };
+    const baseTree = [
+      { path: '.agents/daemons/community-daemon/DAEMON.md', type: 'blob', mode: '100644', sha: 'old-daemon' },
+      { path: '.agents/daemons/community-daemon/extra.txt', type: 'blob', mode: '100644', sha: 'extra' },
+      { path: '.agents/daemons/community-daemon/link', type: 'blob', mode: '120000', sha: 'link' },
+      { path: '.agents/daemons/community-daemon/vendor', type: 'commit', mode: '160000', sha: 'submodule' },
+      { path: '.agents/daemons/other-daemon/keep.txt', type: 'blob', mode: '100644', sha: 'outside' },
+    ];
+    const exactTree = [
+      { path: '.agents/daemons/community-daemon/DAEMON.md', type: 'blob', mode: '100644', sha: gitBlobSha(daemon) },
+      { path: '.agents/daemons/community-daemon/scripts/run.sh', type: 'blob', mode: '100755', sha: gitBlobSha(script) },
+      { path: '.agents/daemons/other-daemon/keep.txt', type: 'blob', mode: '100644', sha: 'outside' },
+    ];
+    const githubClient: DaemonInstallPrGitHubClient = {
+      async request<T>(method: string, requestPath: string, options?: any): Promise<T> {
+        calls.push({ method, path: requestPath, options });
+        if (method === 'GET' && requestPath.endsWith('/git/ref/heads/charlie/daemon-installs/community-daemon')) {
+          if (!branchExists) throw Object.assign(new Error('missing'), { status: 404 });
+          return { ref: 'refs/heads/charlie/daemon-installs/community-daemon', object: { sha: 'new-commit', type: 'commit' } } as T;
+        }
+        if (method === 'GET' && requestPath.endsWith('/git/ref/heads/main')) return { ref: 'refs/heads/main', object: { sha: 'base', type: 'commit' } } as T;
+        if (method === 'GET' && requestPath.endsWith('/git/commits/base')) return { sha: 'base', tree: { sha: 'base-tree' } } as T;
+        if (method === 'GET' && requestPath.endsWith('/git/trees/base-tree')) return { sha: 'base-tree', tree: baseTree, truncated: false } as T;
+        if (method === 'POST' && requestPath.endsWith('/git/trees')) return { sha: 'new-tree', tree: [] } as T;
+        if (method === 'POST' && requestPath.endsWith('/git/commits')) return { sha: 'new-commit', tree: { sha: 'new-tree' } } as T;
+        if (method === 'POST' && requestPath.endsWith('/git/refs')) {
+          branchExists = true;
+          return { ref: 'refs/heads/charlie/daemon-installs/community-daemon', object: { sha: 'new-commit', type: 'commit' } } as T;
+        }
+        if (method === 'POST' && requestPath.endsWith('/pulls')) return pull as T;
+        if (method === 'GET' && requestPath.endsWith('/git/commits/new-commit')) return { sha: 'new-commit', tree: { sha: 'new-tree' } } as T;
+        if (method === 'GET' && requestPath.endsWith('/git/trees/new-tree')) return { sha: 'new-tree', tree: exactTree, truncated: false } as T;
+        if (method === 'GET' && requestPath.endsWith('/pulls')) return [pull] as T;
+        throw new Error(`unexpected ${method} ${requestPath}`);
+      },
+    };
+
+    const first = await createDaemonInstallPullRequest({ repo: 'acme/target', exampleId: 'community-daemon', base: 'main', force: true, catalogClient: client(), githubClient });
+    expect(first.status).toBe('created');
+    const createTree = calls.find((call) => call.method === 'POST' && call.path.endsWith('/git/trees'))!;
+    expect(createTree.options.body.tree).toEqual(expect.arrayContaining([
+      { path: '.agents/daemons/community-daemon/extra.txt', mode: '100644', type: 'blob', sha: null },
+      { path: '.agents/daemons/community-daemon/link', mode: '120000', type: 'blob', sha: null },
+      { path: '.agents/daemons/community-daemon/vendor', mode: '160000', type: 'commit', sha: null },
+      expect.objectContaining({ path: '.agents/daemons/community-daemon/DAEMON.md', mode: '100644', type: 'blob', content: daemon }),
+      expect.objectContaining({ path: '.agents/daemons/community-daemon/scripts/run.sh', mode: '100755', type: 'blob', content: script }),
+    ]));
+    expect(createTree.options.body.tree).not.toContainEqual(expect.objectContaining({ path: '.agents/daemons/other-daemon/keep.txt' }));
+
+    const second = await createDaemonInstallPullRequest({ repo: 'acme/target', exampleId: 'community-daemon', base: 'main', force: true, catalogClient: client(), githubClient });
+    expect(second.status).toBe('existing_open');
+    expect(second.pullRequest.number).toBe(9);
+    expect(calls.filter((call) => call.method === 'POST' && call.path.endsWith('/git/trees'))).toHaveLength(1);
+  });
+
+  test('registry PR without --force rejects inherited target entries before mutation', async () => {
+    const target = githubTargetClient();
+    const originalRequest = target.request.bind(target);
+    target.request = async <T>(method: string, requestPath: string, options?: any): Promise<T> => {
+      if (method === 'GET' && requestPath.endsWith('/git/trees/base-tree')) {
+        target.calls.push({ method, path: requestPath, options });
+        return { sha: 'base-tree', tree: [{ path: '.agents/daemons/community-daemon/extra.txt', type: 'blob', mode: '100644', sha: 'extra' }], truncated: false } as T;
+      }
+      return await originalRequest<T>(method, requestPath, options);
+    };
+    await expect(createDaemonInstallPullRequest({ repo: 'acme/target', exampleId: 'community-daemon', base: 'main', catalogClient: client(), githubClient: target })).rejects.toMatchObject({ code: 'INSTALL_COLLISION' });
+    expect(target.calls.some((call) => call.method === 'POST')).toBe(false);
   });
 
   test('leaves local destination untouched on late or stale external preparation failure', async () => {

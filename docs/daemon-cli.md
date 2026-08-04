@@ -189,7 +189,7 @@ Options:
 - `--ref <sha|branch|tag>` pins the daemon catalog source ref. It defaults to `master`.
 - `--base <branch>` selects the target PR base branch. If omitted, the GitHub repository default branch is used.
 - `--adapt key=value` and `--adapt-file adaptations.json` use the same structured adaptation rules and precedence as `daemon add`.
-- `--force` allows the PR commit to write catalog-managed install paths even when the target base already contains `.agents/daemons/<example-id>/`. Without `--force`, existing target files or directories are reported as collisions and no branch is created.
+- `--force` allows the PR commit to write catalog-managed install paths even when the target base already contains `.agents/daemons/<example-id>/`. For approved registry daemons, force replaces that daemon subtree exactly with the reviewed manifest; bundled first-party force continues to overwrite only catalog-managed files. Without `--force`, existing target files or directories are reported as collisions and no branch is created.
 
 The command uses `GITHUB_TOKEN` or `GH_TOKEN` for GitHub API authentication. Node callers can pass an explicit token or injected GitHub client to `createDaemonInstallPullRequest()`.
 

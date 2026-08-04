@@ -205,6 +205,11 @@ type GitHubTreeEntry = {
   sha?: string | undefined;
 };
 
+type GitHubTreeCreateEntry =
+  | { path: string; mode: '100644' | '100755'; type: 'blob'; content: string }
+  | { path: string; mode: '100644' | '100755' | '120000'; type: 'blob'; sha: null }
+  | { path: string; mode: '160000'; type: 'commit'; sha: null };
+
 type GitHubTree = {
   sha: string;
   truncated?: boolean | undefined;
@@ -631,13 +636,43 @@ function renderedFilesToDisplay(args: { installRoot: string; files: readonly Ren
   }));
 }
 
-function renderedFilesToTreeEntries(args: { installRoot: string; files: readonly RenderedDaemonInstallFile[] }) {
+function renderedFilesToTreeEntries(args: { installRoot: string; files: readonly RenderedDaemonInstallFile[] }): GitHubTreeCreateEntry[] {
   return args.files.map((file) => ({
     path: toDisplayPath(args.installRoot, file.destinationPath),
     mode: file.mode,
     type: 'blob',
     content: file.content,
   }));
+}
+
+function deletionEntryForInheritedPath(entry: GitHubTreeEntry & { path: string }): GitHubTreeCreateEntry {
+  if (entry.type === 'blob' && (entry.mode === '100644' || entry.mode === '100755' || entry.mode === '120000')) {
+    return { path: entry.path, mode: entry.mode, type: 'blob', sha: null };
+  }
+  if (entry.type === 'commit' && entry.mode === '160000') {
+    return { path: entry.path, mode: '160000', type: 'commit', sha: null };
+  }
+  throw new DaemonInstallPullRequestError({
+    code: 'INSTALL_TARGET_TREE_INVALID',
+    message: `Target tree entry '${entry.path}' has unsupported Git type or mode '${entry.type ?? 'unknown'}:${entry.mode ?? 'unknown'}'.`,
+  });
+}
+
+function registryForceDeletionEntries(args: {
+  baseTree: GitHubTree;
+  targetDirectory: string;
+  expectedPaths: ReadonlySet<string>;
+}): GitHubTreeCreateEntry[] {
+  const targetPrefix = `${args.targetDirectory}/`;
+  return args.baseTree.tree
+    .filter((entry): entry is GitHubTreeEntry & { path: string } =>
+      typeof entry.path === 'string' &&
+      (entry.path === args.targetDirectory || entry.path.startsWith(targetPrefix)) &&
+      entry.type !== 'tree' &&
+      !args.expectedPaths.has(entry.path)
+    )
+    .sort((left, right) => left.path.localeCompare(right.path))
+    .map(deletionEntryForInheritedPath);
 }
 
 function plannedPaths(files: readonly InstallFilePlan[]): string[] {
@@ -898,6 +933,8 @@ async function branchContainsRenderedFiles(args: {
   if (branchTree.truncated) return false;
   const entries = treeEntryMap(branchTree);
   const expectedPaths = new Set(args.files.map((file) => toDisplayPath(args.installRoot, file.destinationPath)));
+  const targetEntry = entries.get(args.targetDirectory);
+  if (targetEntry && targetEntry.type !== 'tree') return false;
   const expectedDirectories = new Set<string>();
   for (const expectedPath of expectedPaths) {
     let directory = path.posix.dirname(expectedPath);
@@ -1228,10 +1265,18 @@ export async function createDaemonInstallPullRequest(
     });
   }
 
+  const renderedTreeEntries = renderedFilesToTreeEntries({ installRoot, files: rendered.files });
+  const deletionEntries = communityEntry && options.force === true
+    ? registryForceDeletionEntries({
+        baseTree,
+        targetDirectory,
+        expectedPaths: new Set(renderedTreeEntries.map((entry) => entry.path)),
+      })
+    : [];
   const createdTree = await githubClient.request<GitHubTree>('POST', pathForRepo(repository, '/git/trees'), {
     body: {
       base_tree: baseCommit.tree.sha,
-      tree: renderedFilesToTreeEntries({ installRoot, files: rendered.files }),
+      tree: [...deletionEntries, ...renderedTreeEntries],
     },
   });
   const createdCommit = await githubClient.request<GitHubCommit>('POST', pathForRepo(repository, '/git/commits'), {
